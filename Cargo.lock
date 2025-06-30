@@ -159,22 +159,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f1fe948ff07f4bd06c30984e69f5b4899c516a3ef74f34df92a2df2ab535495"
 
 [[package]]
-name = "carvi_daic"
-version = "0.1.0"
-dependencies = [
- "bindgen",
- "cc",
- "cmake",
- "cxx",
- "image",
- "is-wsl",
- "memmap2",
- "ndarray",
- "num_cpus",
- "walkdir",
-]
-
-[[package]]
 name = "cc"
 version = "1.2.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -358,6 +342,22 @@ dependencies = [
  "quote",
  "rustversion",
  "syn",
+]
+
+[[package]]
+name = "daic-rs"
+version = "0.1.0"
+dependencies = [
+ "bindgen",
+ "cc",
+ "cmake",
+ "cxx",
+ "image",
+ "is-wsl",
+ "memmap2",
+ "ndarray",
+ "num_cpus",
+ "walkdir",
 ]
 
 [[package]]

@@ -23,8 +23,6 @@ fn main() {
 
     // If depthai-core is not available, we need to build it
     // Build depthai-core library
-
-    // Build bindings
     let path_dir: PathBuf = PathBuf::from(env::var("OUT_DIR").unwrap());
     
 
@@ -57,19 +55,27 @@ fn main() {
     println!("cargo:rustc-link-search=native={}", &depthai_core_dlib.clone().unwrap().parent().unwrap().display());
     println!("cargo:rustc-link-lib=dylib=libdepthai-core.so");
 
-    let daic_include_path_buff = depthai_core_path.clone().join("include");
-    let daic_include_path = String::from(daic_include_path_buff.to_str().unwrap());
-    println_info!("Including depthai-core headers to Bindgen from: {}", daic_include_path.clone());
-    let daic_depthai_include_path = String::from(daic_include_path_buff.join("depthai").to_str().unwrap());
-    println_info!("Including depthai-core depthai headers to Bindgen from: {}", daic_depthai_include_path.clone());
-    let daic_header_path = String::from(daic_include_path_buff.join("depthai").join("depthai.hpp").to_str().unwrap());
-    println_info!("Using depthai-core header for Bindgen: {}", daic_header_path.clone());
+    let binding_needs_regen = Path::new("wrapper").join("bindings.rs").exists();
+    // Build bindings
 
-    let mut includes = vec![
+    if binding_needs_regen == false || env::var("DEPTHAI_FORCE_BINDING_REGEN").is_ok() {
+
+         println_info!("Building bindings for depthai-core...");
+        
+        let daic_include_path_buff = depthai_core_path.clone().join("include");
+        let daic_include_path = String::from(daic_include_path_buff.to_str().unwrap());
+        println_info!("Including depthai-core headers to Bindgen from: {}", daic_include_path.clone());
+        let daic_depthai_include_path = String::from(daic_include_path_buff.join("depthai").to_str().unwrap());
+        println_info!("Including depthai-core depthai headers to Bindgen from: {}", daic_depthai_include_path.clone());
+        let daic_header_path = String::from(daic_include_path_buff.join("depthai").join("depthai.hpp").to_str().unwrap());
+        println_info!("Using depthai-core header for Bindgen: {}", daic_header_path.clone());
+        
+        
+        let mut includes = vec![
         daic_include_path.clone(),
         daic_depthai_include_path.clone(),
         format!("{}/shared/depthai-bootloader-shared/include", depthai_core_path.clone().display()),
-    ];
+        ];
 
     // Walking through the depthai-core deps directory to find all include directories and add them to the bindings
     println_info!("Walking through depthai-core deps directory to find all include directories...");
@@ -103,6 +109,7 @@ fn main() {
     bindings
         .write_to_file(PathBuf::from("./wrapper").join("bindings.rs"))
         .expect("Couldn't write bindings!");
+    }
 
 }
 
