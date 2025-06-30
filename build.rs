@@ -7,6 +7,7 @@ use std::os::unix::process::CommandExt;
 use std::{env, path};
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use walkdir::WalkDir;
 
 macro_rules! println_info {
     ($($tokens: tt)*) => {
@@ -64,17 +65,44 @@ fn main() {
     let daic_header_path = String::from(daic_include_path_buff.join("depthai").join("depthai.hpp").to_str().unwrap());
     println_info!("Using depthai-core header for Bindgen: {}", daic_header_path.clone());
 
+    let mut includes = vec![
+        daic_include_path.clone(),
+        daic_depthai_include_path.clone(),
+        format!("{}/shared/depthai-bootloader-shared/include", depthai_core_path.clone().display()),
+    ];
+
+    // Walking through the depthai-core deps directory to find all include directories and add them to the bindings
+    println_info!("Walking through depthai-core deps directory to find all include directories...");
+    for entry in WalkDir::new(&build_dir.join("_deps")) {
+        let entry = entry.expect("Failed to read entry in depthai-core deps directory");
+        if entry.file_type().is_dir() {
+            let path = entry.path();
+            if path.join("include").exists() {
+                let include_path = path.join("include");
+
+                let canonical = include_path.canonicalize()
+                    .expect("Failed to canonicalize include path");
+
+                includes.push(canonical.to_str().unwrap().to_string());
+            }
+        }
+    }
+
+    println_info!("Found the following include directories: {:?}", includes);
+
     let bindings: Bindings = bindgen::Builder::default()
         .header((daic_header_path.clone()))
         .clang_arg(format!("-I{}", daic_include_path.clone()))
         .clang_arg(format!("-I{}", daic_depthai_include_path.clone()))
         .clang_arg("-std=c++17")
+        .clang_args(includes.iter().map(|s| format!("-I{}", s)))
         .generate()
         .expect("Unable to generate bindings");
 
-    // bindings
-    //     .write_to_file(destBuf::from(path_dir).join("bindings.rs"))
-    //     .expect("Couldn't write bindings!");
+
+    bindings
+        .write_to_file(PathBuf::from("./wrapper").join("bindings.rs"))
+        .expect("Couldn't write bindings!");
 
 }
 
@@ -126,10 +154,6 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
     let status = Command::new("cmake")
         .arg("--build")
         .arg(path.clone())
-        .arg("--target")
-        .arg("depthai-core")
-        .arg("--config")
-        .arg("Release")
         .arg("--parallel")
         .arg(parallel_builds.clone())
         .arg("--")
