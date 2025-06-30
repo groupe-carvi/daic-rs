@@ -1,4 +1,4 @@
-# carvi_daic
+# daic-rs
 A Rust wrapper for Luxonis DepthAI-Core
 
 # Requirements
