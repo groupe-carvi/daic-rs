@@ -3,4 +3,16 @@ name = "carvi_daic"
 version = "0.1.0"
 edition = "2024"
 
+
 [dependencies]
+cxx = "1.0.160"
+image = "0.25.6"
+memmap2 = "0.9.5"
+ndarray = "0.16.1"
+
+[build-dependencies]
+bindgen = "0.72.0"
+cc = "1.2.27"
+cmake = "0.1.54"
+num_cpus = "1.17.0"
+is-wsl = "0.4.0"
