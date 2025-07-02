@@ -1,7 +1,9 @@
 # daic-rs
 A Rust wrapper for Luxonis DepthAI-Core
 
-# Requirements
+# Environement Setuo
+
+## Linux
 
 ```sh
 # Install dependencies
