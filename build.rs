@@ -90,6 +90,7 @@ fn main() {
         let daic_header_path = String::from(daic_include_path_buff.join("depthai").join("depthai.hpp").to_str().unwrap());
         println_build!("Using depthai-core header for Bindgen: {}", daic_header_path.clone());
         let wrapper_header_path = String::from(PROJECT_ROOT.join("wrapper").join("wrapper.h").to_str().unwrap());
+        println_build!("Using wrapper header for Bindgen: {}", wrapper_header_path.clone());
         
         
         let mut includes = vec![
@@ -126,10 +127,15 @@ fn main() {
 
      let bindings: Bindings;
 
+     if let wrapper_path = PathBuf::from(wrapper_header_path.clone()) {
+     }
+
     if cfg!(target_os = "linux") {
 
     bindings = bindgen::Builder::default()
-        .header((daic_header_path.clone()))
+        .header((wrapper_header_path.clone()))
+        .clang_arg("-x")
+        .clang_arg("c++")
         .clang_arg(format!("-I{}", daic_include_path.clone()))
         .clang_arg(format!("-I{}", daic_depthai_include_path.clone()))
         .clang_arg("-std=c++17")
@@ -139,10 +145,12 @@ fn main() {
     }
     else if cfg!(target_os = "windows") {
         println_build!("Generating bindings for Windows...");
-        println_build!("Using depthai-core header for Bindgen: {}", daic_header_path.clone());
+        println_build!("Using depthai-core header for Bindgen: {}", wrapper_header_path.clone());
         println_build!("Including depthai-core headers to Bindgen from: {}", includes.iter().map(|s| format!("-I{}", s)).collect::<Vec<String>>().join(", "));
         bindings = bindgen::Builder::default()
         .header((wrapper_header_path.clone()))
+        .clang_arg("-x")
+        .clang_arg("c++")
         .clang_arg("-std=c++17")
         .clang_args(includes.iter().map(|s| format!("-I{}", s)))
         .generate()
