@@ -45,7 +45,7 @@ fn main() {
             Ok(depthai_core_dlib) => {
                 println_build!("Resolved depthai-core path: {}", depthai_core_dlib.display());
                    // Link the depthai-core as a dynamic library
-                println!("cargo:rustc-link-search=native={}", &depthai_core_dlib.display());
+                println!("cargo:rustc-link-search=native={}", &depthai_core_dlib.parent().unwrap().display());
                 println!("cargo:rustc-link-lib=dylib=libdepthai-core.so");
             }
             Err(e) => {
@@ -144,7 +144,7 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
 
     println_build!("Using {} parallel builds", parallel_builds);
 
-        refresh_env();
+       // refresh_env();
 
     let ninja_available = is_tool_available("ninja", "--version");
     if ninja_available {
@@ -153,15 +153,11 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         println_build!("Ninja is not available, falling back to Make.");
     }
 
-    println_build!("Starting CMake configuration...");
-
     let mut cmd: Output;
 
     if ninja_available {
-
-    }
-    else if cfg!(target_os = "windows") {
-        cmd = Command::new("cmake")
+          println_build!("Starting CMake configuration...");
+         cmd = Command::new("cmake")
         .arg("-S")
         .arg(get_depthai_core_root().clone())
         .arg("-B")
@@ -170,11 +166,12 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         .arg("-DDEPTHAI_OPENCV_SUPPORT=OFF")
         .arg("-DBUILD_SHARED_LIBS=ON")
         .arg("-G")
-        .arg("\"MinGW Makefiles\"")
+        .arg("Ninja")
         .output()
         .expect("Failed to run CMake configuration for depthai-core");
     }
     else {
+          println_build!("Starting CMake configuration...");
         cmd = Command::new("cmake")
         .arg("-S")
         .arg(get_depthai_core_root().clone())
@@ -194,6 +191,8 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
     let status: ExitStatus;
 
     if ninja_available {
+        // If Ninja is available, use it for the build process
+        println_build!("Using Ninja for the build process.");
         status = Command::new("cmake")
         .arg("--build")
         .arg(path.clone())
@@ -221,12 +220,11 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
 
     // Return the path to the built library
 
-    let dst = path.clone();
-    dst.join("libdepthai-core.so");
+    let dst = path.clone().join("libdepthai-core.so");
     println_build!("Built depthai-core library at: {}", dst.display());
 
 
-    return Some(dst.parent().unwrap().to_path_buf());
+    return Some(dst);
 }
 
 fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
@@ -243,34 +241,37 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
         }
     };
 
-    if get_depthai_core_root().exists() {
-        println_build!("Depthai-core found in : {}", get_depthai_core_root().display());
-    }
-    else if cfg!(target_os = "windows"){
-        // Since we are on Windows, we will download the prebuilt depthai-core library
-        println_build!("DEPTHAI_CORE_ROOT is not set, will try to download prebuilt depthai-core library.");
-        match get_daic_windows_prebuilt_binary()
-        {
-            Ok(depthai_core_install) => {
-                println_build!("Resolved depthai-core path: {}", depthai_core_install.display());
-                
-                match probe_depthai_core_dlib(depthai_core_install.clone())
-                {
-                    Some(dlib) => {
-                        println_build!("Found depthai-core dynamic library at: {}", dlib.display());
-                        return Ok(dlib);
-                    }
-                    None => {
-                        panic!("Failed to find depthai-core dynamic library after downloading prebuilt binary.");
+    if cfg!(target_os = "windows"){
+        // If DEPTHAI_CORE_ROOT is not set, we will try to download the prebuilt depthai-core library
+        if !get_depthai_core_root().exists() {
+
+            println_build!("DEPTHAI_CORE_ROOT is not set, will try to download prebuilt depthai-core library.");
+            match get_daic_windows_prebuilt_binary()
+            {
+                Ok(depthai_core_install) => {
+                    println_build!("Resolved depthai-core path: {}", depthai_core_install.display());
+                    
+                    match probe_depthai_core_dlib(depthai_core_install.clone())
+                    {
+                        Some(dlib) => {
+                            println_build!("Found depthai-core dynamic library at: {}", dlib.display());
+                            return Ok(dlib);
+                        }
+                        None => {
+                            panic!("Failed to find depthai-core dynamic library after downloading prebuilt binary.");
+                        }
                     }
                 }
+                Err(e) => {
+                    panic!("Failed to resolve depthai-core path: {}", e);
+                }
             }
-            Err(e) => {
-                panic!("Failed to resolve depthai-core path: {}", e);
             }
         }
-    }
     else if cfg!(target_os = "linux") {
+
+        if !get_depthai_core_root().exists() {
+
         // If DEPTHAI_CORE_ROOT is not set, we will try to clone the depthai-core repository
             let daic_clone_dir = BUILD_FOLDER_PATH.join("depthai-core");
 
@@ -287,15 +288,13 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 println_build!("Failed to clone depthai-core repository, path does not exist: {}", daic_clone_dir
                     .display());
             }
-
+        }
+            
             let depthai_core_dlib = cmake_build_depthai_core(BUILD_FOLDER_PATH.clone());
             println_build!("Built depthai-core dynamic library at: {}", depthai_core_dlib.clone().unwrap().display());
 
             return Ok(depthai_core_dlib.unwrap());
         }
-
-    // Check if the depthai-core dynamic library is already available
-    println_build!("Checking for depthai-core dynamic library...");
 
         return Err("Failed to resolve depthai-core dynamic library path");
 }
@@ -309,6 +308,15 @@ fn probe_depthai_core_dlib(out: PathBuf) -> Option<PathBuf> {
     }
     let w = walkdir::WalkDir::new(&out)
         .into_iter()
+         .filter_entry(|entry| {
+            // Skip any entry whose file name is ".git"
+            entry.file_name() != ".git" && entry.file_name() != "include" && 
+            entry.file_name() != "tests" && entry.file_name() != "examples" &&
+            entry.file_name() != "3rdparty" && entry.file_name() != "cmake" &&
+            entry.file_name() != "src" && entry.file_name() != "bindings" &&
+            entry.file_name() != ".github" && entry.file_name() != "shared" &&
+            entry.file_name() != "vcpkg" && entry.file_name() != "_deps"
+            })
         .filter_map(|e| e.ok())
         .find(|e| {
             let path = e.path();

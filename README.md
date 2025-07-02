@@ -8,7 +8,7 @@ A Rust wrapper for Luxonis DepthAI-Core
 ```sh
 # Install dependencies
 
-sudo apt -y install libclang-dev cmake ninja-build python3 autoconf automake autoconf-archive libudev-dev libtool clang
+sudo apt -y install libclang-dev cmake ninja-build python3 autoconf automake autoconf-archive libudev-dev libtool clang libssl-dev
 ```
 
 # Build
