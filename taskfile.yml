@@ -6,8 +6,10 @@ tasks:
     cmd: cargo build -vvv
   gen-binding:
     cmds:
-      - bindgen ./wrapper/wrapper.h -o generated/bindings.rs -- -I./builds/depthai-core/include
-    platforms: [windows/amd64]
+      - cmd: bindgen ./wrapper/wrapper.h -o generated/bindings.rs -- -I./builds/depthai-core/include
+        platforms: [windows/amd64]
+      - cmd: bindgen ./wrapper/wrapper.h -o generated/bindings.rs -- -I./builds/depthai-core/include -I./builds/_deps/include
+        platforms: [linux]
 
   install-bindgen:
     cmds:
