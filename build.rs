@@ -12,6 +12,12 @@ use walkdir::WalkDir;
 use once_cell::sync::Lazy;
 use zip_extensions as zip;
 
+static PROJECT_ROOT: Lazy<PathBuf> = Lazy::new(|| {
+    PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| {
+        env::current_dir().unwrap().to_str().unwrap().to_string()
+    }))
+});
+
 static BUILD_FOLDER_PATH: Lazy<PathBuf> = Lazy::new(|| {
     PathBuf::from(env::current_dir().unwrap()).join("builds")
 });
@@ -60,6 +66,21 @@ fn main() {
     if binding_needs_regen == true{
 
          println_build!("Building bindings for depthai-core...");
+
+          let mut deps_includes_path: PathBuf;
+    if BUILD_FOLDER_PATH.join("_deps").exists() == true {
+        deps_includes_path = BUILD_FOLDER_PATH.join("_deps");
+        println_build!("Found depthai-core deps directory at: {}", deps_includes_path.display());
+    } else if get_depthai_core_root().join("include").exists() == true {
+        deps_includes_path = get_depthai_core_root().join("include");
+        println_build!("Using depthai-core deps directory at: {}", deps_includes_path.display());
+    }
+    else {
+        deps_includes_path = PathBuf::from(env::var("DEPTHAI_CORE_DEPS_INCLUDE_PATH").unwrap_or_else(|_| {
+            BUILD_FOLDER_PATH.join("_deps").to_str().unwrap().to_string()
+        }));
+        println_build!("Using depthai-core deps directory from environment variable: {}", deps_includes_path.display());
+    }
         
         let daic_include_path_buff = get_depthai_core_root().clone().join("include");
         let daic_include_path = String::from(daic_include_path_buff.to_str().unwrap());
@@ -68,17 +89,24 @@ fn main() {
         println_build!("Including depthai-core depthai headers to Bindgen from: {}", daic_depthai_include_path.clone());
         let daic_header_path = String::from(daic_include_path_buff.join("depthai").join("depthai.hpp").to_str().unwrap());
         println_build!("Using depthai-core header for Bindgen: {}", daic_header_path.clone());
+        let wrapper_header_path = String::from(PROJECT_ROOT.join("wrapper").join("wrapper.h").to_str().unwrap());
         
         
         let mut includes = vec![
-        daic_include_path.clone(),
-        daic_depthai_include_path.clone(),
-        format!("{}/shared/depthai-bootloader-shared/include", get_depthai_core_root().clone().display()),
+        daic_include_path.clone()
         ];
 
-    // Walking through the depthai-core deps directory to find all include directories and add them to the bindings
+        
+        if cfg!(target_os = "linux") {
+            // If not on Windows, add the depthai-core include path
+            includes.push(format!("{}/shared/depthai-bootloader-shared/include", get_depthai_core_root().clone().display()));
+            includes.push(daic_depthai_include_path.clone(),);
+        };
+
+      // Walking through the depthai-core deps directory to find all include directories and add them to the bindings
     println_build!("Walking through depthai-core deps directory to find all include directories...");
-    for entry in WalkDir::new(&BUILD_FOLDER_PATH.join("_deps")) {
+    
+    for entry in WalkDir::new(&deps_includes_path) {
         let entry = entry.expect("Failed to read entry in depthai-core deps directory");
         if entry.file_type().is_dir() {
             let path = entry.path();
@@ -87,6 +115,7 @@ fn main() {
 
                 let canonical = include_path.canonicalize()
                     .expect("Failed to canonicalize include path");
+                println_build!("Found include directory: {}", canonical.display());
 
                 includes.push(canonical.to_str().unwrap().to_string());
             }
@@ -95,7 +124,11 @@ fn main() {
 
     println_build!("Found the following include directories: {:?}", includes);
 
-    let bindings: Bindings = bindgen::Builder::default()
+     let bindings: Bindings;
+
+    if cfg!(target_os = "linux") {
+
+    bindings = bindgen::Builder::default()
         .header((daic_header_path.clone()))
         .clang_arg(format!("-I{}", daic_include_path.clone()))
         .clang_arg(format!("-I{}", daic_depthai_include_path.clone()))
@@ -103,6 +136,21 @@ fn main() {
         .clang_args(includes.iter().map(|s| format!("-I{}", s)))
         .generate()
         .expect("Unable to generate bindings");
+    }
+    else if cfg!(target_os = "windows") {
+        println_build!("Generating bindings for Windows...");
+        println_build!("Using depthai-core header for Bindgen: {}", daic_header_path.clone());
+        println_build!("Including depthai-core headers to Bindgen from: {}", includes.iter().map(|s| format!("-I{}", s)).collect::<Vec<String>>().join(", "));
+        bindings = bindgen::Builder::default()
+        .header((wrapper_header_path.clone()))
+        .clang_arg("-std=c++17")
+        .clang_args(includes.iter().map(|s| format!("-I{}", s)))
+        .generate()
+        .expect("Unable to generate bindings");
+    }
+    else {
+        panic!("Unsupported target OS for bindings generation");
+    }
 
     if GEN_FOLDER_PATH.exists() {
         println_build!("Generated bindings directory already exists, writing bindings to it.");
