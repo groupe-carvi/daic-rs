@@ -53,8 +53,8 @@ fn main() {
             }
         }
 
-    let binding_needs_regen = GEN_FOLDER_PATH.join("bindings.rs").exists() &&
-        env::var("DEPTHAI_FORCE_BINDING_REGEN").is_err();
+    let binding_needs_regen = !GEN_FOLDER_PATH.join("bindings.rs").exists() ||
+        env::var("DEPTHAI_FORCE_BINDING_REGEN").is_ok();
     // Build bindings
 
     if binding_needs_regen == true{
@@ -104,12 +104,21 @@ fn main() {
         .generate()
         .expect("Unable to generate bindings");
 
-
+    if GEN_FOLDER_PATH.exists() {
+        println_build!("Generated bindings directory already exists, writing bindings to it.");
+    } else {
+        println_build!("Generated bindings directory does not exist, creating it.");
+        fs::create_dir_all(GEN_FOLDER_PATH.clone()).expect("Failed to create generated bindings directory");
+    }
+    // Write the bindings to the file
+    println_build!("Writing bindings to file: {}", GEN_FOLDER_PATH.join("bindings.rs").display());
     bindings
-        .write_to_file(PathBuf::from("./wrapper").join("bindings.rs"))
+        .write_to_file(PathBuf::from(GEN_FOLDER_PATH.clone()).join("bindings.rs"))
         .expect("Couldn't write bindings!");
     }
-
+    else {
+        println_build!("Skipping bindings generation, already exists and DEPTHAI_FORCE_BINDING_REGEN is not set.");
+    }
 }
 
 /// Build the depthai-core library using CMake.
