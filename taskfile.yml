@@ -1,0 +1,14 @@
+version: '3'
+
+tasks:
+  build:
+    desc: Build the crate with verbose output to debug
+    cmd: cargo build -vvv
+  gen-binding:
+    cmds:
+      - bindgen ./wrapper/wrapper.h -o generated/bindings.rs -- -I./builds/depthai-core/include
+    platforms: [windows/amd64]
+
+  install-bindgen:
+    cmds:
+      - cargo install bindgen-cli

@@ -1,4 +1,4 @@
-// depthai_core_wrapper.h
+// wrapper.h
 #pragma once
 
 #ifdef __cplusplus
