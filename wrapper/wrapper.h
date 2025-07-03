@@ -1,5 +1,10 @@
-// wrapper.h
 #pragma once
+
+#ifdef _WIN32
+#define API __declspec(dllexport)
+#else
+#define API
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -7,9 +12,8 @@ extern "C" {
 
 typedef void* DeviceHandle;
 
-DeviceHandle device_create(const char* name);
-void device_start(DeviceHandle handle);
-void device_destroy(DeviceHandle handle);
+API DeviceHandle device_create(const char* name);
+API void device_destroy(DeviceHandle handle);
 
 #ifdef __cplusplus
 }

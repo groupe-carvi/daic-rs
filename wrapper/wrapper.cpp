@@ -8,11 +8,6 @@ DeviceHandle device_create(const char* name) {
     return reinterpret_cast<DeviceHandle>(new Device(std::string(name)));
 }
 
-void device_start(DeviceHandle handle) {
-    auto device = reinterpret_cast<Device*>(handle);
-    device->start();
-}
-
 void device_destroy(DeviceHandle handle) {
     auto device = reinterpret_cast<Device*>(handle);
     delete device;

@@ -27,4 +27,6 @@ target/
 
 /builds
 
+# Generated files
 /generated
+/src/bindings/bindings.rs

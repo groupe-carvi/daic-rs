@@ -1,15 +1,17 @@
 #![allow(warnings)]
 
 use bindgen::Bindings;
-use cmake::{Config};
-use std::fmt::format;
-use std::fs::{self, File};
-use std::sync::RwLock;
-use std::{env, io, path};
-use std::path::{Path, PathBuf};
-use std::process::{Command, ExitStatus, Output};
-use walkdir::WalkDir;
+use cmake::Config;
 use once_cell::sync::Lazy;
+use std::{
+    env,
+    fs::{self, File},
+    io::{self, Read, Write},
+    path::{Path, PathBuf},
+    process::{Command, ExitStatus, Output},
+    sync::RwLock,
+};
+use walkdir::WalkDir;
 use zip_extensions as zip;
 
 static PROJECT_ROOT: Lazy<PathBuf> = Lazy::new(|| {
@@ -18,17 +20,19 @@ static PROJECT_ROOT: Lazy<PathBuf> = Lazy::new(|| {
     }))
 });
 
-static BUILD_FOLDER_PATH: Lazy<PathBuf> = Lazy::new(|| {
-    PathBuf::from(env::current_dir().unwrap()).join("builds")
-});
+static BUILD_FOLDER_PATH: Lazy<PathBuf> =
+    Lazy::new(|| env::current_dir().unwrap().join("builds"));
 
-static GEN_FOLDER_PATH: Lazy<PathBuf> = Lazy::new(|| {
-    PathBuf::from(env::current_dir().unwrap()).join("generated")
-});
+static GEN_FOLDER_PATH: Lazy<PathBuf> =
+    Lazy::new(|| env::current_dir().unwrap().join("generated"));
 
 static DEPTHAI_CORE_ROOT: Lazy<RwLock<PathBuf>> = Lazy::new(|| {
     RwLock::new(PathBuf::from(env::var("DEPTHAI_CORE_ROOT").unwrap_or_else(|_| {
-        BUILD_FOLDER_PATH.join("depthai-core").to_str().unwrap().to_string()
+        BUILD_FOLDER_PATH
+            .join("depthai-core")
+            .to_str()
+            .unwrap()
+            .to_string()
     })))
 });
 
@@ -37,416 +41,583 @@ const DEPTHAI_CORE_REPOSITORY: &str = "https://github.com/luxonis/depthai-core.g
 const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-core/releases/download/v3.0.0-rc.2/depthai-core-v3.0.0-rc.2-win64.zip";
 
 macro_rules! println_build {
-    ($($tokens: tt)*) => {
+    ($($tokens:tt)*) => {
         println!("cargo:warning=\r\x1b[32;1m   {}", format!($($tokens)*))
     }
 }
 
 fn main() {
-    // Check if depthai-core is already available
+    println_build!("Checking for depthai-core...");
 
-    println_build!("Checking for depthai-core... ");
+    let depthai_core_lib = resolve_depthai_core_lib()
+        .expect("Failed to resolve depthai-core path");
 
-        match resolve_depthai_core_lib() {
-            Ok(depthai_core_dlib) => {
-                println_build!("Resolved depthai-core path: {}", depthai_core_dlib.display());
-                   // Link the depthai-core as a dynamic library
-                println!("cargo:rustc-link-search=native={}", &depthai_core_dlib.parent().unwrap().display());
-                println!("cargo:rustc-link-lib=dylib=libdepthai-core.so");
-            }
-            Err(e) => {
-                panic!("Failed to resolve depthai-core path: {}", e);
-            }
-        }
+    build_wrapper_cpp();
 
-    let binding_needs_regen = !GEN_FOLDER_PATH.join("bindings.rs").exists() ||
-        env::var("DEPTHAI_FORCE_BINDING_REGEN").is_ok();
-    // Build bindings
+    generate_bindings_if_needed();
 
-    if binding_needs_regen == true{
-
-         println_build!("Building bindings for depthai-core...");
-
-          let mut deps_includes_path: PathBuf;
-    if BUILD_FOLDER_PATH.join("_deps").exists() == true {
-        deps_includes_path = BUILD_FOLDER_PATH.join("_deps");
-        println_build!("Found depthai-core deps directory at: {}", deps_includes_path.display());
-    } else if get_depthai_core_root().join("include").exists() == true {
-        deps_includes_path = get_depthai_core_root().join("include");
-        println_build!("Using depthai-core deps directory at: {}", deps_includes_path.display());
+    // ➡ ajoute cette ligne ici
+    if cfg!(target_os = "windows") {
+        download_and_prepare_opencv();
     }
-    else {
-        deps_includes_path = PathBuf::from(env::var("DEPTHAI_CORE_DEPS_INCLUDE_PATH").unwrap_or_else(|_| {
-            BUILD_FOLDER_PATH.join("_deps").to_str().unwrap().to_string()
-        }));
-        println_build!("Using depthai-core deps directory from environment variable: {}", deps_includes_path.display());
-    }
-        
-        let daic_include_path_buff = get_depthai_core_root().clone().join("include");
-        let daic_include_path = String::from(daic_include_path_buff.to_str().unwrap());
-        println_build!("Including depthai-core headers to Bindgen from: {}", daic_include_path.clone());
-        let daic_depthai_include_path = String::from(daic_include_path_buff.join("depthai").to_str().unwrap());
-        println_build!("Including depthai-core depthai headers to Bindgen from: {}", daic_depthai_include_path.clone());
-        let daic_header_path = String::from(daic_include_path_buff.join("depthai").join("depthai.hpp").to_str().unwrap());
-        println_build!("Using depthai-core header for Bindgen: {}", daic_header_path.clone());
-        let wrapper_header_path = String::from(PROJECT_ROOT.join("wrapper").join("wrapper.h").to_str().unwrap());
-        println_build!("Using wrapper header for Bindgen: {}", wrapper_header_path.clone());
-        
-        
-        let mut includes = vec![
-        daic_include_path.clone()
+
+    if cfg!(target_os = "windows") {
+        let dlls = [
+            "depthai-core.dll",
+            "libusb-1.0.dll",
+            "opencv_world4110.dll",
         ];
 
-        
-        if cfg!(target_os = "linux") {
-            // If not on Windows, add the depthai-core include path
-            includes.push(format!("{}/shared/depthai-bootloader-shared/include", get_depthai_core_root().clone().display()));
-            includes.push(daic_depthai_include_path.clone(),);
-        };
+        for dll in dlls {
+            let dll_path = get_depthai_core_root()
+                .join("bin")
+                .join(dll);
 
-      // Walking through the depthai-core deps directory to find all include directories and add them to the bindings
-    println_build!("Walking through depthai-core deps directory to find all include directories...");
-    
-    for entry in WalkDir::new(&deps_includes_path) {
-        let entry = entry.expect("Failed to read entry in depthai-core deps directory");
-        if entry.file_type().is_dir() {
-            let path = entry.path();
-            if path.join("include").exists() {
-                let include_path = path.join("include");
+            if dll_path.exists() {
+                let out_dir = env::var("OUT_DIR").unwrap();
+                let target_dir = Path::new(&out_dir)
+                    .ancestors()
+                    .nth(3)
+                    .unwrap();
 
-                let canonical = include_path.canonicalize()
-                    .expect("Failed to canonicalize include path");
-                println_build!("Found include directory: {}", canonical.display());
+                let debug_dir = target_dir;
+                let deps_dir = debug_dir.join("deps");
 
-                includes.push(canonical.to_str().unwrap().to_string());
+                println_build!("Copying {} to {:?}", dll, debug_dir);
+                fs::create_dir_all(&debug_dir).expect("Failed to create debug dir");
+                fs::copy(&dll_path, debug_dir.join(dll))
+                    .expect(&format!("Failed to copy {} to debug dir", dll));
+
+                println_build!("Copying {} to {:?}", dll, deps_dir);
+                fs::create_dir_all(&deps_dir).expect("Failed to create deps dir");
+                fs::copy(&dll_path, deps_dir.join(dll))
+                    .expect(&format!("Failed to copy {} to deps dir", dll));
+            } else {
+                println_build!("DLL not found: {:?}", dll_path);
             }
+        }
+
+        let bin_path = get_depthai_core_root().join("bin");
+
+        println!(
+            "cargo:rustc-env=PATH={}{}{}",
+            bin_path.display(),
+            ";",
+            env::var("PATH").unwrap()
+        );
+    } else {
+        println_build!("Linux build configuration complete.");
+    }
+}
+
+
+
+
+fn build_wrapper_cpp() {
+    let mut build = cc::Build::new();
+    build.cpp(true);
+    build.file(PROJECT_ROOT.join("wrapper").join("wrapper.cpp"));
+
+    for include in get_depthai_includes() {
+        build.include(include);
+    }
+
+    if cfg!(target_os = "windows") {
+        build.flag("/std:c++17");
+    } else {
+        build.flag("-std=c++17");
+    }
+
+    build.compile("wrapper");
+}
+
+fn get_depthai_includes() -> Vec<PathBuf> {
+    let mut includes = vec![
+        get_depthai_core_root().join("include"),
+        get_depthai_core_root().join("include").join("depthai"),
+    ];
+
+    // Linux-only additional include
+    if cfg!(target_os = "linux") {
+        let bootloader = get_depthai_core_root()
+            .join("shared")
+            .join("depthai-bootloader-shared")
+            .join("include");
+        if bootloader.exists() {
+            includes.push(bootloader);
         }
     }
 
-    println_build!("Found the following include directories: {:?}", includes);
+    includes
+}
 
-     let bindings: Bindings;
+fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
+    let header_size = 6144; // header size known for OpenCV exe
 
-     if let wrapper_path = PathBuf::from(wrapper_header_path.clone()) {
-     }
+    let mut file = File::open(exe_path)
+        .expect("Failed to open OpenCV exe");
 
-    if cfg!(target_os = "linux") {
+    let mut buf = Vec::new();
+    file.read_to_end(&mut buf)
+        .expect("Failed to read OpenCV exe");
 
-    bindings = bindgen::Builder::default()
-        .header((wrapper_header_path.clone()))
-        .clang_arg("-x")
-        .clang_arg("c++")
-        .clang_arg(format!("-I{}", daic_include_path.clone()))
-        .clang_arg(format!("-I{}", daic_depthai_include_path.clone()))
-        .clang_arg("-std=c++17")
-        .clang_args(includes.iter().map(|s| format!("-I{}", s)))
-        .generate()
-        .expect("Unable to generate bindings");
-    }
-    else if cfg!(target_os = "windows") {
-        println_build!("Generating bindings for Windows...");
-        println_build!("Using depthai-core header for Bindgen: {}", wrapper_header_path.clone());
-        println_build!("Including depthai-core headers to Bindgen from: {}", includes.iter().map(|s| format!("-I{}", s)).collect::<Vec<String>>().join(", "));
-        bindings = bindgen::Builder::default()
-        .header((wrapper_header_path.clone()))
-        .clang_arg("-x")
-        .clang_arg("c++")
-        .clang_arg("-std=c++17")
-        .clang_args(includes.iter().map(|s| format!("-I{}", s)))
-        .generate()
-        .expect("Unable to generate bindings");
-    }
-    else {
-        panic!("Unsupported target OS for bindings generation");
+    if buf.len() <= header_size {
+        panic!("Exe file too small, cannot strip header.");
     }
 
-    if GEN_FOLDER_PATH.exists() {
-        println_build!("Generated bindings directory already exists, writing bindings to it.");
+    let seven_z_data = &buf[header_size..];
+
+    let mut out_file = File::create(out_7z_path)
+        .expect("Failed to create .7z output file");
+    out_file.write_all(seven_z_data)
+        .expect("Failed to write stripped .7z file");
+}
+
+fn generate_bindings_if_needed() {
+    let bindings_rs = GEN_FOLDER_PATH.join("bindings.rs");
+
+    let binding_needs_regen =
+        !bindings_rs.exists() || env::var("DEPTHAI_FORCE_BINDING_REGEN") == Ok("true".into());
+
+    if binding_needs_regen {
+        println_build!("Building bindings for depthai-core...");
+
+        let mut includes: Vec<String> = get_depthai_includes()
+            .into_iter()
+            .map(|p| format!("-I{}", p.display()))
+            .collect();
+
+        let deps_includes_path = resolve_deps_includes();
+        println_build!(
+            "Walking through depthai-core deps directory: {}",
+            deps_includes_path.display()
+        );
+
+        for entry in WalkDir::new(&deps_includes_path) {
+            let entry = entry.expect("Failed to read entry in depthai-core deps directory");
+            if entry.file_type().is_dir() && entry.path().join("include").exists() {
+                let canonical = entry
+                    .path()
+                    .join("include")
+                    .canonicalize()
+                    .expect("Failed to canonicalize include path");
+                println_build!("Found include directory: {}", canonical.display());
+                includes.push(format!("-I{}", canonical.display()));
+            }
+        }
+
+        // dedup
+        includes.sort();
+        includes.dedup();
+
+        let wrapper_header_path =
+            PROJECT_ROOT.join("wrapper").join("wrapper.h").to_str().unwrap().to_string();
+
+        println_build!("Using wrapper header for Bindgen: {}", wrapper_header_path);
+        println_build!("Includes for Bindgen: {:?}", includes);
+
+        let mut builder = bindgen::Builder::default()
+            .header(wrapper_header_path.clone())
+            .clang_arg("-x")
+            .clang_arg("c++")
+            .clang_arg("-std=c++17")
+            .parse_callbacks(Box::new(bindgen::CargoCallbacks));
+
+        for include_arg in &includes {
+            builder = builder.clang_arg(include_arg);
+        }
+
+        let bindings = builder
+            .generate()
+            .expect("Unable to generate bindings");
+
+        if !GEN_FOLDER_PATH.exists() {
+            fs::create_dir_all(GEN_FOLDER_PATH.clone())
+                .expect("Failed to create generated bindings directory");
+        }
+
+        println_build!(
+            "Writing bindings to file: {}",
+            bindings_rs.display()
+        );
+
+        bindings
+            .write_to_file(&bindings_rs)
+            .expect("Couldn't write bindings!");
     } else {
-        println_build!("Generated bindings directory does not exist, creating it.");
-        fs::create_dir_all(GEN_FOLDER_PATH.clone()).expect("Failed to create generated bindings directory");
-    }
-    // Write the bindings to the file
-    println_build!("Writing bindings to file: {}", GEN_FOLDER_PATH.join("bindings.rs").display());
-    bindings
-        .write_to_file(PathBuf::from(GEN_FOLDER_PATH.clone()).join("bindings.rs"))
-        .expect("Couldn't write bindings!");
-    }
-    else {
         println_build!("Skipping bindings generation, already exists and DEPTHAI_FORCE_BINDING_REGEN is not set.");
     }
 }
 
-/// Build the depthai-core library using CMake.
-/// /// # Arguments
-/// * `path` - Optional path to the destination directory where the library will
-///   be built and copied. If not provided, it defaults to the path_DIR environment variable
-///   or the current directory if that is not set.
-/// /// # Returns
-/// * `Option<PathBuf>` - The path to the directory containing the built library if successful, or None
-////// # Panics
-/// This function will panic if the CMake build process fails or if the
-/// library cannot be copied to the destination directory.
-////// # Example
-/// ```
-/// cmake_build_depthai_core(Some(PathBuf::from("/path/to/destination")));
-/// ```
-///
-/// # Note
-/// This function assumes that the CMakeLists.txt file is present in the
-/// `src/depthai-core` directory and that the necessary build tools are installed
-/// on the system.
-fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
-    // Build depthai-core dynamically
-    println_build!("Building depthai-core into dynamic library in {}...", path.display());
-
-     let mut parallel_builds = (num_cpus::get() as f32 * 0.80).ceil().to_string();
-
-    if is_wsl() {
-        println_build!("Running on WSL, limiting parallel builds to 4 to avoid issues with WSL file system performance.");
-        parallel_builds = "4".to_string();
+fn download_and_prepare_opencv() {
+    if !cfg!(target_os = "windows") {
+        return;
     }
 
-    println_build!("Using {} parallel builds", parallel_builds);
+    let opencv_dll = get_depthai_core_root()
+        .join("bin")
+        .join("opencv_world4110.dll");
 
-       // refresh_env();
+    if opencv_dll.exists() {
+        println_build!("opencv_world4110.dll already present, skipping download.");
+        return;
+    }
 
-    let ninja_available = is_tool_available("ninja", "--version");
-    if ninja_available {
-        println_build!("Ninja is available, using it for the build process.");
+    println_build!("opencv_world4110.dll not found, proceeding to download OpenCV prebuilt binaries...");
+
+    let opencv_url = "https://github.com/opencv/opencv/releases/download/4.1.1/opencv-4.1.1-vc14_vc15.exe";
+
+    let temp_dir = BUILD_FOLDER_PATH.join("opencv_download");
+    let opencv_exe_path = temp_dir.join("opencv-4.1.1-vc14_vc15.exe");
+
+    if !opencv_exe_path.exists() {
+        fs::create_dir_all(&temp_dir).expect("Failed to create temp dir for OpenCV download");
+
+        println_build!("Downloading OpenCV from {}", opencv_url);
+
+        let downloaded = download_file(opencv_url, &temp_dir)
+            .expect("Failed to download OpenCV prebuilt binary");
+
+        fs::rename(downloaded, &opencv_exe_path)
+            .expect("Failed to rename downloaded OpenCV exe");
     } else {
-        println_build!("Ninja is not available, falling back to Make.");
+        println_build!("OpenCV exe already downloaded at {:?}", opencv_exe_path);
     }
 
-    let mut cmd: Output;
+    let extract_path = temp_dir.join("opencv");
+    if !extract_path.exists() {
+        println_build!("Extracting OpenCV exe to {:?}", extract_path);
 
-    if ninja_available {
-          println_build!("Starting CMake configuration...");
-         cmd = Command::new("cmake")
-        .arg("-S")
-        .arg(get_depthai_core_root().clone())
-        .arg("-B")
-        .arg(path.clone())
-        .arg("-DCMAKE_BUILD_TYPE=Release")
-        .arg("-DDEPTHAI_OPENCV_SUPPORT=OFF")
-        .arg("-DBUILD_SHARED_LIBS=ON")
-        .arg("-G")
-        .arg("Ninja")
-        .output()
-        .expect("Failed to run CMake configuration for depthai-core");
-    }
-    else {
-          println_build!("Starting CMake configuration...");
-        cmd = Command::new("cmake")
-        .arg("-S")
-        .arg(get_depthai_core_root().clone())
-        .arg("-B")
-        .arg(path.clone())
-        .arg("-DCMAKE_BUILD_TYPE=Release")
-        .arg("-DDEPTHAI_OPENCV_SUPPORT=OFF")
-        .arg("-DBUILD_SHARED_LIBS=ON")
-        .output()
-        .expect("Failed to run CMake configuration for depthai-core");
-    }
-
-    println_build!("CMake configuration complete, building depthai-core...");
-
-    // Build the project
-
-    let status: ExitStatus;
-
-    if ninja_available {
-        // If Ninja is available, use it for the build process
-        println_build!("Using Ninja for the build process.");
-        status = Command::new("cmake")
-        .arg("--build")
-        .arg(path.clone())
-        .arg("--parallel")
-        .arg(parallel_builds.clone())
-        .arg("--")
-        .arg("-j")
-        .arg(parallel_builds.clone())
-        .status()
-        .expect("Failed to build depthai-core with CMake");
-        
-    } else {
-        status = Command::new("cmake")
-        .arg("--build")
-        .arg(path.clone())
-        .arg("--parallel")
-        .arg(parallel_builds.clone())
-        .status()
-        .expect("Failed to build depthai-core with CMake");
-    }
+        let status = Command::new(opencv_exe_path.clone())
+            .arg("/SILENT")
+            .arg(format!("/DIR={}", extract_path.display()))
+            .status()
+            .expect("Failed to execute OpenCV installer");
 
         if !status.success() {
-        panic!("Failed to build depthai-core with CMake: {}", String::from_utf8_lossy(status.to_string().as_ref()));
+            panic!("OpenCV installer failed with exit code: {:?}", status);
+        }
+    } else {
+        println_build!("OpenCV already extracted at {:?}", extract_path);
     }
 
-    // Return the path to the built library
+    // Locate the DLL
+    let dll_path = extract_path
+        .join("build")
+        .join("x64")
+        .join("vc15")
+        .join("bin")
+        .join("opencv_world411.dll");
 
-    let dst = path.clone().join("libdepthai-core.so");
-    println_build!("Built depthai-core library at: {}", dst.display());
+    if !dll_path.exists() {
+        panic!("opencv_world411.dll not found in extracted files at {:?}", dll_path);
+    }
 
+    // Copy and rename to opencv_world4110.dll
+    println_build!("Copying and renaming OpenCV DLL...");
 
-    return Some(dst);
+    let dest_path = get_depthai_core_root()
+        .join("bin")
+        .join("opencv_world4110.dll");
+
+    fs::copy(&dll_path, &dest_path)
+        .expect("Failed to copy opencv_world411.dll");
+
+    println_build!("OpenCV DLL copied to {:?}", dest_path);
+}
+
+fn resolve_deps_includes() -> PathBuf {
+    let build_deps = BUILD_FOLDER_PATH.join("_deps");
+    let core_include = get_depthai_core_root().join("include");
+
+    if build_deps.exists() {
+        println_build!("Found depthai-core deps directory at: {}", build_deps.display());
+        build_deps
+    } else if core_include.exists() {
+        println_build!("Using depthai-core include directory at: {}", core_include.display());
+        core_include
+    } else {
+        let fallback = PathBuf::from(
+            env::var("DEPTHAI_CORE_DEPS_INCLUDE_PATH").unwrap_or_else(|_| {
+                build_deps.to_str().unwrap().to_string()
+            }),
+        );
+        println_build!("Using depthai-core deps path from environment variable: {}", fallback.display());
+        fallback
+    }
 }
 
 fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
+    // D'abord, tente de détecter un build déjà présent
+    if let Some(found_lib) = probe_depthai_core_lib(BUILD_FOLDER_PATH.clone()) {
+        println_build!("Found depthai-core library at: {}", found_lib.display());
 
-    // Check if depthai-core is already available
-    match probe_depthai_core_dlib(BUILD_FOLDER_PATH.clone())
-    {
-        Some(dlib) => {
-            println_build!("Found depthai-core dynamic library at: {}", dlib.display());
-            return Ok(dlib);
-        }
-        None => {
-            println_build!("Depthai-core dynamic library not found, proceeding to resolve depthai-core path.");
-        }
-    };
-
-    if cfg!(target_os = "windows"){
-        // If DEPTHAI_CORE_ROOT is not set, we will try to download the prebuilt depthai-core library
-        if !get_depthai_core_root().exists() {
-
-            println_build!("DEPTHAI_CORE_ROOT is not set, will try to download prebuilt depthai-core library.");
-            match get_daic_windows_prebuilt_binary()
+        if cfg!(target_os = "windows") {
+            // Si c'est une DLL, chercher la .lib à côté
+            if found_lib
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|ext| ext.eq_ignore_ascii_case("dll"))
+                .unwrap_or(false)
             {
-                Ok(depthai_core_install) => {
-                    println_build!("Resolved depthai-core path: {}", depthai_core_install.display());
-                    
-                    match probe_depthai_core_dlib(depthai_core_install.clone())
-                    {
-                        Some(dlib) => {
-                            println_build!("Found depthai-core dynamic library at: {}", dlib.display());
-                            return Ok(dlib);
-                        }
-                        None => {
-                            panic!("Failed to find depthai-core dynamic library after downloading prebuilt binary.");
-                        }
-                    }
+                let lib_path = found_lib
+                    .parent() // bin
+                    .and_then(|p| p.parent()) // depthai-core
+                    .map(|p| p.join("lib").join("depthai-core.lib"))
+                    .ok_or("Could not construct path to depthai-core.lib")?;
+
+                if !lib_path.exists() {
+                    panic!(
+                        "Found depthai-core.dll but depthai-core.lib not found at expected location: {}",
+                        lib_path.display()
+                    );
                 }
-                Err(e) => {
-                    panic!("Failed to resolve depthai-core path: {}", e);
-                }
-            }
-            }
-        }
-    else if cfg!(target_os = "linux") {
 
-        if !get_depthai_core_root().exists() {
+                println_build!(
+                    "Using Windows import library for linking: {}",
+                    lib_path.display()
+                );
+                println!(
+                    "cargo:rustc-link-search=native={}",
+                    lib_path.parent().unwrap().display()
+                );
+                println!("cargo:rustc-link-lib=depthai-core");
 
-        // If DEPTHAI_CORE_ROOT is not set, we will try to clone the depthai-core repository
-            let daic_clone_dir = BUILD_FOLDER_PATH.join("depthai-core");
-
-            println_build!("DEPTHAI_CORE_ROOT is not set and none found, will clone depthai-core to: {}", daic_clone_dir.display());
-            clone_repository(DEPTHAI_CORE_REPOSITORY, &daic_clone_dir)
-            .expect("Failed to clone depthai-core repository");
-            if daic_clone_dir.exists() {
-                println_build!("Successfully cloned depthai-core repository to: {}", daic_clone_dir.display());
-                if daic_clone_dir != get_depthai_core_root(){
-                let mut new_path = DEPTHAI_CORE_ROOT.write().unwrap();
-                *new_path = daic_clone_dir.clone();
-            }
+                // Retourne le chemin vers la .lib (pour d'éventuels usages ultérieurs)
+                return Ok(lib_path);
+            } else if found_lib
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|ext| ext.eq_ignore_ascii_case("lib"))
+                .unwrap_or(false)
+            {
+                // On a directement trouvé la .lib
+                println!(
+                    "cargo:rustc-link-search=native={}",
+                    found_lib.parent().unwrap().display()
+                );
+                println!("cargo:rustc-link-lib=depthai-core");
+                return Ok(found_lib);
             } else {
-                println_build!("Failed to clone depthai-core repository, path does not exist: {}", daic_clone_dir
-                    .display());
+                return Err("Unsupported library type found on Windows.");
+            }
+        } else {
+            // Linux
+            println!(
+                "cargo:rustc-link-search=native={}",
+                found_lib.parent().unwrap().display()
+            );
+            println!("cargo:rustc-link-lib=static=depthai-core");
+            return Ok(found_lib);
+        }
+    }
+
+    println_build!("Depthai-core library not found, proceeding to build or download...");
+
+    if cfg!(target_os = "windows") {
+        if !get_depthai_core_root().exists() {
+            println_build!("DEPTHAI_CORE_ROOT not set, downloading prebuilt depthai-core...");
+
+            let depthai_core_install = get_daic_windows_prebuilt_binary()
+                .map_err(|_| "Failed to download prebuilt depthai-core.")?;
+
+            // Après extraction, probe à nouveau
+            if let Some(lib) = probe_depthai_core_lib(depthai_core_install.clone()) {
+                return resolve_depthai_core_lib();
+            } else {
+                panic!("Failed to find depthai-core after downloading prebuilt binary.");
             }
         }
-            
-            let depthai_core_dlib = cmake_build_depthai_core(BUILD_FOLDER_PATH.clone());
-            println_build!("Built depthai-core dynamic library at: {}", depthai_core_dlib.clone().unwrap().display());
+    } else if cfg!(target_os = "linux") {
+        if !get_depthai_core_root().exists() {
+            let clone_path = BUILD_FOLDER_PATH.join("depthai-core");
 
-            return Ok(depthai_core_dlib.unwrap());
+            println_build!(
+                "Cloning depthai-core repository to {}...",
+                clone_path.display()
+            );
+
+            clone_repository(DEPTHAI_CORE_REPOSITORY, &clone_path)
+                .expect("Failed to clone depthai-core repository");
+
+            let mut new_path = DEPTHAI_CORE_ROOT.write().unwrap();
+            *new_path = clone_path.clone();
+
+            println_build!(
+                "Updated DEPTHAI_CORE_ROOT to {}",
+                new_path.display()
+            );
         }
 
-        return Err("Failed to resolve depthai-core dynamic library path");
+        let built_lib =
+            cmake_build_depthai_core(BUILD_FOLDER_PATH.clone())
+                .expect("Failed to build depthai-core via CMake.");
+
+        println_build!(
+            "Built depthai-core static library at: {}",
+            built_lib.display()
+        );
+
+        println!(
+            "cargo:rustc-link-search=native={}",
+            built_lib.parent().unwrap().display()
+        );
+        println!("cargo:rustc-link-lib=static=depthai-core");
+
+        return Ok(built_lib);
+    }
+
+    Err("Failed to resolve depthai-core library path.")
 }
 
-fn probe_depthai_core_dlib(out: PathBuf) -> Option<PathBuf> {
-    // Check if the depthai-core dynamic library is already available
-    println_build!("Probing for depthai-core dynamic library in: {}", out.display());
+
+fn probe_depthai_core_lib(out: PathBuf) -> Option<PathBuf> {
+    println_build!("Probing for depthai-core library in: {}", out.display());
     if !out.exists() {
-        println_build!("Output directory does not exist: {}", out.display());
         return None;
     }
-    let w = walkdir::WalkDir::new(&out)
+
+    let w = WalkDir::new(&out)
         .into_iter()
-         .filter_entry(|entry| {
-            // Skip any entry whose file name is ".git"
-            entry.file_name() != ".git" && entry.file_name() != "include" && 
-            entry.file_name() != "tests" && entry.file_name() != "examples" &&
-            entry.file_name() != "3rdparty" && entry.file_name() != "cmake" &&
-            entry.file_name() != "src" && entry.file_name() != "bindings" &&
-            entry.file_name() != ".github" && entry.file_name() != "shared" &&
-            entry.file_name() != "vcpkg" && entry.file_name() != "_deps"
-            })
+        .filter_entry(|entry| {
+            entry.file_name() != ".git"
+                && entry.file_name() != "include"
+                && entry.file_name() != "tests"
+                && entry.file_name() != "examples"
+                && entry.file_name() != "bindings"
+        })
         .filter_map(|e| e.ok())
         .find(|e| {
             let path = e.path();
-            if path.is_dir() {
-                println_build!("Scanning Directory: {}", path.display());
-            }
-
-            if path.is_file() && (path.file_name().map_or(false, |n| n == "libdepthai-core.so" || n == "depthai-core.dll")) {
-                return true;
-            }
-            false
+            path.is_file()
+                && matches!(
+                    path.file_name().and_then(|n| n.to_str()),
+                    Some("libdepthai-core.a")
+                        | Some("libdepthai-core.so")
+                        | Some("depthai-core.lib")
+                        | Some("depthai-core.dll")
+                )
         });
 
-    if let Some(entry) = w {
-        let dlib_path = entry.path().to_path_buf();
-        println_build!("Found depthai-core dynamic library at: {}", dlib_path.display());
-        return Some(dlib_path);
-    }
-
-    return None;
+    w.map(|entry| entry.path().to_path_buf())
 }
 
-fn is_wsl() -> bool {
-    // Check if the current environment is WSL
-    if cfg!(target_os = "linux") {
-        if let Ok(wsl) = std::env::var("WSL_DISTRO_NAME") {
-            println_build!("Running on WSL: {}", wsl);
-            return true;
-        }
+fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
+    println_build!("Building depthai-core in {}...", path.display());
+
+    let mut parallel_builds =
+        (num_cpus::get() as f32 * 0.80).ceil().to_string();
+
+    if is_wsl() {
+        println_build!("Running on WSL, limiting parallel builds to 4.");
+        parallel_builds = "4".to_string();
     }
-    false
+
+    let ninja_available = is_tool_available("ninja", "--version");
+    let generator = if ninja_available { "Ninja" } else { "Unix Makefiles" };
+
+    let mut cmd = Command::new("cmake");
+    cmd.arg("-S")
+        .arg(get_depthai_core_root().clone())
+        .arg("-B")
+        .arg(&path)
+        .arg("-DCMAKE_BUILD_TYPE=Release")
+        .arg("-DDEPTHAI_OPENCV_SUPPORT=OFF")
+        .arg("-G")
+        .arg(generator);
+
+    let output = cmd
+        .output()
+        .expect("Failed to run CMake configuration");
+
+    println_build!(
+        "CMake output:\n{}",
+        String::from_utf8_lossy(&output.stdout)
+    );
+
+    let status = Command::new("cmake")
+        .arg("--build")
+        .arg(&path)
+        .arg("--parallel")
+        .arg(&parallel_builds)
+        .status()
+        .expect("Failed to build depthai-core with CMake");
+
+    if !status.success() {
+        panic!("Failed to build depthai-core.");
+    }
+
+    let dst = path.join("libdepthai-core.a");
+    println_build!("Built depthai-core library at: {}", dst.display());
+
+    Some(dst)
 }
 
-fn is_tool_available(tool: &str, vers_cmd: &str) -> bool {
-    let output = Command::new(tool)
-        .arg(vers_cmd)
-        .output();
-    match output {
-        Ok(output) => output.status.success(),
-        Err(_) => false,
+fn get_daic_windows_prebuilt_binary() -> Result<PathBuf, String> {
+    let mut zip_path = BUILD_FOLDER_PATH.join("depthai-core.zip");
+
+    if !zip_path.exists() {
+        let downloaded = download_file(DEPTHAI_CORE_WINPREBUILT_URL, BUILD_FOLDER_PATH.as_path())?;
+        zip_path.set_file_name(downloaded.file_name().unwrap());
+        fs::rename(&downloaded, &zip_path);
+        println_build!("Downloaded prebuilt depthai-core to: {}", downloaded.display());
     }
+
+    println_build!("Extracting prebuilt depthai-core...");
+    let extracted_path = BUILD_FOLDER_PATH.join("depthai-core");
+
+    if !extracted_path.exists() {
+        zip::zip_extract(
+            &zip_path,
+            &BUILD_FOLDER_PATH,
+        )
+        .expect("Failed to extract prebuilt depthai-core");
+
+        let inner_folder = BUILD_FOLDER_PATH.join(
+            zip_path
+                .file_stem()
+                .expect("zip has no stem")
+                .to_str()
+                .unwrap(),
+        );
+
+        fs::rename(&inner_folder, &extracted_path)
+            .expect("Failed to rename extracted folder");
+
+        fs::remove_file(&zip_path).expect("Failed to remove zip archive");
+    }
+
+    let mut new_path = DEPTHAI_CORE_ROOT.write().unwrap();
+    *new_path = extracted_path.clone();
+
+    Ok(extracted_path)
 }
 
-fn refresh_env() {
-    // Refresh the environment variables
-    if cfg!(target_os = "windows") {
-        // On Windows, use the refresh_env.cmd script
-        Command::new("cmd")
-            .args(["/c", "'./scripts/refresh_env.cmd'"])
-            .status()
-            .expect("Failed to refresh environment variables");
-    } else {
-        // On Unix-like systems, we can use the `env` command
-        Command::new("env")
-            .status()
-            .expect("Failed to refresh environment variables");
+fn download_file(url: &str, dest_dir: &Path) -> Result<PathBuf, String> {
+    if !dest_dir.exists() {
+        fs::create_dir_all(dest_dir).map_err(|e| format!("Failed to create directory: {}", e))?;
     }
-}
 
-fn get_depthai_core_root() -> PathBuf {
-    DEPTHAI_CORE_ROOT.read().unwrap().to_path_buf()
+    let response = reqwest::blocking::get(url)
+        .map_err(|e| format!("Failed to download file: {}", e))?;
+
+    if !response.status().is_success() {
+        return Err(format!("Failed to download file: {}", response.status()));
+    }
+
+    let file_name = url.split('/').last().unwrap_or("downloaded_file");
+    let dest_path = dest_dir.join(file_name);
+
+    println_build!("Saving downloaded file to: {}", dest_path.display());
+
+    let mut file = File::create(&dest_path).map_err(|e| format!("Failed to create file: {}", e))?;
+    io::copy(&mut response.bytes().unwrap().as_ref(), &mut file)
+        .map_err(|e| format!("Failed to write file: {}", e))?;
+
+    Ok(dest_path)
 }
 
 fn clone_repository(repo_url: &str, dest_path: &Path) -> Result<(), String> {
-    // Clone the repository to the specified destination path
     let status = Command::new("git")
         .args(["clone", "--recurse-submodules", repo_url])
         .arg(dest_path)
@@ -460,106 +631,24 @@ fn clone_repository(repo_url: &str, dest_path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// Download a file from the specified URL to the destination path
-/// # Arguments
-/// * `url` - The URL of the file to download
-/// * `dest_dir` - The path where the downloaded file will be saved
-/// # Returns
-/// * `Ok(PathBuf)` - The path to the downloaded file if successful
-/// * `Err(String)` - An error message if the download fails
-/// # Example
-/// ```
-/// let url = "https://example.com/file.zip";
-/// let dest_path = PathBuf::from("path/to/save/file.zip");
-/// let result = download_file(url, &dest_path);
-/// if let Ok(path) = result {
-///     println!("File downloaded successfully to: {}", path.display());
-/// } else {
-///    println!("Failed to download file: {}", result.err().unwrap());
-/// }
-/// /// # Note
-/// This function will create the destination directory if it does not exist.
-/// If the destination file already exists, it will return an error.
-/// /// # Panics
-/// This function will panic if the destination path has no parent directory or if the file cannot be
-/// created.
-/// It will also panic if the download fails or if the file cannot be written.
-fn download_file(url: &str, dest_dir: &Path) -> Result<PathBuf, String> {
-    
-    // Ensure the destination directory exists\
-    if !dest_dir.exists() {
-        
-        fs::create_dir_all(dest_dir)
-        .map_err(|e| format!("Failed to create directory: {}", e))?;
-    }
-
-    // Download a file from the specified URL to the destination path
-    let response = reqwest::blocking::get(url)
-        .map_err(|e| format!("Failed to download file: {}", e))?;
-
-    if !response.status().is_success() {
-        return Err(format!("Failed to download file: {}", response.status()));
-    }
-
-    let file_name = url.split('/').last().unwrap_or("downloaded_file");
-    let dest_path = dest_dir.join(file_name);
-
-    println_build!("Saving downloaded file to: {}", dest_path.display());
-
-    let mut file = File::create(dest_path.clone())
-        .map_err(|e| format!("Failed to create file: {}", e))?;
-    
-    io::copy(&mut response.bytes().unwrap().as_ref(), &mut file)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
-
-    Ok(dest_path.to_path_buf())
+fn is_tool_available(tool: &str, vers_cmd: &str) -> bool {
+    Command::new(tool)
+        .arg(vers_cmd)
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
 }
 
-fn get_daic_windows_prebuilt_binary() -> Result<PathBuf, String> {
-    let mut prebuilt_binary_archive: Option<PathBuf> = None;
-    if(!BUILD_FOLDER_PATH.join("depthai-core.zip").exists()) {
-        //Downloading prebuilt depthai-core
-        match download_file(DEPTHAI_CORE_WINPREBUILT_URL, BUILD_FOLDER_PATH.as_path()) {
-            Ok(path) => {
-                prebuilt_binary_archive = Some(path);
-                println_build!("Downloaded prebuilt depthai-core to: {}", prebuilt_binary_archive.clone().unwrap().display());
-            }
-            Err(e) => {
-                return Err(format!("Failed to download prebuilt depthai-core: {}", e));
-            }
+fn is_wsl() -> bool {
+    if cfg!(target_os = "linux") {
+        if let Ok(wsl) = std::env::var("WSL_DISTRO_NAME") {
+            println_build!("Running on WSL: {}", wsl);
+            return true;
         }
     }
+    false
+}
 
-    // Extract the prebuilt depthai-core library
-    println_build!("Extracting prebuilt depthai-core library...");
-    if !BUILD_FOLDER_PATH.join("depthai-core").exists() {
-        zip_extensions::zip_extract(
-            &BUILD_FOLDER_PATH.clone().join(prebuilt_binary_archive.clone().unwrap()),
-            &BUILD_FOLDER_PATH.clone(),
-        )
-        .expect("Failed to extract prebuilt depthai-core library");
-
-        let extracted_path = BUILD_FOLDER_PATH.join(prebuilt_binary_archive.clone().unwrap().file_stem().unwrap());
-
-        println_build!("Extracted prebuilt depthai-core library to: {}", extracted_path.display());
-
-        // Remove the prebuilt depthai-core zip file
-        println_build!("Removing prebuilt depthai-core zip file...");
-        fs::remove_file(BUILD_FOLDER_PATH.join(prebuilt_binary_archive.clone().unwrap()))
-            .expect("Failed to remove prebuilt depthai-core zip file");
-
-        // Rename the extracted directory to depthai-core
-        println_build!("Renaming {} to depthai-core...", extracted_path.clone().display());
-        fs::rename(&extracted_path, BUILD_FOLDER_PATH.join("depthai-core"))
-            .expect("Failed to rename extracted depthai-core directory");
-
-        println_build!("Renamed {} to depthai-core", extracted_path.clone().display());
-        // Set the DEPTHAI_CORE_ROOT constant to the new path
-        let mut new_path = DEPTHAI_CORE_ROOT.write().unwrap();
-        *new_path = BUILD_FOLDER_PATH.join("depthai-core");
-
-        return Ok(BUILD_FOLDER_PATH.join("depthai-core"));
-    }
-
-    return Err("Failed to extract prebuilt depthai-core library".to_string());
+fn get_depthai_core_root() -> PathBuf {
+    DEPTHAI_CORE_ROOT.read().unwrap().to_path_buf()
 }

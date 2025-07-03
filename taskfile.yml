@@ -3,7 +3,15 @@ version: '3'
 tasks:
   build:
     desc: Build the crate with verbose output to debug
-    cmd: cargo build -vvv
+    cmds:
+      - cmd: set RUSTFLAGS=-C link-args=/VERBOSE
+      - cmd: cargo build -vvv
+  clean-build:
+    desc: Build the crate with verbose output to debug
+    cmds:
+      - cmd: set RUSTFLAGS=-C link-args=/VERBOSE
+      - cmd: cargo clean
+      - cmd: cargo build -vvv
   gen-binding:
     cmds:
       - cmd: bindgen ./wrapper/wrapper.h -o generated/bindings.rs -- -I./builds/depthai-core/include
