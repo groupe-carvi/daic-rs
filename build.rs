@@ -40,6 +40,8 @@ const DEPTHAI_CORE_REPOSITORY: &str = "https://github.com/luxonis/depthai-core.g
 
 const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-core/releases/download/v3.0.0-rc.2/depthai-core-v3.0.0-rc.2-win64.zip";
 
+const OPENCV_WIN_PREBUILT_URL: &str = "https://github.com/opencv/opencv/releases/download/4.11.0/opencv-4.11.0-windows.exe";
+
 macro_rules! println_build {
     ($($tokens:tt)*) => {
         println!("cargo:warning=\r\x1b[32;1m   {}", format!($($tokens)*))
@@ -47,6 +49,7 @@ macro_rules! println_build {
 }
 
 fn main() {
+    println!("cargo:rerun-if-changed=wrapper/");
     println_build!("Checking for depthai-core...");
 
     let depthai_core_lib = resolve_depthai_core_lib()
@@ -176,8 +179,7 @@ fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
 fn generate_bindings_if_needed() {
     let bindings_rs = GEN_FOLDER_PATH.join("bindings.rs");
 
-    let binding_needs_regen =
-        !bindings_rs.exists() || env::var("DEPTHAI_FORCE_BINDING_REGEN") == Ok("true".into());
+    let binding_needs_regen = true; // TODO: Put behind a cargo feature or environment variable
 
     if binding_needs_regen {
         println_build!("Building bindings for depthai-core...");
@@ -254,28 +256,49 @@ fn download_and_prepare_opencv() {
         return;
     }
 
-    let opencv_dll = get_depthai_core_root()
+    let opencv_dll_file = "opencv_world4110.dll";
+
+    {let dll = get_depthai_core_root()
         .join("bin")
         .join("opencv_world4110.dll");
 
-    if opencv_dll.exists() {
+
+    if dll.exists() {
         println_build!("opencv_world4110.dll already present, skipping download.");
         return;
-    }
+    }}
 
     println_build!("opencv_world4110.dll not found, proceeding to download OpenCV prebuilt binaries...");
 
-    let opencv_url = "https://github.com/opencv/opencv/releases/download/4.1.1/opencv-4.1.1-vc14_vc15.exe";
+    let extraction_dir = BUILD_FOLDER_PATH.join("opencv_download");
+    let opencv_exe_path = extraction_dir.join(OPENCV_WIN_PREBUILT_URL.split('/').last().unwrap());
+    let extract_path = extraction_dir.join("opencv");
+    let dll_path = extract_path
+        .join("build")
+        .join("x64")
+        .join("vc16")
+        .join("bin")
+        .join(opencv_dll_file);
 
-    let temp_dir = BUILD_FOLDER_PATH.join("opencv_download");
-    let opencv_exe_path = temp_dir.join("opencv-4.1.1-vc14_vc15.exe");
+    if dll_path.exists() {
+        println_build!("{} already exists at {:?}",opencv_dll_file.clone() ,dll_path);
+        return;
+    }
 
     if !opencv_exe_path.exists() {
-        fs::create_dir_all(&temp_dir).expect("Failed to create temp dir for OpenCV download");
+        println_build!("OpenCV exe is not downloaded {:?}", opencv_exe_path);
 
-        println_build!("Downloading OpenCV from {}", opencv_url);
+        if !extraction_dir.exists() {
+            println_build!("Creating extraction directory: {:?}", extraction_dir);
+            fs::create_dir_all(&extraction_dir)
+                .expect("Failed to create temp dir for OpenCV download");
+        } else {
+            println_build!("Extraction directory already exists: {:?}", extraction_dir);
+        }
 
-        let downloaded = download_file(opencv_url, &temp_dir)
+        println_build!("Downloading OpenCV from {}", OPENCV_WIN_PREBUILT_URL);
+
+        let downloaded = download_file(OPENCV_WIN_PREBUILT_URL, &extraction_dir)
             .expect("Failed to download OpenCV prebuilt binary");
 
         fs::rename(downloaded, &opencv_exe_path)
@@ -284,8 +307,7 @@ fn download_and_prepare_opencv() {
         println_build!("OpenCV exe already downloaded at {:?}", opencv_exe_path);
     }
 
-    let extract_path = temp_dir.join("opencv");
-    if !extract_path.exists() {
+    if !extract_path.exists() && opencv_exe_path.exists() {
         println_build!("Extracting OpenCV exe to {:?}", extract_path);
 
         let status = Command::new(opencv_exe_path.clone())
@@ -301,16 +323,8 @@ fn download_and_prepare_opencv() {
         println_build!("OpenCV already extracted at {:?}", extract_path);
     }
 
-    // Locate the DLL
-    let dll_path = extract_path
-        .join("build")
-        .join("x64")
-        .join("vc15")
-        .join("bin")
-        .join("opencv_world411.dll");
-
     if !dll_path.exists() {
-        panic!("opencv_world411.dll not found in extracted files at {:?}", dll_path);
+        panic!("{:?} not found in extracted files at {:?}",&opencv_dll_file ,dll_path);
     }
 
     // Copy and rename to opencv_world4110.dll
@@ -318,10 +332,10 @@ fn download_and_prepare_opencv() {
 
     let dest_path = get_depthai_core_root()
         .join("bin")
-        .join("opencv_world4110.dll");
+        .join(&opencv_dll_file);
 
     fs::copy(&dll_path, &dest_path)
-        .expect("Failed to copy opencv_world411.dll");
+        .expect("Failed to copy OpenCV DLL");
 
     println_build!("OpenCV DLL copied to {:?}", dest_path);
 }
