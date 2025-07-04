@@ -59,7 +59,6 @@ fn main() {
 
     generate_bindings_if_needed();
 
-    // ➡ ajoute cette ligne ici
     if cfg!(target_os = "windows") {
         download_and_prepare_opencv();
     }
@@ -362,12 +361,12 @@ fn resolve_deps_includes() -> PathBuf {
 }
 
 fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
-    // D'abord, tente de détecter un build déjà présent
+    
     if let Some(found_lib) = probe_depthai_core_lib(BUILD_FOLDER_PATH.clone()) {
         println_build!("Found depthai-core library at: {}", found_lib.display());
 
         if cfg!(target_os = "windows") {
-            // Si c'est une DLL, chercher la .lib à côté
+            // Windows-specific handling
             if found_lib
                 .extension()
                 .and_then(|e| e.to_str())
@@ -397,7 +396,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 );
                 println!("cargo:rustc-link-lib=depthai-core");
 
-                // Retourne le chemin vers la .lib (pour d'éventuels usages ultérieurs)
+                
                 return Ok(lib_path);
             } else if found_lib
                 .extension()
@@ -405,7 +404,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 .map(|ext| ext.eq_ignore_ascii_case("lib"))
                 .unwrap_or(false)
             {
-                // On a directement trouvé la .lib
+                
                 println!(
                     "cargo:rustc-link-search=native={}",
                     found_lib.parent().unwrap().display()
@@ -435,7 +434,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
             let depthai_core_install = get_daic_windows_prebuilt_binary()
                 .map_err(|_| "Failed to download prebuilt depthai-core.")?;
 
-            // Après extraction, probe à nouveau
+            // After extracting, check if the library exists
             if let Some(lib) = probe_depthai_core_lib(depthai_core_install.clone()) {
                 return resolve_depthai_core_lib();
             } else {
