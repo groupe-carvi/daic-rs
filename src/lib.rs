@@ -18,7 +18,7 @@ mod tests {
         // Example test to ensure bindings are accessible
         let handle = unsafe {
             // Assuming device_create is a function in the bindings that returns a DeviceHandle
-            bindings::device_create(CString::new("TestDevice").unwrap().as_ptr())
+            bindings::device_create()
         };
         // Check if the handle is not null
         assert!(!handle.is_null(), "Device handle should not be null");

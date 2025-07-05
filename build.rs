@@ -208,6 +208,16 @@ fn generate_bindings_if_needed() {
     if binding_needs_regen {
         println_build!("Building bindings for depthai-core...");
 
+        if bindings_rs.exists() {
+            println_build!(
+                "Bindings file already exists at {}, removing it to regenerate.",
+                bindings_rs.display()
+            );
+            fs::remove_file(&bindings_rs).expect("Failed to remove existing bindings file");
+        }
+
+
+
         let mut includes: Vec<String> = get_depthai_includes()
             .into_iter()
             .map(|p| format!("-I{}", p.display()))

@@ -1,15 +1,14 @@
 #include "wrapper.h"
 #include "depthai/depthai.hpp"
+#include <memory>
 #include <string>
 
 using namespace dai;
 
-DeviceHandle device_create(const char* name) {
-    try {
-        if(name == nullptr) {
-            return reinterpret_cast<DeviceHandle>(new Device());
-        }
-        return reinterpret_cast<DeviceHandle>(new Device(std::string(name)));
+DeviceHandle device_create(){
+     try {
+        Device* device = new Device(); // Create a new Device instance
+        return reinterpret_cast<DeviceHandle>(device); // Return as DeviceHandle
     } catch(const std::exception& e) {
         // Handle exceptions if needed
         return nullptr; // or handle error appropriately

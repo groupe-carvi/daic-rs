@@ -12,8 +12,12 @@ extern "C" {
 
 typedef void* DeviceHandle;
 
-API DeviceHandle device_create(const char* name);
+API DeviceHandle device_create();
 API void device_destroy(DeviceHandle handle);
+
+typedef void* PipelineHandle;
+
+API PipelineHandle pipeline_create(DeviceHandle device);
 
 #ifdef __cplusplus
 }

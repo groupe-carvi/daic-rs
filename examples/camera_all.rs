@@ -1,19 +1,15 @@
-use daic_rs::bindings;
+use daic_rs::bindings::{self, device_create};
 use std::ffi::CString;
 
 fn main() {
     // Example usage of the bindings
-    let device_name = "TestDevice";
-    let handle = unsafe {
-        // Assuming device_create is a function in the bindings that returns a DeviceHandle
-        bindings::device_create(CString::new(device_name).unwrap().as_ptr())
-    };
+    let device = unsafe{device_create()};
     
     // Check if the handle is not null
-    assert!(!handle.is_null(), "Device handle should not be null");
+    assert!(!device.is_null(), "Device handle should not be null");
     
     // Clean up by destroying the device
     unsafe {
-        bindings::device_destroy(handle);
+        bindings::device_destroy(device);
     }
 }
