@@ -108,6 +108,16 @@ fn main() {
             env::var("PATH").unwrap()
         );
     } else {
+        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+        fs::copy(
+            &depthai_core_lib,
+            out_dir.join("libdepthai-core.so"),
+        );
+        fs::copy(
+            &depthai_core_lib,
+            out_dir.join("deps").join("libdepthai-core.so"),
+        );
+        println_build!("Depthai-core library copied to: {} and {}", out_dir.to_string_lossy(), out_dir.join("deps").display());
         println_build!("Linux build configuration complete.");
     }
 }
@@ -121,6 +131,7 @@ fn build_wrapper_cpp() {
     build.file(PROJECT_ROOT.join("wrapper").join("wrapper.cpp"));
 
     for include in get_depthai_includes() {
+        println_build!("Adding include path: {}", include.display());
         build.include(include);
     }
 
@@ -138,6 +149,20 @@ fn get_depthai_includes() -> Vec<PathBuf> {
         get_depthai_core_root().join("include"),
         get_depthai_core_root().join("include").join("depthai"),
     ];
+
+    let deps_path = BUILD_FOLDER_PATH.join("_deps");
+
+    if deps_path.exists() {
+        println_build!("Found depthai-core deps directory at: {}", deps_path.display());
+            // Add the deps includes
+            includes.push(deps_path.join("libnop-src").join("include"));
+            includes.push(deps_path.join("nlohmann_json-src").join("include"));
+            includes.push(deps_path.join("xlink-src").join("include"));
+            includes.push(deps_path.join("xtensor-src").join("include"));
+            includes.push(deps_path.join("xtl-src").join("include"));
+    } else {
+        println_build!("No depthai-core deps directory found, using core include.");
+    }
 
     // Linux-only additional include
     if cfg!(target_os = "linux") {
@@ -420,7 +445,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 "cargo:rustc-link-search=native={}",
                 found_lib.parent().unwrap().display()
             );
-            println!("cargo:rustc-link-lib=static=depthai-core");
+            println!("cargo:rustc-link-lib=dylib=depthai-core");
             return Ok(found_lib);
         }
     }
@@ -467,7 +492,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 .expect("Failed to build depthai-core via CMake.");
 
         println_build!(
-            "Built depthai-core static library at: {}",
+            "Built depthai-core dynamic library at: {}",
             built_lib.display()
         );
 
@@ -475,7 +500,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
             "cargo:rustc-link-search=native={}",
             built_lib.parent().unwrap().display()
         );
-        println!("cargo:rustc-link-lib=static=depthai-core");
+        println!("cargo:rustc-link-lib=dylib=depthai-core");
 
         return Ok(built_lib);
     }
@@ -535,6 +560,7 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         .arg("-B")
         .arg(&path)
         .arg("-DCMAKE_BUILD_TYPE=Release")
+        .arg("-DBUILD_SHARED_LIBS=ON")
         .arg("-DDEPTHAI_OPENCV_SUPPORT=OFF")
         .arg("-G")
         .arg(generator);
@@ -560,7 +586,7 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         panic!("Failed to build depthai-core.");
     }
 
-    let dst = path.join("libdepthai-core.a");
+    let dst = path.join("libdepthai-core.so");
     println_build!("Built depthai-core library at: {}", dst.display());
 
     Some(dst)
