@@ -9,6 +9,7 @@ cxx = "1.0.160"
 image = "0.25.6"
 memmap2 = "0.9.5"
 ndarray = "0.16.1"
+sevenz-rust2 = "0.16.0"
 
 [build-dependencies]
 bindgen = "0.72.0"
