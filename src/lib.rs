@@ -3,28 +3,22 @@ pub mod bindings {
     include!("../generated/bindings.rs");
 }
 
-use std::ffi::CString;
-
-
-
-#[cfg(test)]
-mod tests {
-    use std::ffi::CString;
-
-    use super::bindings;
-
-    #[test]
-    fn test_bindings() {
-        // Example test to ensure bindings are accessible
-        let handle = unsafe {
-            // Assuming device_create is a function in the bindings that returns a DeviceHandle
-            bindings::device_create()
-        };
-        // Check if the handle is not null
-        assert!(!handle.is_null(), "Device handle should not be null");
-        // Clean up by destroying the device
-        unsafe {
-            bindings::device_destroy(handle);
-        }
-    }
+pub trait DeviceInterface {
+    fn create() -> Self;
+    fn destroy(self);
+    fn get_name(&self) -> String;
+    fn get_serial_number(&self) -> String;
+    fn get_firmware_version(&self) -> String;
+    fn get_hardware_version(&self) -> String;
 }
+
+pub enum ReconnectionStatus {
+Reconnected, 
+Reconnecting, 
+ReconnectFailed
+}
+
+
+
+
+

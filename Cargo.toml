@@ -3,6 +3,9 @@ name = "daic-rs"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+hdep-tests = [] # Hardware Dependent Tests
+
 
 [dependencies]
 cxx = "1.0.160"
@@ -13,7 +16,7 @@ sevenz-rust2 = "0.16.0"
 
 [build-dependencies]
 bindgen = "0.72.0"
-cc = "1.2.27"
+cc = "1.2.29"
 cmake = "0.1.54"
 num_cpus = "1.17.0"
 walkdir = "2.5.0"

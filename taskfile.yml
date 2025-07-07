@@ -22,3 +22,6 @@ tasks:
   install-bindgen:
     cmds:
       - cargo install bindgen-cli
+  test:hdep:
+    cmds:
+      - cargo test --features hdep_tests
