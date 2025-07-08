@@ -4,14 +4,10 @@ use bindgen::Bindings;
 use cmake::Config;
 use once_cell::sync::Lazy;
 use std::{
-    env,
-    fs::{self, File},
-    io::{self, Read, Write},
-    path::{Path, PathBuf},
-    process::{Command, ExitStatus, Output},
-    sync::RwLock,
+    env, fs::{self, File}, io::{self, Read, Write}, os::windows, path::{Path, PathBuf}, process::{Command, ExitStatus, Output}, sync::RwLock
 };
 use walkdir::WalkDir;
+use pkg_config::Config as PkgConfig;
 use zip_extensions as zip;
 
 static PROJECT_ROOT: Lazy<PathBuf> = Lazy::new(|| {
@@ -50,10 +46,26 @@ macro_rules! println_build {
 
 fn main() {
     println!("cargo:rerun-if-changed=wrapper/");
+    println!("cargo:rerun-if-changed=builds/depthai-core/include/");
     println_build!("Checking for depthai-core...");
+
 
     let depthai_core_lib = resolve_depthai_core_lib()
         .expect("Failed to resolve depthai-core path");
+    let windows_static_lib = if cfg!(target_os = "windows") {
+        Some(get_depthai_core_root()
+        .join("lib")
+        .join("depthai-core.lib"))
+        
+    } else {
+        None
+    };
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let target_dir = Path::new(&out_dir)
+        .ancestors()
+        .nth(3)
+        .unwrap();
+    let deps_dir = target_dir.join("deps");
 
     build_wrapper_cpp();
 
@@ -70,28 +82,31 @@ fn main() {
             "opencv_world4110.dll",
         ];
 
+    if windows_static_lib.clone().is_some_and(|p| p.exists()) {
+        let lib_path = windows_static_lib.clone().unwrap();
+        let lib_name = lib_path.file_name().unwrap().to_str().unwrap();
+        println_build!("Found static library: {}", lib_path.display());
+
+        println_build!("Copying {} to {:?}", lib_name, target_dir);
+        fs::copy(&lib_path, target_dir.join(lib_name))
+            .expect(&format!("Failed to copy {} to debug dir", lib_name));
+    }
+
         for dll in dlls {
             let dll_path = get_depthai_core_root()
                 .join("bin")
                 .join(dll);
 
             if dll_path.exists() {
-                let out_dir = env::var("OUT_DIR").unwrap();
-                let target_dir = Path::new(&out_dir)
-                    .ancestors()
-                    .nth(3)
-                    .unwrap();
 
-                let debug_dir = target_dir;
-                let deps_dir = debug_dir.join("deps");
-
-                println_build!("Copying {} to {:?}", dll, debug_dir);
-                fs::create_dir_all(&debug_dir).expect("Failed to create debug dir");
-                fs::copy(&dll_path, debug_dir.join(dll))
+                
+                println_build!("Copying {} to {:?}", dll, target_dir);
+                //fs::create_dir_all(&target_dir).expect("Failed to create debug dir");
+                fs::copy(&dll_path, target_dir.join(dll))
                     .expect(&format!("Failed to copy {} to debug dir", dll));
 
                 println_build!("Copying {} to {:?}", dll, deps_dir);
-                fs::create_dir_all(&deps_dir).expect("Failed to create deps dir");
+                //fs::create_dir_all(&deps_dir).expect("Failed to create deps dir");
                 fs::copy(&dll_path, deps_dir.join(dll))
                     .expect(&format!("Failed to copy {} to deps dir", dll));
             } else {
@@ -203,10 +218,10 @@ fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
 fn generate_bindings_if_needed() {
     let bindings_rs = GEN_FOLDER_PATH.join("bindings.rs");
 
-    let binding_needs_regen = true; // TODO: Put behind a cargo feature or environment variable
-
+    let binding_needs_regen = env::var("CARGO_FEATURE_FORCE_BINDING_REGEN")
+        .map_or(false, |v| v == "1") || !bindings_rs.exists();
     if binding_needs_regen {
-        println_build!("Building bindings for depthai-core...");
+        println_build!("Building bindings for depthai-core..");
 
         if bindings_rs.exists() {
             println_build!(
@@ -396,6 +411,23 @@ fn resolve_deps_includes() -> PathBuf {
 }
 
 fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
+
+    let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
+    let target_dir = Path::new(&out_dir)
+        .ancestors()
+        .nth(3)
+        .unwrap();
+    let deps_dir = Path::new(&target_dir)
+        .join("deps");
+
+    println_build!("Searching for depthai-core library in target directory: {}", target_dir.display());
+    if cfg!(target_os = "windows") && target_dir.join("depthai-core.dll").exists() && out_dir.join("depthai-core.lib").exists(){
+        println_build!("Found depthai-core.dll in OUT_DIR: {}", target_dir.display());
+        return Ok(target_dir.join("depthai-core.dll"));
+    }else if target_dir.join("libdepthai-core.so").exists() {
+        println_build!("Found libdepthai-core.so in OUT_DIR: {}", target_dir.display());
+        return Ok(target_dir.join("depthai-core.so"));
+    }
     
     if let Some(found_lib) = probe_depthai_core_lib(BUILD_FOLDER_PATH.clone()) {
         println_build!("Found depthai-core library at: {}", found_lib.display());
@@ -408,11 +440,17 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 .map(|ext| ext.eq_ignore_ascii_case("dll"))
                 .unwrap_or(false)
             {
-                let lib_path = found_lib
-                    .parent() // bin
-                    .and_then(|p| p.parent()) // depthai-core
-                    .map(|p| p.join("lib").join("depthai-core.lib"))
-                    .ok_or("Could not construct path to depthai-core.lib")?;
+                let lib_path = if found_lib == get_depthai_core_root().join("depthai-core.dll") {
+                    out_dir
+                        .parent() // bin
+                        .and_then(|p| p.parent()) // depthai-core
+                        .map(|p| p.join("lib").join("depthai-core.lib"))
+                        .ok_or("Could not construct path to depthai-core.lib")?
+                } else if found_lib == out_dir.join("depthai-core.dll") {
+                    out_dir.join("depthai-core.lib")
+                } else {
+                    found_lib.with_extension("lib")
+                };
 
                 if !lib_path.exists() {
                     panic!(
@@ -520,6 +558,55 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
 
 
 fn probe_depthai_core_lib(out: PathBuf) -> Option<PathBuf> {
+
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let target_dir = Path::new(&out_dir)
+        .ancestors()
+        .nth(3)
+        .unwrap();
+    let deps_dir = Path::new(&target_dir)
+        .join("deps");
+
+    let lib_path = if cfg!(target_os = "windows") {
+        deps_dir.join("depthai-core.dll")
+    } else {
+        deps_dir.join("libdepthai-core.so")
+        
+    };
+
+    println_build!("Searching for depthai-core library in: {}", deps_dir.display());
+    let win_static_lib_path = if cfg!(target_os = "windows") && deps_dir.join("depthai-core.lib").exists() {
+        Some(deps_dir.join("depthai-core.lib"))
+    }else {
+        None
+    };
+
+    if lib_path.exists() && win_static_lib_path.is_some_and(|p| p.exists()) {
+        println_build!("Found depthai-core library at: {}", lib_path.display());
+        return Some(lib_path);
+    }
+
+    // Check if pkg-config can find depthai-core
+    // This is only applicable for Linux and macOS, as Windows does not use pkg-config
+    if cfg!(target_os = "linux") || cfg!(target_os = "macos")
+    {
+        let mut cfg = PkgConfig::new();
+        let prob_res = cfg.atleast_version("3.0.0")
+        .cargo_metadata(true)
+        .probe("depthai-core")
+        .ok();
+
+    match prob_res {
+        Some(_) => {
+            println_build!("Found depthai-core via pkg-config.");
+            return Some(out.join("libdepthai-core.so"));
+        },
+        None => {
+            println_build!("depthai-core not found via pkg-config.");
+            }
+        }
+    }
+
     println_build!("Probing for depthai-core library in: {}", out.display());
     if !out.exists() {
         return None;

@@ -1,0 +1,23 @@
+[package]
+name = "daic-sys"
+version = "0.1.0"
+edition = "2024"
+links = "depthai-core"
+
+[dependencies]
+cxx = "1.0.160"
+
+[features]
+force-binding-regeneration = []
+
+[build-dependencies]
+bindgen = "0.72.0"
+cc = "1.2.29"
+cmake = "0.1.54"
+num_cpus = "1.17.0"
+walkdir = "2.5.0"
+once_cell = "1.21.3"
+zip-extensions = "0.8.3"
+reqwest = { version = "0.12.22", features = ["blocking", "json"] }
+sevenz-rust2 = "0.16.0"
+pkg-config = "0.3.32"

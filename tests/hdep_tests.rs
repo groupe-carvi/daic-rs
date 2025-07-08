@@ -1,7 +1,7 @@
 
 #[cfg(feature = "hdep-tests")]
 mod hdep_tests {
-use daic_rs::bindings::*;
+use daic_sys::bindings::*;
 
     #[test]
     fn test_create_device_bindings() {

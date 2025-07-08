@@ -8,18 +8,13 @@ hdep-tests = [] # Hardware Dependent Tests
 
 
 [dependencies]
-cxx = "1.0.160"
 image = "0.25.6"
 memmap2 = "0.9.5"
 ndarray = "0.16.1"
-sevenz-rust2 = "0.16.0"
+daic-sys = { path = "daic-sys" }
 
-[build-dependencies]
-bindgen = "0.72.0"
-cc = "1.2.29"
-cmake = "0.1.54"
-num_cpus = "1.17.0"
-walkdir = "2.5.0"
-once_cell = "1.21.3"
-zip-extensions = "0.8.3"
-reqwest = { version = "0.12.22", features = ["blocking", "json"] }
+[workspace]
+members = [
+    ".",
+    "daic-sys",
+]

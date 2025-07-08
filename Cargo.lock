@@ -512,15 +512,23 @@ dependencies = [
 name = "daic-rs"
 version = "0.1.0"
 dependencies = [
+ "daic-sys",
+ "image",
+ "memmap2",
+ "ndarray",
+]
+
+[[package]]
+name = "daic-sys"
+version = "0.1.0"
+dependencies = [
  "bindgen",
  "cc",
  "cmake",
  "cxx",
- "image",
- "memmap2",
- "ndarray",
  "num_cpus",
  "once_cell",
+ "pkg-config",
  "reqwest",
  "sevenz-rust2",
  "walkdir",
