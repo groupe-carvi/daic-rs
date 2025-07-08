@@ -27,5 +27,7 @@ target/
 
 /daic-sys/builds
 
+/daic-sys/builds/depthai-core
+
 # Generated files
 /daic-sys/generated

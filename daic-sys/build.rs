@@ -4,7 +4,7 @@ use bindgen::Bindings;
 use cmake::Config;
 use once_cell::sync::Lazy;
 use std::{
-    env, fs::{self, File}, io::{self, Read, Write}, os::windows, path::{Path, PathBuf}, process::{Command, ExitStatus, Output}, sync::RwLock
+    env, fs::{self, File}, io::{self, Read, Write}, path::{Path, PathBuf}, process::{Command, ExitStatus, Output}, sync::RwLock
 };
 use walkdir::WalkDir;
 use pkg_config::Config as PkgConfig;
@@ -33,6 +33,8 @@ static DEPTHAI_CORE_ROOT: Lazy<RwLock<PathBuf>> = Lazy::new(|| {
 });
 
 const DEPTHAI_CORE_REPOSITORY: &str = "https://github.com/luxonis/depthai-core.git";
+
+const DEPTHAI_CORE_BRANCH: &str = "v3.0.0-rc.2";
 
 const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-core/releases/download/v3.0.0-rc.2/depthai-core-v3.0.0-rc.2-win64.zip";
 
@@ -123,16 +125,15 @@ fn main() {
             env::var("PATH").unwrap()
         );
     } else {
-        let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
         fs::copy(
             &depthai_core_lib,
-            out_dir.join("libdepthai-core.so"),
+            target_dir.join("libdepthai-core.so"),
         );
         fs::copy(
             &depthai_core_lib,
-            out_dir.join("deps").join("libdepthai-core.so"),
+            target_dir.join("deps").join("libdepthai-core.so"),
         );
-        println_build!("Depthai-core library copied to: {} and {}", out_dir.to_string_lossy(), out_dir.join("deps").display());
+        println_build!("Depthai-core library copied to: {} and {}", target_dir.to_string_lossy(), target_dir.join("deps").display());
         println_build!("Linux build configuration complete.");
     }
 }
@@ -523,8 +524,10 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 clone_path.display()
             );
 
-            clone_repository(DEPTHAI_CORE_REPOSITORY, &clone_path)
+            clone_repository(DEPTHAI_CORE_REPOSITORY, &clone_path, Some(DEPTHAI_CORE_BRANCH))
                 .expect("Failed to clone depthai-core repository");
+
+
 
             let mut new_path = DEPTHAI_CORE_ROOT.write().unwrap();
             *new_path = clone_path.clone();
@@ -534,7 +537,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 new_path.display()
             );
         }
-
+        println_build!("Building depthai-core via CMake for path: {}", BUILD_FOLDER_PATH.display());
         let built_lib =
             cmake_build_depthai_core(BUILD_FOLDER_PATH.clone())
                 .expect("Failed to build depthai-core via CMake.");
@@ -638,7 +641,7 @@ fn probe_depthai_core_lib(out: PathBuf) -> Option<PathBuf> {
 }
 
 fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
-    println_build!("Building depthai-core in {}...", path.display());
+    println_build!("Building depthai-core with source in {} and target in {}...",get_depthai_core_root().display(), path.display());
 
     let mut parallel_builds =
         (num_cpus::get() as f32 * 0.80).ceil().to_string();
@@ -753,9 +756,15 @@ fn download_file(url: &str, dest_dir: &Path) -> Result<PathBuf, String> {
     Ok(dest_path)
 }
 
-fn clone_repository(repo_url: &str, dest_path: &Path) -> Result<(), String> {
+fn clone_repository(repo_url: &str, dest_path: &Path, branch:Option<&str> ) -> Result<(), String> {
+    let clone_cmd = if let Some(branch_name) = branch {
+        vec!["clone", "--recurse-submodules", "--branch", branch_name, repo_url]
+    } else {
+        vec!["clone", "--recurse-submodules", repo_url]
+    };
+    println_build!("Cloning repository {} to {}", repo_url, dest_path.display());
     let status = Command::new("git")
-        .args(["clone", "--recurse-submodules", repo_url])
+        .args(clone_cmd)
         .arg(dest_path)
         .status()
         .map_err(|e| format!("Failed to clone repository: {}", e))?;
