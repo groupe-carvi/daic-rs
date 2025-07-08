@@ -17,10 +17,10 @@ static PROJECT_ROOT: Lazy<PathBuf> = Lazy::new(|| {
 });
 
 static BUILD_FOLDER_PATH: Lazy<PathBuf> =
-    Lazy::new(|| env::current_dir().unwrap().join("builds"));
+    Lazy::new(|| PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("builds"));
 
 static GEN_FOLDER_PATH: Lazy<PathBuf> =
-    Lazy::new(|| env::current_dir().unwrap().join("generated"));
+    Lazy::new(|| PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("generated"));
 
 static DEPTHAI_CORE_ROOT: Lazy<RwLock<PathBuf>> = Lazy::new(|| {
     RwLock::new(PathBuf::from(env::var("DEPTHAI_CORE_ROOT").unwrap_or_else(|_| {
@@ -440,16 +440,16 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 .map(|ext| ext.eq_ignore_ascii_case("dll"))
                 .unwrap_or(false)
             {
-                let lib_path = if found_lib == get_depthai_core_root().join("depthai-core.dll") {
-                    out_dir
+                let lib_path = if found_lib == get_depthai_core_root().join("bin").join("depthai-core.dll") {
+                    found_lib
                         .parent() // bin
                         .and_then(|p| p.parent()) // depthai-core
                         .map(|p| p.join("lib").join("depthai-core.lib"))
                         .ok_or("Could not construct path to depthai-core.lib")?
-                } else if found_lib == out_dir.join("depthai-core.dll") {
+                } else if found_lib == out_dir.join("depthai-core.lib") {
                     out_dir.join("depthai-core.lib")
                 } else {
-                    found_lib.with_extension("lib")
+                    get_depthai_core_root().join("lib").join("depthai-core.lib")
                 };
 
                 if !lib_path.exists() {
