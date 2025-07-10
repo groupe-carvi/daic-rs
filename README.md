@@ -2,7 +2,7 @@
 
 A Rust wrapper for Luxonis [DepthAI-Core V3](https://github.com/luxonis/depthai-core).
 
-> [!WARNING]  
+> [!CAUTION]  
 > The crate is still in active development and may not be usable.
 
 Our core goals with daic-rs are:
@@ -12,6 +12,7 @@ Our core goals with daic-rs are:
 - Create a rust friendly and safe API inside the daic-rs crate.
 - Use alternative library or tools from the rust ecosystem where we can. (Like [kornia](https://github.com/kornia/kornia) and [rerun](https://github.com/rerun-io/rerun) instead of OpenCV for the examples).
 
+> [!WARNING]
 > ### About DepthAI-Core API Unstability
 > As your can read in the DepthAI-Core repository disclaimer, luxonis don't yet provides API stability guaranties. It means that there could be some breaking changes to DepthAI-Core API that could impact daic-rs own API down the road and so we cannot guaranty any stability neither.
 > The current version of the crate currently target [DepthAI-Core v3.0.0-rc.2](https://github.com/luxonis/depthai-core/tree/v3.0.0-rc.2).
