@@ -6,11 +6,11 @@ A Rust wrapper for Luxonis [DepthAI-Core V3](https://github.com/luxonis/depthai-
 > The crate is still in active development and may not be usable.
 
 Our core goals with daic-rs are:
-- [x]To make it 'Battery Included' by resolving any native dependancies for the crate users.
-- [ ]Wrap the native C++ intrinsic types in C.
-- [ ]Generates a clean raw rust binding inside the daic-sys crate.
-- [ ]Create a rust friendly and safe API inside the daic-rs crate.
-- [ ]Use alternative library or tools from the rust ecosystem where we can. (Like [kornia](https://github.com/kornia/kornia) and [rerun](https://github.com/rerun-io/rerun) instead of OpenCV for the examples).
+- [x] To make it 'Battery Included' by resolving any native dependancies for the crate users.
+- [ ] Wrap the native C++ intrinsic types in C.
+- [ ] Generates a clean raw rust binding inside the daic-sys crate.
+- [ ] Create a rust friendly and safe API inside the daic-rs crate.
+- [ ] Use alternative library or tools from the rust ecosystem where we can. (Like [kornia](https://github.com/kornia/kornia) and [rerun](https://github.com/rerun-io/rerun) instead of OpenCV for the examples).
 
 > [!WARNING]
 > ### About DepthAI-Core API Unstability
