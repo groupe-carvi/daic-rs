@@ -19,9 +19,14 @@ Our core goals with daic-rs are:
 > 
 > <ins>We will try to follow the latest release offering a Windows prebuilt binary for the moment</ins>.
 
-## Environement Setup
+## Environment Setup
 
 ### Linux
+
+> [!WARNING]
+> For Linux system we only support debian based distributions for the moment and will investigate more as we go.
+
+Since the crate is pulling and building Depth-AI dynamic library from source, you will need to make sure that your system has the required dependancies.
 
 ```sh
 # Install dependencies
@@ -31,7 +36,7 @@ sudo apt -y install libclang-dev pkg-config cmake ninja-build python3 autoconf a
 
 ### Windows
 
-Make sure to have Visual Studio 2022 installed with C++ development tools and CMake.
+For Windows we use the prebuilt binary of DepthAI-Core found in the repository release section.
 
 ```powershell
 # Install dependencies
