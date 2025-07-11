@@ -9,6 +9,7 @@ cxx = "1.0.160"
 
 [features]
 force-binding-regeneration = []
+default = ["force-binding-regeneration"]
 
 [build-dependencies]
 bindgen = "0.72.0"

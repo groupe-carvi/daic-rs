@@ -7,6 +7,16 @@ pub trait DeviceInterface {
     fn get_hardware_version(&self) -> String;
 }
 
+pub trait PipelineInterface {
+    fn create() -> Self;
+    fn destroy(self);
+}
+
+pub trait CameraInterface {
+    fn create() -> Self;
+    fn destroy(self);
+}
+
 pub enum ReconnectionStatus {
 Reconnected, 
 Reconnecting, 

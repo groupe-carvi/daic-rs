@@ -4,7 +4,7 @@ use bindgen::Bindings;
 use cmake::Config;
 use once_cell::sync::Lazy;
 use std::{
-    env, fs::{self, File}, io::{self, Read, Write}, path::{Path, PathBuf}, process::{Command, ExitStatus, Output}, sync::RwLock
+    env, fs::{self, File}, io::{self, Read, Write}, path::{Path, PathBuf}, process::{Command, ExitStatus, Output}, sync::RwLock, vec
 };
 use walkdir::WalkDir;
 use pkg_config::Config as PkgConfig;
@@ -39,6 +39,16 @@ const DEPTHAI_CORE_BRANCH: &str = "v3.0.0-rc.2";
 const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-core/releases/download/v3.0.0-rc.2/depthai-core-v3.0.0-rc.2-win64.zip";
 
 const OPENCV_WIN_PREBUILT_URL: &str = "https://github.com/opencv/opencv/releases/download/4.11.0/opencv-4.11.0-windows.exe";
+
+static DAIC_BINDGEN_HEADER: &str = "wrapper/wrapper.h";
+
+static DAIC_ALLOWLIST_ITEMS: &'static [&str] = &[
+    "DeviceHandle",
+    "PipelineHandle",
+    "CameraHandle",
+    "NodeHandle",
+    "AssetManagerHandle",
+];
 
 macro_rules! println_build {
     ($($tokens:tt)*) => {
@@ -219,7 +229,7 @@ fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
 fn generate_bindings_if_needed() {
     let bindings_rs = GEN_FOLDER_PATH.join("bindings.rs");
 
-    let binding_needs_regen = env::var("CARGO_FEATURE_FORCE_BINDING_REGEN")
+    let binding_needs_regen = env::var("CARGO_FEATURE_FORCE_BINDING_REGENERATION")
         .map_or(false, |v| v == "1") || !bindings_rs.exists();
     if binding_needs_regen {
         println_build!("Building bindings for depthai-core..");
@@ -262,14 +272,13 @@ fn generate_bindings_if_needed() {
         includes.sort();
         includes.dedup();
 
-        let wrapper_header_path =
-            PROJECT_ROOT.join("wrapper").join("wrapper.h").to_str().unwrap().to_string();
-
-        println_build!("Using wrapper header for Bindgen: {}", wrapper_header_path);
+        println_build!("Using wrapper header for Bindgen: {}", &DAIC_BINDGEN_HEADER);
         println_build!("Includes for Bindgen: {:?}", includes);
 
         let mut builder = bindgen::Builder::default()
-            .header(wrapper_header_path.clone())
+            .header(DAIC_BINDGEN_HEADER)
+            .allowlist_file(DAIC_BINDGEN_HEADER)
+            .opaque_type("std::.*")
             .clang_arg("-x")
             .clang_arg("c++")
             .clang_arg("-std=c++17")
