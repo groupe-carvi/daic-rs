@@ -6,6 +6,12 @@ tasks:
     cmds:
       - cmd: set RUSTFLAGS=-C link-args=/VERBOSE
       - cmd: cargo build -vvv
+  build-gen:
+    desc: Build and force binding gen
+    cmds:
+      - task: build
+    env:
+      CARGO_FEATURE_FORCE_BINDING_REGENERATION: 1
   clean-build:
     desc: Build the crate with verbose output to debug
     cmds:
