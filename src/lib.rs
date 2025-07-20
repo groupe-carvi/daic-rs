@@ -1,20 +1,14 @@
-pub trait DeviceInterface {
-    fn create() -> Self;
-    fn destroy(self);
-    fn get_name(&self) -> String;
-    fn get_serial_number(&self) -> String;
-    fn get_firmware_version(&self) -> String;
-    fn get_hardware_version(&self) -> String;
+pub mod device;
+
+use daic_sys::bindings::root::dai as dai;
+
+
+pub struct Camera {
+    pub(crate) inner: dai::node::Camera,
 }
 
-pub trait PipelineInterface {
-    fn create() -> Self;
-    fn destroy(self);
-}
-
-pub trait CameraInterface {
-    fn create() -> Self;
-    fn destroy(self);
+pub struct CameraBoardSocket {
+    pub(crate) inner: dai::CameraBoardSocket::Type,
 }
 
 pub enum ReconnectionStatus {
