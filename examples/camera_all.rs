@@ -1,8 +1,9 @@
 
-use std::ffi::CString;
+use daic_rs::device::Device;
 
 fn main() {
-    // Create a devive
+    // Create a device
+    let device = Device::new();
+
     
-    // Check if the device is valid 
 }

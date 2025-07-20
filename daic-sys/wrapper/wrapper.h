@@ -12,20 +12,6 @@
 extern "C" {
 #endif
 
-typedef void* DeviceHandle;
-
-API DeviceHandle device_create();
-API void device_destroy(DeviceHandle handle);
-
-typedef void* PipelineHandle;
-
-API PipelineHandle pipeline_create(DeviceHandle device);
-API void pipeline_destroy(PipelineHandle handle);
-
-typedef void* CameraHandle;
-API CameraHandle camera_create(DeviceHandle device);
-API void camera_destroy(CameraHandle handle);
-
 // Version informations getters
 API const char* dai_build_version();
 API const int dai_build_version_major();
