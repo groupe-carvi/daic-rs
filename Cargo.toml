@@ -21,4 +21,4 @@ members = [
 
 [dev-dependencies]
 kornia = "0.1.9"
-rerun = "0.23.4"
+rerun = "0.24.0"
