@@ -3,3 +3,10 @@
 pub mod bindings {
     include!("../generated/bindings.rs");
 }
+
+pub mod camera;
+pub mod device;
+pub mod frame;
+pub mod pipeline;
+pub mod camera_info;
+pub mod calibration;

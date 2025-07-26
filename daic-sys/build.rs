@@ -205,7 +205,7 @@ fn get_depthai_includes() -> Vec<PathBuf> {
 }
 
 fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
-    let header_size = 6144; // header size known for OpenCV exe
+    let header_size = 6144;
 
     let mut file = File::open(exe_path)
         .expect("Failed to open OpenCV exe");
@@ -215,7 +215,7 @@ fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
         .expect("Failed to read OpenCV exe");
 
     if buf.len() <= header_size {
-        panic!("Exe file too small, cannot strip header.");
+        panic!("Exe file too small ({} bytes), cannot strip header. Expected size > {} bytes.", buf.len(), header_size);
     }
 
     let seven_z_data = &buf[header_size..];
@@ -432,16 +432,37 @@ fn download_and_prepare_opencv() {
     }
 
     if !extract_path.exists() && opencv_exe_path.exists() {
-        println_build!("Extracting OpenCV exe to {:?}", extract_path);
-
-        let status = Command::new(opencv_exe_path.clone())
-            .arg("/SILENT")
-            .arg(format!("/DIR={}", extract_path.display()))
-            .status()
-            .expect("Failed to execute OpenCV installer");
-
-        if !status.success() {
-            panic!("OpenCV installer failed with exit code: {:?}", status);
+        println_build!("Attempting to extract OpenCV using silent installer...");
+        
+        let status = Command::new(&opencv_exe_path)
+            .arg("-o")
+            .arg(&extract_path)
+            .arg("-y")
+            .status();
+            
+        match status {
+            Ok(exit_status) if exit_status.success() => {
+                println_build!("OpenCV extracted successfully using silent installer");
+            },
+            _ => {
+                println_build!("Silent installer failed, trying SFX header stripping...");
+                let opencv_7z_path = extraction_dir.join("opencv.7z");
+                
+                let file_size = fs::metadata(&opencv_exe_path)
+                    .expect("Failed to get file metadata")
+                    .len();
+                    
+                if file_size > 10000 {
+                    strip_sfx_header(&opencv_exe_path, &opencv_7z_path);
+                    
+                    println_build!("Extracting .7z payload to {:?}", extract_path);
+                    zip::zip_extract(&opencv_7z_path, &extract_path)
+                        .expect("Failed to extract OpenCV .7z payload");
+                    fs::remove_file(&opencv_7z_path).expect("Failed to remove .7z payload");
+                } else {
+                    panic!("OpenCV file is too small and extraction methods failed. Please check the download.");
+                }
+            }
         }
     } else {
         println_build!("OpenCV already extracted at {:?}", extract_path);
@@ -811,11 +832,19 @@ fn download_file(url: &str, dest_dir: &Path) -> Result<PathBuf, String> {
         fs::create_dir_all(dest_dir).map_err(|e| format!("Failed to create directory: {}", e))?;
     }
 
+    println_build!("Downloading from: {}", url);
     let response = reqwest::blocking::get(url)
         .map_err(|e| format!("Failed to download file: {}", e))?;
 
     if !response.status().is_success() {
-        return Err(format!("Failed to download file: {}", response.status()));
+        return Err(format!("Failed to download file: HTTP {}", response.status()));
+    }
+
+    let content_length = response.content_length().unwrap_or(0);
+    println_build!("Content length: {} bytes", content_length);
+
+    if content_length == 0 {
+        return Err("Downloaded file is empty (0 bytes)".to_string());
     }
 
     let file_name = url.split('/').last().unwrap_or("downloaded_file");
@@ -823,9 +852,19 @@ fn download_file(url: &str, dest_dir: &Path) -> Result<PathBuf, String> {
 
     println_build!("Saving downloaded file to: {}", dest_path.display());
 
-    let mut file = File::create(&dest_path).map_err(|e| format!("Failed to create file: {}", e))?;
-    io::copy(&mut response.bytes().unwrap().as_ref(), &mut file)
-        .map_err(|e| format!("Failed to write file: {}", e))?;
+    let bytes = response.bytes().map_err(|e| format!("Failed to read response bytes: {}", e))?;
+    
+    if bytes.is_empty() {
+        return Err("Downloaded content is empty".to_string());
+    }
+
+    fs::write(&dest_path, &bytes).map_err(|e| format!("Failed to write file: {}", e))?;
+
+    let written_size = fs::metadata(&dest_path)
+        .map_err(|e| format!("Failed to get file metadata: {}", e))?
+        .len();
+        
+    println_build!("Successfully downloaded {} bytes to {}", written_size, dest_path.display());
 
     Ok(dest_path)
 }

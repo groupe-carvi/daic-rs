@@ -41,6 +41,9 @@ For Windows we use the prebuilt binary of DepthAI-Core found in the repository r
 ```powershell
 # Install dependencies
 
+# Install clang
+winget install -e --id LLVM.LLVM
+
 ```
 
 ## Build
