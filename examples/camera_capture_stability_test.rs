@@ -13,11 +13,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let config = dev_visualization::CaptureConfig {
         app_name: "depthai_stabilized_api_test".to_string(),
         entity_path: "camera/rgb".to_string(),
-        max_frames: None,  // Capture continuous frames for thorough testing
+        max_frames: Some(200),  // Capture 200 frames for thorough testing
         fps_delay_ms: 50,  // 20 FPS
         stabilization_delay_ms: 1000,
         auto_launch_rerun: true,  // Auto-launch for ease of use
-        restart_camera_every: None,
+        restart_camera_every: Some(50),  // Restart every 50 frames to test stability
     };
     
     println!("📋 Configuration:");

@@ -1,5 +1,5 @@
 //! Safe Rust API for DepthAI camera
-use crate::device::Device;
+use crate::device::{self, Device};
 use crate::frame::{Frame, TestPattern};
 use std::sync::Arc;
 use std::time::Duration;
@@ -11,8 +11,7 @@ pub struct Camera {
 
 impl Camera {
     /// Initialise une nouvelle caméra DepthAI avec gestion d'erreur améliorée
-    pub fn new() -> Result<Self, &'static str> {
-        let device = Device::new()?;
+    pub fn new(device: Device ) -> Result<Self, &'static str> {
         
         // Test initial de connectivité
         if !device.is_connected() {

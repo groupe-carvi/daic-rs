@@ -26,6 +26,10 @@ API const char* dai_build_bootloader_version();
 API const char* dai_build_device_rvc3_version();
 API const char* dai_build_device_rvc4_version();
 
+// Helper function to convert std::string to C string (caller must free)
+API char* dai_string_to_cstring(const char* std_string);
+API void dai_free_cstring(char* cstring);
+
 
 #ifdef __cplusplus
 }

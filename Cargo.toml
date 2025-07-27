@@ -12,6 +12,7 @@ image = "0.25.6"
 memmap2 = "0.9.5"
 ndarray = "0.16.1"
 daic-sys = { path = "daic-sys" }
+imageproc = "0.25.0"
 
 [workspace]
 members = [

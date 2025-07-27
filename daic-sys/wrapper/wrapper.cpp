@@ -1,5 +1,7 @@
 #include "wrapper.h"
 #include "depthai/build/version.hpp"
+#include <cstring>
+#include <cstdlib>
 using namespace dai::node;
 
 const char* dai_build_version() {
@@ -40,4 +42,21 @@ const char* dai_build_device_rvc3_version() {
 }
 const char* dai_build_device_rvc4_version() {
     return dai::build::DEVICE_RVC4_VERSION;
+}
+// Helper function to convert std::string to C string (caller must free)
+char* dai_string_to_cstring(const char* std_string) {
+    if (!std_string) return nullptr;
+    
+    size_t len = strlen(std_string);
+    char* result = static_cast<char*>(malloc(len + 1));
+    if (result) {
+        strcpy(result, std_string);
+    }
+    return result;
+}
+
+void dai_free_cstring(char* cstring) {
+    if (cstring) {
+        free(cstring);
+    }
 }

@@ -1,4 +1,4 @@
-use daic_rs::{Device, Camera, Frame};
+use daic_rs::{device::Device, camera::Camera, frame::Frame};
 use std::thread;
 use std::time::Duration;
 
