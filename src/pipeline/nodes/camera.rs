@@ -1,23 +1,7 @@
 use crate::error::{DaiError, DaiResult};
 use crate::pipeline::PipelineNode;
+use crate::common::CameraBoardSocket;
 use daic_sys::root::dai::node::Camera as DaiCamera;
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CameraBoardSocket {
-    Rgb,
-    Left, 
-    Right,
-}
-
-impl CameraBoardSocket {
-    pub fn as_u32(&self) -> u32 {
-        match self {
-            CameraBoardSocket::Rgb => 0,
-            CameraBoardSocket::Left => 1,
-            CameraBoardSocket::Right => 2,
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
 pub enum CameraResolution {

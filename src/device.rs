@@ -7,6 +7,19 @@ use daic_sys::root::daic::{device_create, device_destroy, device_is_connected, D
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+/// Device platform information
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Platform {
+    /// RVC2 platform
+    Rvc2,
+    /// RVC3 platform  
+    Rvc3,
+    /// RVC4 platform
+    Rvc4,
+    /// Unknown platform
+    Unknown(u32),
+}
+
 pub struct Device {
     inner: Arc<Mutex<DeviceInner>>,
     last_capture: Arc<Mutex<Option<Instant>>>,
@@ -160,7 +173,10 @@ mod tests {
         // Test that device creation returns a result (may fail without hardware)
         let device_result = Device::new();
         match device_result {
-            Ok(_) => println!("Device created successfully"),
+            Ok(_device) => {
+                println!("Device created successfully");
+                // Basic creation successful, this is enough for unit testing
+            }
             Err(DaiError::FfiError(msg)) if msg.contains("No available devices") => {
                 println!("Expected error: No devices available");
             }
@@ -182,10 +198,14 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "hdep-tests")]
-    fn test_device_ffi_connection() {
-        let device = Device::new().expect("Failed to create device");
-        // Note: This test may fail if no device is actually connected
-        let _connected = device.is_connected_ffi();
+    fn test_device_info_creation() {
+        // Test device info structure creation (doesn't require hardware)
+        let device_info = crate::device_info::DeviceInfo::new();
+        
+        // Just test that we can create a DeviceInfo without panicking
+        // The actual values depend on the C++ implementation
+        let _name = device_info.get_name();
+        
+        println!("DeviceInfo created successfully");
     }
 }

@@ -3,10 +3,10 @@
 //! Provides safe wrapper around DepthAI mono camera nodes for stereo vision.
 
 use crate::pipeline::PipelineNode;
-use crate::error::{DaiError, DaiResult};
+use crate::error::{DaiResult};
 use daic_sys::root::dai;
 use std::collections::HashMap;
-use crate::pipeline::nodes::camera::CameraBoardSocket;
+use crate::common::CameraBoardSocket;
 
 #[derive(Debug, Clone, Copy, PartialEq, Default)] 
 pub enum MonoCameraResolution {
@@ -37,7 +37,7 @@ pub struct MonoCamera {
 impl Default for MonoCameraConfig {
     fn default() -> Self {
         Self {
-            board_socket: Some(CameraBoardSocket::Left),
+            board_socket: Some(CameraBoardSocket::CamA),
             resolution: MonoCameraResolution::The720P,
             fps: 30.0,
         }
@@ -164,7 +164,7 @@ mod tests {
     #[test]
     fn test_mono_camera_configuration() {
         let config = MonoCameraConfig {
-            board_socket: Some(CameraBoardSocket::Right),
+            board_socket: Some(CameraBoardSocket::Auto),
             resolution: MonoCameraResolution::The800P,
             fps: 60.0,
         };

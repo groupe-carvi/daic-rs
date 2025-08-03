@@ -5,7 +5,8 @@
 use crate::pipeline::{Pipeline, PipelineConfig};
 use crate::pipeline::nodes::*;
 use crate::error::{DaiResult};
-use crate::pipeline::nodes::camera::{CameraBoardSocket, CameraResolution, ColorOrder, CameraConfig};
+use crate::common::CameraBoardSocket;
+use crate::pipeline::nodes::camera::{CameraResolution, ColorOrder, CameraConfig};
 use crate::pipeline::nodes::mono_camera::{MonoCameraConfig, MonoCameraResolution};
 use crate::pipeline::nodes::neural_network::NeuralNetworkConfig;
 use crate::pipeline::nodes::depth::{DepthConfig, DepthPreset, MedianFilter}; 
@@ -58,37 +59,37 @@ impl PipelineBuilder {
     }
     
     /// Add a camera node
-    pub fn add_camera(mut self, socket: CameraBoardSocket) -> CameraBuilder<Self> {
+    pub fn add_camera(self, socket: CameraBoardSocket) -> CameraBuilder<Self> {
         CameraBuilder::new(self, socket)
     }
     
     /// Add a mono camera node
-    pub fn add_mono_camera(mut self, socket: CameraBoardSocket) -> MonoCameraBuilder<Self> {
+    pub fn add_mono_camera(self, socket: CameraBoardSocket) -> MonoCameraBuilder<Self> {
         MonoCameraBuilder::new(self, socket)
     }
     
     /// Add a neural network node
-    pub fn add_neural_network(mut self, blob_path: impl Into<String>) -> NeuralNetworkBuilder<Self> {
+    pub fn add_neural_network(self, blob_path: impl Into<String>) -> NeuralNetworkBuilder<Self> {
         NeuralNetworkBuilder::new(self, blob_path)
     }
     
     /// Add a stereo depth node
-    pub fn add_stereo_depth(mut self) -> DepthBuilder<Self> {
+    pub fn add_stereo_depth(self) -> DepthBuilder<Self> {
         DepthBuilder::new(self)
     }
     
     /// Add an image manipulation node
-    pub fn add_image_manip(mut self) -> ImageManipBuilder<Self> {
+    pub fn add_image_manip(self) -> ImageManipBuilder<Self> {
         ImageManipBuilder::new(self)
     }
     
     /// Add an output stream
-    pub fn add_output(mut self, stream_name: impl Into<String>) -> OutputBuilder<Self> {
+    pub fn add_output(self, stream_name: impl Into<String>) -> OutputBuilder<Self> {
         OutputBuilder::new(self, stream_name)
     }
     
     /// Add an input stream
-    pub fn add_input(mut self, stream_name: impl Into<String>) -> InputBuilder<Self> {
+    pub fn add_input(self, stream_name: impl Into<String>) -> InputBuilder<Self> {
         InputBuilder::new(self, stream_name)
     }
     
@@ -108,7 +109,7 @@ impl PipelineBuilder {
     }
     
     /// Build the pipeline
-    pub fn build(mut self) -> DaiResult<Pipeline> {
+    pub fn build(self) -> DaiResult<Pipeline> {
         let mut pipeline = Pipeline::with_config(self.config)?;
         
         // Add all nodes to the pipeline
@@ -141,7 +142,7 @@ impl PipelineBuilder {
         }
         
         // TODO: Apply connections between nodes
-        for connection in &self.connections {
+        for _connection in &self.connections {
             // Connect nodes in the C++ pipeline
             // This requires access to the underlying C++ objects
         }
@@ -552,7 +553,7 @@ mod tests {
     #[test]
     fn test_pipeline_builder() {
         let builder = PipelineBuilder::new()
-            .add_camera(CameraBoardSocket::Rgb)
+            .add_camera(CameraBoardSocket::Auto)
                 .resolution(CameraResolution::The1080P)
                 .fps(30.0)
                 .finish()
@@ -567,7 +568,7 @@ mod tests {
     #[test]
     fn test_complex_pipeline() {
         let builder = PipelineBuilder::new()
-            .add_camera(CameraBoardSocket::Rgb)
+            .add_camera(CameraBoardSocket::Auto)
                 .resolution(CameraResolution::The1080P)
                 .id("main_camera")
                 .finish()

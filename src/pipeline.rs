@@ -36,7 +36,7 @@ pub mod builder;
 // Re-export main types for convenience
 pub use builder::PipelineBuilder;
 pub use nodes::{
-    Camera, CameraConfig, CameraResolution, MonoCameraResolution, ColorOrder, CameraBoardSocket,
+    Camera, CameraConfig, CameraResolution, MonoCameraResolution, ColorOrder,
     DepthPreset, ResizeMode, ResizeConfig, CropConfig,
     XLinkIn, XLinkOut,
 };
@@ -262,9 +262,15 @@ mod tests {
 
     #[test]
     fn test_pipeline_creation() {
+        // Test that pipeline creation returns a result (may fail without hardware)
         let result = Pipeline::new();
         match result {
-            Ok(_) => println!("Pipeline created successfully"),
+            Ok(pipeline) => {
+                println!("Pipeline created successfully");
+                // Test that we can call basic methods without panicking
+                let _config = pipeline.get_config();
+                let _schema = pipeline.get_schema();
+            }
             Err(e) => println!("Expected creation error: {}", e),
         }
     }
@@ -276,11 +282,30 @@ mod tests {
             ..Default::default()
         };
         
-        let result = Pipeline::with_config(config);
+        // Test that pipeline creation with config returns a result
+        let result = Pipeline::with_config(config.clone());
         match result {
-            Ok(_) => println!("Pipeline with config created successfully"),
+            Ok(pipeline) => {
+                println!("Pipeline with config created successfully");
+                // Verify config was applied
+                let retrieved_config = pipeline.get_config();
+                assert_eq!(retrieved_config.create_implicit_device, config.create_implicit_device);
+            }
             Err(e) => println!("Expected config error: {}", e),
         }
+    }
+
+    #[test]
+    fn test_pipeline_config_default() {
+        // Test pipeline configuration without requiring hardware
+        let config = PipelineConfig::default();
+        assert!(!config.create_implicit_device, "Default create_implicit_device should be false");
+        
+        let custom_config = PipelineConfig {
+            create_implicit_device: true,
+            ..Default::default()
+        };
+        assert!(custom_config.create_implicit_device, "Custom create_implicit_device should be true");
     }
 }
 

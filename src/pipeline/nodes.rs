@@ -11,7 +11,7 @@ pub mod output;
 pub mod input;
 
 // Re-export node types
-pub use camera::{Camera, CameraConfig, CameraResolution, ColorOrder, CameraBoardSocket};
+pub use camera::{Camera, CameraConfig, CameraResolution, ColorOrder};
 pub use mono_camera::{MonoCamera, MonoCameraConfig, MonoCameraResolution};
 pub use neural_network::{NeuralNetwork, NeuralNetworkConfig};
 pub use depth::{Depth, DepthConfig, DepthPreset, MedianFilter};

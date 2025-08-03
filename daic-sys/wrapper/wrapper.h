@@ -1,6 +1,8 @@
 
 #pragma once
 #include "depthai/depthai.hpp"
+#include "XLink/XLink.h"
+#include "XLink/XLinkPublicDefines.h"
 #ifdef _WIN32
 #define API __declspec(dllexport)
 #else
@@ -28,6 +30,16 @@ API const char* dai_build_device_rvc3_version();
 API const char* dai_build_device_rvc4_version();
 
 // Helper function to convert std::string to C string (caller must free)
+API char* dai_string_to_cstring(const char* std_string);
+API void dai_free_cstring(char* cstring);
+
+// XLink types exposure - these types are already defined in XLink headers
+// We just re-expose them to ensure they're available in bindings
+typedef XLinkError_t XLinkError;
+typedef XLinkProtocol_t XLinkProtocol;  
+typedef XLinkPlatform_t XLinkPlatform;
+typedef XLinkDeviceState_t XLinkDeviceState;
+typedef deviceDesc_t DeviceDesc;
 API char* dai_string_to_cstring(const char* std_string);
 API void dai_free_cstring(char* cstring);
 

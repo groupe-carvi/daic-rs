@@ -5,9 +5,10 @@
 
 use daic_rs::{
     device::Device,
+    CameraBoardSocket,
     pipeline::{
-        core::{Pipeline, PipelineConfig},
-        nodes::camera::{Camera, CameraConfig, BoardSocket, ResolutionPreset, ColorOrder, CameraBoardSocket, CameraResolution},
+        Pipeline, PipelineConfig,
+        nodes::camera::{Camera, CameraConfig, CameraResolution, ColorOrder},
     },
     error::DaiResult,
 };
@@ -38,37 +39,26 @@ fn main() -> DaiResult<()> {
     
     // Create and configure a camera node
     let camera_config = CameraConfig {
-        board_socket: CameraBoardSocket::CamA,
+        board_socket: Some(CameraBoardSocket::CamA),
         resolution: CameraResolution::The1080P,
         fps: 30.0,
         preview_size: Some((416, 416)),
-        video_size: Some((1920, 1080)),
-        still_size: None,
-        interleaved: true,
-        color_order: ColorOrder::BGR,
+        color_order: Some(ColorOrder::BGR),
     };
     
-    let mut camera = Camera::with_config("main_camera", camera_config)?;
+    let mut camera = Camera::with_config("main_camera", camera_config);
     println!("Camera node created successfully");
     
     // Configure camera settings
-    camera.set_board_socket(BoardSocket::CamA)?;
-    camera.set_resolution(ResolutionPreset::The1080P)?;
-    camera.set_fps(30.0)?;
-    camera.set_preview_size(416, 416);
-    camera.set_color_order(ColorOrder::BGR);
-    
-    // Request camera outputs
-    camera.request_preview_output("preview")?;
-    camera.request_video_output("video")?;
+    camera.set_board_socket(CameraBoardSocket::CamA);
+    camera.set_resolution(CameraResolution::The1080P);
+    camera.set_fps(30.0);
     
     println!("Camera configured:");
     println!("  - Board Socket: CAM_A");
-    println!("  - Resolution: 1080P ({}x{})", 
-             ResolutionPreset::The1080P.dimensions().0,
-             ResolutionPreset::The1080P.dimensions().1);
-    println!("  - FPS: {}", camera.config().fps);
-    println!("  - Preview Size: {:?}", camera.config().preview_size);
+    println!("  - Resolution: 1080P (1920x1080)");
+    println!("  - FPS: {}", camera.config.fps);
+    println!("  - Preview Size: {:?}", camera.config.preview_size);
     
     // Add camera to pipeline
     pipeline.add_node(camera)?;
