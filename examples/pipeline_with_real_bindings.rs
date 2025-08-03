@@ -21,7 +21,7 @@ fn main() -> DaiResult<()> {
     println!("Device created successfully");
     
     // Check if device is connected
-    if !device.is_connected_ffi()? {
+    if !device.is_connected()? {
         println!("Warning: No DepthAI device detected");
         return Ok(());
     }

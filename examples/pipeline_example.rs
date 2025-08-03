@@ -17,7 +17,7 @@ fn main() -> DaiResult<()> {
     println!("✓ Device created successfully");
 
     // Check device connection
-    match device.is_connected_ffi() {
+    match device.is_connected() {
         Ok(true) => println!("✓ Device is connected"),
         Ok(false) => println!("⚠ Device is not connected"),
         Err(e) => println!("⚠ Could not check device connection: {}", e),
