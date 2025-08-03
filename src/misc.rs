@@ -1,4 +1,5 @@
-use crate::bindings::root::{dai_string_to_cstring, dai_free_cstring, __BindgenOpaqueArray};
+use daic_sys::root::daic::{dai_string_to_cstring, dai_free_cstring};
+use daic_sys::root::__BindgenOpaqueArray;
 use std::ffi::CStr;
 
 /// Helper function to convert __BindgenOpaqueArray (std::string) to Rust String

@@ -3,3 +3,6 @@
 pub mod bindings {
     include!("../generated/bindings.rs");
 }
+
+// Re-export the generated bindings for easier access
+pub use bindings::*;

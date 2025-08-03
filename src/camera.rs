@@ -38,7 +38,7 @@ impl Camera {
         for attempt in 0..3 {
             match self.device.capture_frame() {
                 Ok(mut frame) => {
-                    // Pour les tests, utiliser des patterns variés
+                    // Test patterns
                     if frame_id % 90 < 30 {
                         frame = Frame::test_pattern(640, 480, TestPattern::Gradient);
                     } else if frame_id % 90 < 60 {
@@ -53,7 +53,7 @@ impl Camera {
                     if attempt == 2 {
                         return Err(e);
                     }
-                    // Pause courte avant retry
+                    // Short pause before retry
                     std::thread::sleep(Duration::from_millis(10));
                 }
             }
@@ -62,7 +62,7 @@ impl Camera {
         Err("Failed to capture after retries")
     }
 
-    /// Obtenir des statistiques de capture
+    /// Get stats about captures and device state
     pub fn get_stats(&self) -> CameraStats {
         CameraStats {
             total_frames: self.frame_counter.load(std::sync::atomic::Ordering::SeqCst),
@@ -71,13 +71,13 @@ impl Camera {
         }
     }
 
-    /// Déconnecter proprement la caméra
+    /// Disconnect the camera gracefully
     pub fn disconnect(&self) {
         self.device.disconnect();
     }
 }
 
-/// Statistiques de la caméra
+/// Camera statistics structure
 #[derive(Debug)]
 pub struct CameraStats {
     pub total_frames: u32,

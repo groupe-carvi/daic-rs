@@ -11,6 +11,7 @@
 extern "C" {
 #endif
 
+namespace daic {
 // Version informations getters
 API const char* dai_build_version();
 API const int dai_build_version_major();
@@ -29,6 +30,26 @@ API const char* dai_build_device_rvc4_version();
 // Helper function to convert std::string to C string (caller must free)
 API char* dai_string_to_cstring(const char* std_string);
 API void dai_free_cstring(char* cstring);
+
+// Device management
+typedef void* DeviceHandle;
+API DeviceHandle device_create();
+API void device_destroy(DeviceHandle handle);
+API bool device_is_connected(DeviceHandle handle);
+
+// Pipeline management
+typedef void* PipelineHandle;
+API PipelineHandle pipeline_create();
+API void pipeline_destroy(PipelineHandle handle);
+API bool pipeline_start(PipelineHandle handle, DeviceHandle device);
+API void pipeline_stop(PipelineHandle handle);
+API bool pipeline_is_running(PipelineHandle handle);
+
+// Error handling
+API const char* dai_get_last_error();
+API void dai_clear_last_error();
+
+} // namespace daic
 
 
 #ifdef __cplusplus

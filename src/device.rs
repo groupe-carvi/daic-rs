@@ -2,12 +2,15 @@
 
 use crate::bindings::root::dai;
 use crate::frame::Frame;
+use crate::error::{DaiError, DaiResult};
+use daic_sys::root::daic::{device_create, device_destroy, device_is_connected, DeviceHandle, dai_get_last_error};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 pub struct Device {
     inner: Arc<Mutex<DeviceInner>>,
     last_capture: Arc<Mutex<Option<Instant>>>,
+    ffi_handle: DeviceHandle,
 }
 
 struct DeviceInner {
@@ -18,8 +21,14 @@ struct DeviceInner {
 
 impl Device {
     /// Create a new DepthAI device instance with better error handling
-    pub fn new() -> Result<Self, &'static str> {
-        // Use null pointer instead of actual C++ object for maximum stability
+    pub fn new() -> DaiResult<Self> {
+        // Create FFI handle for new pipeline API
+        let ffi_handle = unsafe { device_create() };
+        if ffi_handle.is_null() {
+            return Err(DaiError::from_ffi());
+        }
+
+        // Use null pointer for legacy compatibility
         let device_ptr = std::ptr::null_mut();
         
         let inner = DeviceInner {
@@ -31,10 +40,19 @@ impl Device {
         Ok(Device {
             inner: Arc::new(Mutex::new(inner)),
             last_capture: Arc::new(Mutex::new(None)),
+            ffi_handle,
         })
     }
 
-    /// Capture a frame from the device with stability improvements
+    /// Create a new DepthAI device instance (legacy method for compatibility)
+    pub fn new_legacy() -> Result<Self, &'static str> {
+        match Self::new() {
+            Ok(device) => Ok(device),
+            Err(_) => Err("Failed to create device")
+        }
+    }
+
+    /// Capture a frame from the device
     pub fn capture_frame(&self) -> Result<Frame, &'static str> {
         // Rate limiting: minimum 10ms between captures for stability
         {
@@ -69,16 +87,44 @@ impl Device {
         inner.capture_count
     }
 
-    /// Check if device is connected
+    /// Check if device is connected (legacy method)
     pub fn is_connected(&self) -> bool {
         let inner = self.inner.lock().unwrap();
         inner.is_connected
+    }
+
+    /// Check if device is connected using FFI
+    pub fn is_connected_ffi(&self) -> DaiResult<bool> {
+        unsafe {
+            let connected = device_is_connected(self.ffi_handle);
+            // Check if there was an FFI error
+            let error_ptr = dai_get_last_error();
+            if !error_ptr.is_null() {
+                return Err(DaiError::from_ffi());
+            }
+            Ok(connected)
+        }
     }
 
     /// Disconnect device gracefully
     pub fn disconnect(&self) {
         let mut inner = self.inner.lock().unwrap();
         inner.is_connected = false;
+    }
+
+    /// Get the raw handle for FFI operations
+    /// 
+    /// # Safety
+    /// 
+    /// This is intended for internal use only. The handle must not be used after
+    /// the Device is dropped.
+    pub(crate) unsafe fn as_raw(&self) -> DeviceHandle {
+        self.ffi_handle
+    }
+
+    /// Get the device handle for pipeline operations
+    pub fn get_handle(&self) -> DeviceHandle {
+        self.ffi_handle
     }
 }
 
@@ -91,6 +137,55 @@ impl Drop for DeviceInner {
     }
 }
 
+impl Drop for Device {
+    fn drop(&mut self) {
+        if !self.ffi_handle.is_null() {
+            unsafe {
+                device_destroy(self.ffi_handle);
+            }
+        }
+    }
+}
+
 // Thread-safe device sharing
 unsafe impl Send for Device {}
 unsafe impl Sync for Device {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_device_creation() {
+        // Test that device creation returns a result (may fail without hardware)
+        let device_result = Device::new();
+        match device_result {
+            Ok(_) => println!("Device created successfully"),
+            Err(DaiError::FfiError(msg)) if msg.contains("No available devices") => {
+                println!("Expected error: No devices available");
+            }
+            Err(e) => panic!("Unexpected error: {}", e),
+        }
+    }
+
+    #[test]
+    fn test_device_legacy() {
+        // Test that legacy device creation returns a result
+        let device_result = Device::new_legacy();
+        match device_result {
+            Ok(_) => println!("Legacy device created successfully"),
+            Err(msg) if msg.contains("Failed to create device") => {
+                println!("Expected legacy error: {}", msg);
+            }
+            Err(e) => panic!("Unexpected legacy error: {}", e),
+        }
+    }
+
+    #[test]
+    #[cfg(feature = "hdep-tests")]
+    fn test_device_ffi_connection() {
+        let device = Device::new().expect("Failed to create device");
+        // Note: This test may fail if no device is actually connected
+        let _connected = device.is_connected_ffi();
+    }
+}

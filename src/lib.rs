@@ -6,13 +6,14 @@ pub mod camera_info;
 pub mod calibration;
 pub mod device_info;
 pub mod misc;
+pub mod error;
 
-pub use daic_sys::bindings::root::dai as dai;
-pub use daic_sys::bindings as bindings;
+pub use daic_sys as bindings;
 
-pub struct CameraBoardSocket {
-    pub(crate) inner: dai::CameraBoardSocket::Type,
-}
+// Re-export main types for convenience
+pub use crate::device::Device;
+pub use crate::pipeline::{Pipeline, PipelineBuilder};
+pub use crate::error::{DaiError, DaiResult};
 
 pub enum ReconnectionStatus {
     Reconnected, 
