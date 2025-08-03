@@ -309,3 +309,9 @@ pub fn kill_existing_rerun_processes() {
         let _ = Command::new("pkill").args(["-f", "rerun"]).spawn();
     }
 }
+
+fn main() {
+    println!("Development visualization example");
+    println!("This example demonstrates visualization capabilities for development.");
+    println!("Run this to test visualization features.");
+}

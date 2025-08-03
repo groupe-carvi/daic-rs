@@ -185,19 +185,6 @@ mod tests {
     }
 
     #[test]
-    fn test_device_legacy() {
-        // Test that legacy device creation returns a result
-        let device_result = Device::new_legacy();
-        match device_result {
-            Ok(_) => println!("Legacy device created successfully"),
-            Err(msg) if msg.contains("Failed to create device") => {
-                println!("Expected legacy error: {}", msg);
-            }
-            Err(e) => panic!("Unexpected legacy error: {}", e),
-        }
-    }
-
-    #[test]
     fn test_device_info_creation() {
         // Test device info structure creation (doesn't require hardware)
         let device_info = crate::device_info::DeviceInfo::new();

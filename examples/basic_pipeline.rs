@@ -1,16 +1,18 @@
-// Exemple basique utilisant seulement les bindings générés
+// Basic example using only generated bindings
 use daic_sys::{
-    root::{DeviceHandle, PipelineHandle},
-    device_create, device_destroy, device_is_connected,
-    pipeline_create, pipeline_destroy, pipeline_start, pipeline_stop, pipeline_is_running,
-    dai_get_last_error, dai_clear_last_error
+    root::daic::{DeviceHandle, PipelineHandle},
+    root::daic::{
+        device_create, device_destroy, device_is_connected,
+        pipeline_create, pipeline_destroy, pipeline_start, pipeline_stop, pipeline_is_running,
+        dai_get_last_error, dai_clear_last_error
+    }
 };
 use std::ffi::CStr;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Création d'un device DepthAI...");
+    println!("Creating a DepthAI device...");
     
-    // Créer le device
+    // Create the device
     let device = unsafe { device_create() };
     if device.is_null() {
         let error = unsafe { 
@@ -18,47 +20,47 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             if !err_ptr.is_null() {
                 CStr::from_ptr(err_ptr).to_string_lossy().to_string()
             } else {
-                "Erreur inconnue lors de la création du device".to_string()
+                "Unknown error during device creation".to_string()
             }
         };
-        return Err(format!("Impossible de créer le device: {}", error).into());
+        return Err(format!("Failed to create device: {}", error).into());
     }
     
-    println!("Device créé avec succès!");
+    println!("Device created successfully!");
     
-    // Vérifier la connexion
+    // Check connection
     let is_connected = unsafe { device_is_connected(device) };
-    println!("Device connecté: {}", is_connected);
+    println!("Device connected: {}", is_connected);
     
-    // Créer un pipeline
+    // Create a pipeline
     let pipeline = unsafe { pipeline_create() };
     if pipeline.is_null() {
         unsafe { device_destroy(device) };
-        return Err("Impossible de créer le pipeline".into());
+        return Err("Failed to create pipeline".into());
     }
     
-    println!("Pipeline créé avec succès!");
+    println!("Pipeline created successfully!");
     
-    // Démarrer le pipeline (probablement échouera sans device physique)
+    // Start the pipeline (will probably fail without physical device)
     let pipeline_started = unsafe { pipeline_start(pipeline, device) };
-    println!("Pipeline démarré: {}", pipeline_started);
+    println!("Pipeline started: {}", pipeline_started);
     
     if pipeline_started {
         let is_running = unsafe { pipeline_is_running(pipeline) };
-        println!("Pipeline en cours d'exécution: {}", is_running);
+        println!("Pipeline running: {}", is_running);
         
-        // Arrêter le pipeline
-        let stopped = unsafe { pipeline_stop(pipeline) };
-        println!("Pipeline arrêté: {}", stopped);
+        // Stop the pipeline
+        unsafe { pipeline_stop(pipeline); }
+        println!("Pipeline stopped");
     }
     
-    // Nettoyage
+    // Cleanup
     unsafe { 
         pipeline_destroy(pipeline);
         device_destroy(device);
         dai_clear_last_error();
     }
     
-    println!("Nettoyage terminé avec succès!");
+    println!("Cleanup terminated with success!");
     Ok(())
 }

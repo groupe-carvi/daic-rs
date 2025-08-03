@@ -29,10 +29,10 @@ fn main() -> DaiResult<()> {
     println!("✓ Pipeline created successfully");
 
     // Check initial pipeline state
-    match pipeline.is_running() {
-        Ok(false) => println!("✓ Pipeline is initially stopped"),
-        Ok(true) => println!("⚠ Pipeline is unexpectedly running"),
-        Err(e) => println!("⚠ Could not check pipeline status: {}", e),
+    if pipeline.is_running() {
+        println!("⚠ Pipeline is unexpectedly running");
+    } else {
+        println!("✓ Pipeline is initially stopped");
     }
 
     // Start the pipeline
@@ -42,10 +42,10 @@ fn main() -> DaiResult<()> {
             println!("✓ Pipeline started successfully");
             
             // Check if pipeline is running
-            match pipeline.is_running() {
-                Ok(true) => println!("✓ Pipeline is running"),
-                Ok(false) => println!("⚠ Pipeline should be running but reports stopped"),
-                Err(e) => println!("⚠ Could not check pipeline status: {}", e),
+            if pipeline.is_running() {
+                println!("✓ Pipeline is running");
+            } else {
+                println!("⚠ Pipeline should be running but reports stopped");
             }
 
             // Run for a short time
