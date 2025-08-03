@@ -100,14 +100,8 @@ impl Device {
         inner.capture_count
     }
 
-    /// Check if device is connected (legacy method)
-    pub fn is_connected(&self) -> bool {
-        let inner = self.inner.lock().unwrap();
-        inner.is_connected
-    }
-
     /// Check if device is connected using FFI
-    pub fn is_connected_ffi(&self) -> DaiResult<bool> {
+    pub fn is_connected(&self) -> DaiResult<bool> {
         unsafe {
             let connected = device_is_connected(self.ffi_handle);
             // Check if there was an FFI error

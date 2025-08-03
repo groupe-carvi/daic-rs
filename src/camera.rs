@@ -14,7 +14,7 @@ impl Camera {
     pub fn new(device: Device ) -> Result<Self, &'static str> {
         
         // Test initial de connectivité
-        if !device.is_connected() {
+        if !device.is_connected().unwrap() {
             return Err("Device not connected");
         }
 
@@ -27,7 +27,7 @@ impl Camera {
     /// Capture une image depuis la caméra avec stabilité améliorée
     pub fn capture(&self) -> Result<Frame, &'static str> {
         // Vérifier que le device est toujours connecté
-        if !self.device.is_connected() {
+        if !self.device.is_connected().unwrap_or(false) {
             return Err("Camera disconnected");
         }
 
@@ -67,7 +67,7 @@ impl Camera {
         CameraStats {
             total_frames: self.frame_counter.load(std::sync::atomic::Ordering::SeqCst),
             device_captures: self.device.get_capture_count(),
-            is_connected: self.device.is_connected(),
+            is_connected: self.device.is_connected().unwrap(),
         }
     }
 
