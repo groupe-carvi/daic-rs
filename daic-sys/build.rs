@@ -34,9 +34,9 @@ static DEPTHAI_CORE_ROOT: Lazy<RwLock<PathBuf>> = Lazy::new(|| {
 
 const DEPTHAI_CORE_REPOSITORY: &str = "https://github.com/luxonis/depthai-core.git";
 
-const DEPTHAI_CORE_BRANCH: &str = "v3.0.0-rc.2";
+const DEPTHAI_CORE_BRANCH: &str = "v3.0.0-rc.4";
 
-const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-core/releases/download/v3.0.0-rc.2/depthai-core-v3.0.0-rc.2-win64.zip";
+const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-core/releases/download/v3.0.0-rc.4/depthai-core-v3.0.0-rc.4-win64.zip";
 
 const OPENCV_WIN_PREBUILT_URL: &str = "https://github.com/opencv/opencv/releases/download/4.11.0/opencv-4.11.0-windows.exe";
 
