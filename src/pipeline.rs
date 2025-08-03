@@ -14,13 +14,16 @@
 //!
 //! ## Example Usage
 //!
-//! ```rust
+//! ```rust,no_run
 //! use daic_rs::pipeline::*;
+//! use daic_rs::{CameraBoardSocket, Device};
 //!
 //! // Create a pipeline with camera and neural network
 //! let mut pipeline = PipelineBuilder::new()
-//!     .add_camera(CameraBoardSocket::CAM_A)
+//!     .add_camera(CameraBoardSocket::CamA)
+//!     .finish()
 //!     .add_neural_network("path/to/model.blob")
+//!     .finish()
 //!     .build()?;
 //!
 //! // Connect to device and start
