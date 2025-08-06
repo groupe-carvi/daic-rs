@@ -3,6 +3,8 @@
 mod bindings {
     include!("../generated/bindings.rs");
 }
+pub mod string_utils;
 
 // Re-export the generated bindings for easier access
-pub use bindings::*;
+pub use bindings::root::daic as daic;
+pub use bindings::root::dai as dai;

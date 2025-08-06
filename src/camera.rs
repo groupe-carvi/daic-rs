@@ -1,90 +1,133 @@
-//! Safe Rust API for DepthAI camera
-use crate::device::{self, Device};
-use crate::frame::{Frame, TestPattern};
-use std::sync::Arc;
-use std::time::Duration;
+use daic_sys::daic;
+// use std::collections::HashMap;
 
-pub struct Camera {
-    device: Arc<Device>,
-    frame_counter: std::sync::atomic::AtomicU32,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct CameraBoardSocket(pub i32);
+
+/// Safe Rust wrapper for DepthAI Camera Node
+pub struct CameraNode {
+    handle: daic::DaiCameraNode,
 }
 
-impl Camera {
-    /// Initialise une nouvelle caméra DepthAI avec gestion d'erreur améliorée
-    pub fn new(device: Device ) -> Result<Self, &'static str> {
-        
-        // Test initial de connectivité
-        if !device.is_connected().unwrap() {
-            return Err("Device not connected");
-        }
-
-        Ok(Camera {
-            device: Arc::new(device),
-            frame_counter: std::sync::atomic::AtomicU32::new(0),
-        })
+impl CameraNode {
+    pub(crate) fn new(handle: daic::DaiCameraNode) -> Self {
+        Self { handle }
     }
 
-    /// Capture une image depuis la caméra avec stabilité améliorée
-    pub fn capture(&self) -> Result<Frame, &'static str> {
-        // Vérifier que le device est toujours connecté
-        if !self.device.is_connected().unwrap_or(false) {
-            return Err("Camera disconnected");
-        }
+// Adapt according to the actual C++ API if build is needed
+// pub fn build(&self, socket: CameraBoardSocket) -> Result<(), String> { ... }
 
-        // Incrémenter le compteur de frames de façon thread-safe
-        let frame_id = self.frame_counter.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-        
-        // Capture avec retry en cas d'erreur temporaire
-        for attempt in 0..3 {
-            match self.device.capture_frame() {
-                Ok(mut frame) => {
-                    // Test patterns
-                    if frame_id % 90 < 30 {
-                        frame = Frame::test_pattern(640, 480, TestPattern::Gradient);
-                    } else if frame_id % 90 < 60 {
-                        frame = Frame::test_pattern(640, 480, TestPattern::Checkerboard);
-                    } else {
-                        frame = Frame::test_pattern(640, 480, TestPattern::Noise);
-                    }
-                    
-                    return Ok(frame.with_frame_id(frame_id));
+    pub fn request_output(&self, width: i32, height: i32, type_: i32, resize_mode: i32, fps: f32, enable_undistortion: i32) -> Result<Output, String> {
+        let handle = unsafe {
+            daic::dai_camera_request_output(
+                self.handle,
+                width,
+                height,
+                type_,
+                resize_mode,
+                fps,
+                enable_undistortion,
+            )
+        };
+        if handle.is_null() {
+            let error = unsafe {
+                let error_ptr = daic::dai_get_last_error();
+                if !error_ptr.is_null() {
+                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
+                } else {
+                    "Failed to get camera output".to_string()
                 }
-                Err(e) => {
-                    if attempt == 2 {
-                        return Err(e);
-                    }
-                    // Short pause before retry
-                    std::thread::sleep(Duration::from_millis(10));
+            };
+            Err(error)
+        } else {
+            Ok(Output::new(handle as *mut std::ffi::c_void))
+        }
+    }
+
+
+    pub fn request_full_resolution_output(&self) -> Result<Output, String> {
+        let handle = unsafe { daic::dai_camera_request_full_resolution_output(self.handle) };
+        if handle.is_null() {
+            let error = unsafe {
+                let error_ptr = daic::dai_get_last_error();
+                if !error_ptr.is_null() {
+                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
+                } else {
+                    "Failed to get camera output".to_string()
                 }
-            }
+            };
+            Err(error)
+        } else {
+            Ok(Output::new(handle as *mut std::ffi::c_void))
         }
-        
-        Err("Failed to capture after retries")
-    }
-
-    /// Get stats about captures and device state
-    pub fn get_stats(&self) -> CameraStats {
-        CameraStats {
-            total_frames: self.frame_counter.load(std::sync::atomic::Ordering::SeqCst),
-            device_captures: self.device.get_capture_count(),
-            is_connected: self.device.is_connected().unwrap(),
-        }
-    }
-
-    /// Disconnect the camera gracefully
-    pub fn disconnect(&self) {
-        self.device.disconnect();
     }
 }
 
-/// Camera statistics structure
-#[derive(Debug)]
-pub struct CameraStats {
-    pub total_frames: u32,
-    pub device_captures: u32,
-    pub is_connected: bool,
+/// Safe Rust wrapper for DepthAI Output
+pub struct Output {
+    handle: *mut std::ffi::c_void,
 }
 
-// Thread safety
-unsafe impl Send for Camera {}
-unsafe impl Sync for Camera {}
+impl Output {
+    pub(crate) fn new(handle: *mut std::ffi::c_void) -> Self {
+        Self { handle }
+    }
+
+    pub fn create_output_queue(&self) -> Result<MessageQueue, String> {
+        // There is no dai_output_create_queue, use DaiDataQueue if needed
+        // Placeholder: returns an error
+        Err("Not implemented: output queue creation".to_string())
+    }
+}
+
+/// Safe Rust wrapper for DepthAI Message Queue
+pub struct MessageQueue {
+    handle: *mut daic::DaiDataQueue,
+}
+
+impl MessageQueue {
+    pub(crate) fn new(handle: *mut daic::DaiDataQueue) -> Self {
+        Self { handle }
+    }
+
+    pub fn get(&self) -> Option<*mut std::ffi::c_void> {
+        // There is no dai_message_queue_get, use dai_frame_get_data if needed
+        None
+    }
+}
+
+impl Drop for MessageQueue {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            unsafe { daic::dai_queue_delete(self.handle as *mut ::std::os::raw::c_void) };
+        }
+    }
+}
+
+unsafe impl Send for MessageQueue {}
+unsafe impl Sync for MessageQueue {}
+
+impl CameraBoardSocket {
+    pub fn to_string(&self) -> Result<String, String> {
+        let c_str = unsafe { daic::dai_camera_socket_name(self.0) };
+        if c_str.is_null() {
+            let error = unsafe {
+                let error_ptr = daic::dai_get_last_error();
+                if !error_ptr.is_null() {
+                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
+                } else {
+                    "Failed to convert socket to string".to_string()
+                }
+            };
+            Err(error)
+        } else {
+            let result = unsafe {
+                let rust_str = std::ffi::CStr::from_ptr(c_str).to_string_lossy().into_owned();
+                // Free the C string properly
+                daic::dai_free_cstring(c_str as *mut ::std::os::raw::c_char);
+                rust_str
+            };
+            Ok(result)
+        }
+    }
+}

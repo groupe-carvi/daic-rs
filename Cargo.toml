@@ -9,10 +9,11 @@ hdep-tests = [] # Hardware Dependent Tests
 
 [dependencies]
 image = "0.25.6"
-memmap2 = "0.9.5"
+memmap2 = "0.9.7"
 ndarray = "0.16.1"
 daic-sys = { path = "daic-sys" }
 imageproc = "0.25.0"
+serde = { version = "1.0.219", features = ["derive"] }
 
 [workspace]
 members = [
@@ -23,3 +24,11 @@ members = [
 [dev-dependencies]
 kornia = "0.1.9"
 rerun = "0.24.0"
+
+[[example]]
+name = "rgbd"
+path = "examples/rgbd/rgbd.rs"
+
+[[example]]
+name = "camera"
+path = "examples/camera.rs"

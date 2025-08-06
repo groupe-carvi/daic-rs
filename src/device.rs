@@ -1,192 +1,150 @@
-//! Safe Rust API for DepthAI Device
+use daic_sys::daic;
+use crate::camera_api::{CameraBoardSocket, CameraNode};
 
-use crate::bindings::root::dai;
-use crate::frame::Frame;
-use crate::error::{DaiError, DaiResult};
-use daic_sys::root::daic::{device_create, device_destroy, device_is_connected, DeviceHandle, dai_get_last_error};
-use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant};
-
-/// Device platform information
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Platform {
-    /// RVC2 platform
-    Rvc2,
-    /// RVC3 platform  
-    Rvc3,
-    /// RVC4 platform
-    Rvc4,
-    /// Unknown platform
-    Unknown(u32),
-}
-
+/// Safe Rust wrapper for DepthAI Device
 pub struct Device {
-    inner: Arc<Mutex<DeviceInner>>,
-    last_capture: Arc<Mutex<Option<Instant>>>,
-    ffi_handle: DeviceHandle,
-}
-
-struct DeviceInner {
-    device_ptr: *mut dai::Device,
-    is_connected: bool,
-    capture_count: u32,
+    handle: daic::DaiDevice,
 }
 
 impl Device {
-    /// Create a new DepthAI device instance with better error handling
-    pub fn new() -> DaiResult<Self> {
-        // Create FFI handle for new pipeline API
-        let ffi_handle = unsafe { device_create() };
-        if ffi_handle.is_null() {
-            return Err(DaiError::from_ffi());
+    pub fn new() -> Result<Self, String> {
+        let handle = unsafe { daic::dai_device_new() };
+        if handle.is_null() {
+            let error = unsafe {
+                let error_ptr = daic::dai_get_last_error();
+                if !error_ptr.is_null() {
+                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
+                } else {
+                    "Failed to create device".to_string()
+                }
+            };
+            Err(error)
+        } else {
+            Ok(Device { handle })
         }
+    }
 
-        // Use null pointer for legacy compatibility
-        let device_ptr = std::ptr::null_mut();
+    pub fn is_connected(&self) -> bool {
+        // Check if device is not closed (inverse logic)
+        !unsafe { daic::dai_device_is_closed(self.handle) }
+    }
+
+    pub(crate) fn handle(&self) -> daic::DaiDevice {
+        self.handle
+    }
+
+    pub fn get_connected_cameras(&self) -> Result<Vec<CameraBoardSocket>, String> {
+        const MAX_SOCKETS: usize = 16; // Reasonable maximum for DepthAI devices
+        let mut sockets = vec![0i32; MAX_SOCKETS];
         
-        let inner = DeviceInner {
-            device_ptr,
-            is_connected: true,
-            capture_count: 0,
+        let count = unsafe { 
+            daic::dai_device_get_connected_camera_sockets(self.handle, sockets.as_mut_ptr(), MAX_SOCKETS as i32) 
         };
         
-        Ok(Device {
-            inner: Arc::new(Mutex::new(inner)),
-            last_capture: Arc::new(Mutex::new(None)),
-            ffi_handle,
-        })
-    }
-
-    /// Create a new DepthAI device instance (legacy method for compatibility)
-    pub fn new_legacy() -> Result<Self, &'static str> {
-        match Self::new() {
-            Ok(device) => Ok(device),
-            Err(_) => Err("Failed to create device")
-        }
-    }
-
-    /// Capture a frame from the device
-    pub fn capture_frame(&self) -> Result<Frame, &'static str> {
-        // Rate limiting: minimum 10ms between captures for stability
-        {
-            let mut last_capture = self.last_capture.lock().unwrap();
-            if let Some(last_time) = *last_capture {
-                let elapsed = last_time.elapsed();
-                if elapsed < Duration::from_millis(10) {
-                    std::thread::sleep(Duration::from_millis(10) - elapsed);
+        if count == 0 {
+            let error = unsafe {
+                let error_ptr = daic::dai_get_last_error();
+                if !error_ptr.is_null() {
+                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
+                } else {
+                    "No cameras found or error getting cameras".to_string()
                 }
-            }
-            *last_capture = Some(Instant::now());
+            };
+            return Err(error);
         }
-
-        let mut inner = self.inner.lock().unwrap();
         
-        // Check if device is still connected
-        if !inner.is_connected {
-            return Err("Device disconnected");
-        }
-
-        // Increment capture count for monitoring
-        inner.capture_count += 1;
-        
-        // For now, return a dummy frame with proper dimensions
-        // TODO: Implement actual capture when C++ bindings are stable
-        Ok(Frame::new_with_data(640, 480, vec![128; 640 * 480]))
-    }
-
-    /// Get capture statistics
-    pub fn get_capture_count(&self) -> u32 {
-        let inner = self.inner.lock().unwrap();
-        inner.capture_count
-    }
-
-    /// Check if device is connected using FFI
-    pub fn is_connected(&self) -> DaiResult<bool> {
-        unsafe {
-            let connected = device_is_connected(self.ffi_handle);
-            // Check if there was an FFI error
-            let error_ptr = dai_get_last_error();
-            if !error_ptr.is_null() {
-                return Err(DaiError::from_ffi());
-            }
-            Ok(connected)
-        }
-    }
-
-    /// Disconnect device gracefully
-    pub fn disconnect(&self) {
-        let mut inner = self.inner.lock().unwrap();
-        inner.is_connected = false;
-    }
-
-    /// Get the raw handle for FFI operations
-    /// 
-    /// # Safety
-    /// 
-    /// This is intended for internal use only. The handle must not be used after
-    /// the Device is dropped.
-    pub(crate) unsafe fn as_raw(&self) -> DeviceHandle {
-        self.ffi_handle
-    }
-
-    /// Get the device handle for pipeline operations
-    pub fn get_handle(&self) -> DeviceHandle {
-        self.ffi_handle
-    }
-}
-
-// Implement proper cleanup - safer version
-impl Drop for DeviceInner {
-    fn drop(&mut self) {
-        // Safe cleanup - no C++ deallocation to avoid crashes
-        self.is_connected = false;
-        self.device_ptr = std::ptr::null_mut();
+        sockets.truncate(count as usize);
+        Ok(sockets.into_iter().map(CameraBoardSocket).collect())
     }
 }
 
 impl Drop for Device {
     fn drop(&mut self) {
-        if !self.ffi_handle.is_null() {
-            unsafe {
-                device_destroy(self.ffi_handle);
-            }
+        if !self.handle.is_null() {
+            unsafe { daic::dai_device_delete(self.handle) };
         }
     }
 }
 
-// Thread-safe device sharing
 unsafe impl Send for Device {}
 unsafe impl Sync for Device {}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+/// Safe Rust wrapper for DepthAI Pipeline
+pub struct Pipeline {
+    handle: daic::DaiPipeline,
+}
 
-    #[test]
-    fn test_device_creation() {
-        // Test that device creation returns a result (may fail without hardware)
-        let device_result = Device::new();
-        match device_result {
-            Ok(_device) => {
-                println!("Device created successfully");
-                // Basic creation successful, this is enough for unit testing
-            }
-            Err(DaiError::FfiError(msg)) if msg.contains("No available devices") => {
-                println!("Expected error: No devices available");
-            }
-            Err(e) => panic!("Unexpected error: {}", e),
+impl Pipeline {
+    pub fn new(_device: &Device) -> Result<Self, String> {
+        let handle = unsafe { daic::dai_pipeline_new() };
+        if handle.is_null() {
+            let error = unsafe {
+                let error_ptr = daic::dai_get_last_error();
+                if !error_ptr.is_null() {
+                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
+                } else {
+                    "Failed to create pipeline".to_string()
+                }
+            };
+            Err(error)
+        } else {
+            Ok(Pipeline { handle })
         }
     }
 
-    #[test]
-    fn test_device_info_creation() {
-        // Test device info structure creation (doesn't require hardware)
-        let device_info = crate::device_info::DeviceInfo::new();
-        
-        // Just test that we can create a DeviceInfo without panicking
-        // The actual values depend on the C++ implementation
-        let _name = device_info.get_name();
-        
-        println!("DeviceInfo created successfully");
+    pub fn start(&self, device: &Device) -> Result<(), String> {
+        let success = unsafe { daic::dai_pipeline_start(self.handle, device.handle()) };
+        if success {
+            Ok(())
+        } else {
+            let error = unsafe {
+                let error_ptr = daic::dai_get_last_error();
+                if !error_ptr.is_null() {
+                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
+                } else {
+                    "Failed to start pipeline".to_string()
+                }
+            };
+            Err(error)
+        }
+    }
+
+    pub fn stop(&self) {
+        // Note: No dai_pipeline_stop function available in the bindings
+        // This might need to be implemented in the C++ wrapper if needed
+    }
+
+    pub fn is_running(&self) -> bool {
+        // Note: No dai_pipeline_is_running function available in the bindings
+        // This might need to be implemented in the C++ wrapper if needed
+        false
+    }
+
+    pub fn create_camera_node(&self) -> Result<CameraNode, String> {
+        let handle = unsafe { daic::dai_pipeline_create_camera(self.handle) };
+        if handle.is_null() {
+            let error = unsafe {
+                let error_ptr = daic::dai_get_last_error();
+                if !error_ptr.is_null() {
+                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
+                } else {
+                    "Failed to create camera node".to_string()
+                }
+            };
+            Err(error)
+        } else {
+            Ok(CameraNode::new(handle))
+        }
     }
 }
+
+impl Drop for Pipeline {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            unsafe { daic::dai_pipeline_delete(self.handle) };
+        }
+    }
+}
+
+unsafe impl Send for Pipeline {}
+unsafe impl Sync for Pipeline {}
