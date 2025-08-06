@@ -1,5 +1,5 @@
-use daic_rs::safe_api::{Device, Pipeline};
-use daic_rs::camera_api::MessageQueue;
+use daic_rs::device::{Device, Pipeline};
+use daic_rs::camera::MessageQueue;
 use std::collections::HashMap;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

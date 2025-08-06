@@ -1,5 +1,5 @@
 use daic_sys::daic;
-use crate::camera_api::{CameraBoardSocket, CameraNode};
+use crate::camera::{CameraBoardSocket, CameraNode};
 
 /// Safe Rust wrapper for DepthAI Device
 pub struct Device {
