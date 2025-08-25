@@ -1,0 +1,158 @@
+{
+	"name": "rust-studio",
+	// image: "localhost/devcontainers/rust-studio:latest",
+	"build": {
+		"context": ".",
+		"dockerfile": "./Containerfile"
+		// "args": {
+		// 	// "STUDIO": "2025.1.1.13",
+		// 	// "BUILD": "35.0.1",
+		// 	// "NDK": "28.2.13676358",
+		// 	// "APIS": "21 22 23 24 25 26 27 28 29 30 31 32 33 34 35"
+		// }
+	},
+	"runArgs": [
+		"--cpus", "2",
+    "--memory", "10g",
+    "--ulimit", "cpu=300:600",
+		"--userns", "keep-id",
+		"--security-opt", "label=disable",
+		"--gpus", "all",
+		"--net", "host"
+	],
+	"containerEnv": {
+    "CARGO_BUILD_JOBS": "2",
+		"HOME": "/home/vscode",
+		"NO_AT_BRIDGE": "1",
+		"DISPLAY": "${localEnv:DISPLAY}",
+		"NVIDIA_DRIVER_CAPABILITIES": "all",
+		"NVIDIA_VISIBLE_DEVICES": "all",
+		"NVIDIA_CTK_DEBUG": "true",
+		"XDG_RUNTIME_DIR": "${localEnv:XDG_RUNTIME_DIR}",
+		"WEBKIT_DISABLE_COMPOSITING_MODE": "1",
+		"PNPM_HOME": "/pnpm"
+	},
+	"mounts": [
+		{
+			"source": "/home/${localEnv:USER}/.ssh",
+			"target": "/home/vscode/.ssh",
+			"type": "bind"
+		},
+		{
+			"source": "/home/${localEnv:USER}/.ssh",
+			"target": "/home/${localEnv:USER}/.ssh",
+			"type": "bind"
+		},
+		{
+			"source": "/tmp/.X11-unix",
+			"target": "/tmp/.X11-unix",
+			"type": "bind"
+		},
+		{
+			"source": "/run/user/1000/bus",
+			"target": "/run/user/1000c/bus",
+			"type": "bind"
+		}
+	],
+	"postCreateCommand": "/opt/flutter/bin/flutter doctor || true",
+	"containerUser": "vscode",
+	"remoteUser": "vscode",
+	"customizations": {
+		"vscode": {
+			"extensions": [
+				"vadimcn.vscode-lldb",
+				"tauri-apps.tauri-vscode",
+				"rust-lang.rust-analyzer",
+				"svelte.svelte-vscode",
+				"ms-vscode.cpptools",
+				"ms-vscode.cpptools-extension-pack",
+				"theqtcompany.qt-cpp",
+				"esbenp.prettier-vscode",
+				"dbaeumer.vscode-eslint",
+				"xabikos.JavaScriptSnippets",
+				"dzannotti.vscode-babel-coloring",
+				"mikestead.dotenv",
+				"EditorConfig.EditorConfig",
+				"eamodio.gitlens",
+				"vscode-icons-team.vscode-icons",
+				"fwcd.kotlin",
+				"vscjava.vscode-gradle",
+				"ms-azuretools.vscode-docker",
+				"GitHub.vscode-github-actions",
+				"golang.go",
+				"redhat.vscode-yaml",
+				"streetsidesoftware.code-spell-checker",
+				"task.vscode-task",
+				"dart-code.dart-code",
+				"dart-code.flutter",
+				"esbenp.prettier-vscode"
+			],
+			"settings": {
+				"[javascript]": {
+					"editor.formatOnSave": true,
+					"editor.formatOnPaste": true,
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"[typescript]": {
+					"editor.formatOnSave": true,
+					"editor.formatOnPaste": true,
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"[dart]": {
+					"editor.formatOnSave": true,
+					"editor.formatOnPaste": true,
+					"editor.defaultFormatter": "dart-code.dart-code"
+				},
+				"[javascriptreact]": {
+					"editor.formatOnSave": true,
+					"editor.formatOnPaste": true,
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"[typescriptreact]": {
+					"editor.formatOnSave": true,
+					"editor.formatOnPaste": true,
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"[svelte]": {
+					"editor.formatOnSave": true,
+					"editor.formatOnPaste": true,
+					"editor.defaultFormatter": "svelte.svelte-vscode"
+				},
+				"[css]": {
+					"editor.formatOnSave": true,
+					"editor.formatOnPaste": true,
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"[html]": {
+					"editor.formatOnSave": true,
+					"editor.formatOnPaste": true,
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"[yaml]": {
+					"editor.formatOnSave": true,
+					"editor.formatOnPaste": true,
+					"editor.defaultFormatter": "esbenp.prettier-vscode"
+				},
+				"eslint.options": {
+					"extensions": [".html", ".js", ".ts", ".svelte"]
+				},
+				"eslint.validate": ["html", "svelte", "javascript", "typescript"]
+			}
+		}
+	}
+
+	// 👇 Features to add to the Dev Container. More info: https://containers.dev/implementors/features.
+	// "features": {},
+
+	// 👇 Use 'forwardPorts' to make a list of ports inside the container available locally.
+	// "forwardPorts": [],
+
+	// 👇 Use 'postCreateCommand' to run commands after the container is created.
+	// "postCreateCommand": ""
+
+	// 👇 Configure tool-specific properties.
+	// "customizations": {},
+
+	// 👇 Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
+	// "remoteUser": "root"
+}

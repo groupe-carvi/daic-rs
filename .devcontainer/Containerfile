@@ -1,0 +1,176 @@
+
+ARG STUDIO=2025.1.1.13
+ARG BUILD=35.0.1
+ARG NDK=28.2.13676358
+ARG APIS="21 22 23 24 25 26 27 28 29 30 31 32 33 34 35"
+ARG UID=1000
+
+# Node
+FROM docker.io/library/node:lts-bookworm as node
+
+RUN corepack enable && \
+    corepack prepare pnpm@latest-9 --activate
+
+
+
+# Task
+FROM docker.io/library/golang:1-bookworm as go
+
+ENV GOBIN=/usr/local/bin 
+
+RUN go install github.com/go-task/task/v3/cmd/task@latest
+
+
+
+# Android
+FROM docker.io/thyrlian/android-sdk:latest as android
+
+ARG STUDIO
+ARG BUILD
+ARG NDK
+ARG APIS
+
+ENV ANDROID_STUDIO=/opt/android-studio
+ENV ANDROID_HOME=/opt/android-sdk
+ENV NDK_HOME=${ANDROID_HOME}/ndk
+ENV STUDIO=${STUDIO}
+ENV BUILD=${BUILD}
+ENV NDK=${NDK}
+ENV APIS=${APIS}
+
+RUN yes | ${ANDROID_HOME}/cmdline-tools/tools/bin/sdkmanager --licenses && \
+    ${ANDROID_HOME}/cmdline-tools/tools/bin/sdkmanager --install \
+      "platform-tools" \
+      "ndk;${NDK}" \
+      "build-tools;${BUILD}" \
+      "cmdline-tools;latest" \
+      "emulator" \
+      "system-images;android-33;google_apis;x86_64" \
+      "system-images;android-34;google_apis;x86_64" \
+      "system-images;android-35;google_apis;x86_64" && \
+    for api in ${APIS}; do \
+        ${ANDROID_HOME}/cmdline-tools/tools/bin/sdkmanager --install "platforms;android-$api"; \
+    done
+
+ADD https://dl.google.com/dl/android/studio/ide-zips/${STUDIO}/android-studio-${STUDIO}-linux.tar.gz /opt/android-studio.tar.gz
+RUN cd /opt/ && tar -zxvf android-studio.tar.gz && \
+    rm android-studio.tar.gz
+
+# Flutter
+RUN git clone https://github.com/flutter/flutter.git /opt/flutter
+
+
+
+# Rust
+FROM mcr.microsoft.com/devcontainers/rust:1-bookworm
+
+ARG NDK
+ARG UID
+ARG PUID=1000
+ARG PGID=1000
+
+ENV ANDROID_STUDIO=/opt/android-studio
+ENV ANDROID_HOME=/opt/android-sdk
+ENV JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
+ENV NDK_HOME=${ANDROID_HOME}/ndk/${NDK}/
+ENV NDK=${NDK}
+
+ENV PATH="$PATH:/home/linuxbrew/.linuxbrew/Homebrew/bin:/opt/gradle/bin:/opt/kotlinc/bin:/opt/android-studio/bin:/opt/android-sdk/cmdline-tools/latest/bin:/opt/android-sdk/cmdline-tools/tools/bin:/opt/android-sdk/platform-tools:/opt/android-sdk/emulator:/usr/lib/dart/bin"
+
+ENV UID=${PUID:-${UID:-1000}}
+ENV GID=${PGID:-${UID:-1000}}
+
+COPY --from=docker.io/library/dart:stable /usr/lib/dart /usr/lib/dart
+
+COPY --from=docker.io/oven/bun:1-debian /usr/local/bin/bun /usr/local/bin/bun
+COPY --from=docker.io/oven/bun:1-debian /usr/local/bin/bunx /usr/local/bin/bunx
+
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+COPY --from=node /usr/local/bin /usr/local/bin
+
+COPY --from=go /usr/local/bin/task /usr/local/bin/task
+
+COPY --from=docker.io/homebrew/brew:latest --chown=${UID}:${GID} /home/linuxbrew/.linuxbrew /home/linuxbrew/.linuxbrew
+
+COPY --from=android --chown=${UID}:${GID} ${ANDROID_STUDIO} ${ANDROID_STUDIO}
+COPY --from=android --chown=${UID}:${GID} ${ANDROID_HOME} ${ANDROID_HOME}
+COPY --from=android --chown=${UID}:${GID} ${JAVA_HOME} ${JAVA_HOME}
+COPY --from=android --chown=${UID}:${GID} /opt/gradle /opt/gradle
+COPY --from=android --chown=${UID}:${GID} /opt/kotlinc /opt/kotlinc
+COPY --from=android --chown=${UID}:${GID} /opt/flutter /opt/flutter
+
+RUN ln -s /home/linuxbrew/.linuxbrew/Homebrew/bin/brew /usr/local/bin/brew && \
+    mkdir -p /run/user/1000 && \
+    chown ${UID}:${GID} /run/user/1000
+
+RUN apt-get update && \ 
+    apt-get install -y --no-install-recommends \
+      # General Utilities
+      dbus-user-session \
+      build-essential \
+      ca-certificates \
+      curl \
+      tar \
+      xz-utils \
+      wget \
+      file \
+      unzip \
+      procps \
+      git \
+      git-lfs \
+      # Android
+      openjdk-17-jdk \
+      libwebkit2gtk-4.1-dev \
+      libcanberra-gtk-module \
+      libcanberra-gtk3-module \
+      libudev-dev \
+      libtool  \
+      libssl-dev \
+      libayatana-appindicator3-dev \
+      librsvg2-dev \
+      # BindGen
+      libclang-dev \
+      clang \
+      cmake \ 
+      ninja-build \
+      python3 \
+      autoconf \
+      automake \
+      autoconf-archive \
+      # Windows
+      mingw-w64 && \
+      # Depth AI
+      libopencv-dev \
+      xtensor-dev \   
+      # Clean Up
+      apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# Update Rust 
+RUN rustup update stable && \
+    rustup default stable && \
+    rustup component add rustfmt rust-src
+
+# Mobile
+RUN rustup target add \
+      # Windows
+      x86_64-pc-windows-gnu \
+      i686-pc-windows-gnu \
+      # Linux
+      x86_64-unknown-linux-gnu \
+      aarch64-unknown-linux-gnu \
+      # MacOS
+      x86_64-apple-darwin \
+      aarch64-apple-darwin \
+      # Android
+      aarch64-linux-android \
+      armv7-linux-androideabi \
+      i686-linux-android \
+      x86_64-linux-android \
+      # iOS
+      aarch64-apple-ios \
+      x86_64-apple-ios \
+      aarch64-apple-ios-sim && \
+    avdmanager create avd --name flutter --force --package "system-images;android-35;google_apis;x86_64" --device pixel_7_pro
+      
+# Frontend
+RUN bun x playwright install --with-deps
