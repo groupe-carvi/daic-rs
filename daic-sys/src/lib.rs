@@ -1,10 +1,66 @@
-#[allow(non_camel_case_types, non_upper_case_globals, non_snake_case)]
-#[allow(unsafe_op_in_unsafe_fn)]
-mod bindings {
-    include!("../generated/bindings.rs");
+// Use autocxx to generate C++ bindings
+use autocxx::prelude::*;
+
+include_cpp! {
+    #include "autocxx_wrapper.h"
+
+    // Version information helpers
+    generate!("daic::dai_build_version")
+    generate!("daic::dai_build_version_major")
+    generate!("daic::dai_build_version_minor")
+    generate!("daic::dai_build_version_patch")
+    generate!("daic::dai_build_pre_release_type")
+    generate!("daic::dai_build_pre_release_version")
+    generate!("daic::dai_build_commit")
+    generate!("daic::dai_build_commit_datetime")
+    generate!("daic::dai_build_build_datetime")
+    generate!("daic::dai_build_device_version")
+    generate!("daic::dai_build_bootloader_version")
+    generate!("daic::dai_build_device_rvc3_version")
+    generate!("daic::dai_build_device_rvc4_version")
+
+    // Raw handle types
+    generate!("daic::DaiDevice")
+    generate!("daic::DaiPipeline")
+    generate!("daic::DaiCameraNode")
+    generate!("daic::DaiDataQueue")
+
+    // Device functions
+    generate!("daic::dai_device_new")
+    generate!("daic::dai_device_delete")
+    generate!("daic::dai_device_is_closed")
+    generate!("daic::dai_device_close")
+    generate!("daic::dai_device_get_connected_camera_sockets")
+
+    // Pipeline functions
+    generate!("daic::dai_pipeline_new")
+    generate!("daic::dai_pipeline_delete")
+    generate!("daic::dai_pipeline_start")
+    generate!("daic::dai_pipeline_create_camera")
+
+    // Camera helpers
+    generate!("daic::dai_camera_request_output")
+    generate!("daic::dai_camera_request_output_capability")
+    generate!("daic::dai_camera_request_full_resolution_output")
+
+    // Queue/frame helpers
+    generate!("daic::dai_queue_delete")
+
+    // Utilities
+    generate!("daic::dai_camera_socket_name")
+    generate!("daic::dai_string_to_cstring")
+    generate!("daic::dai_free_cstring")
+    generate!("daic::dai_get_last_error")
+    generate!("daic::dai_clear_last_error")
+
+    safety!(unsafe_ffi)
 }
+
 pub mod string_utils;
 
-// Re-export the generated bindings for easier access
-pub use bindings::root::daic as daic;
-pub use bindings::root::dai as dai;
+// Simple test module to verify autocxx works
+#[cfg(test)]
+mod simple_test;
+
+// Re-export for convenience
+pub use ffi::*;

@@ -30,7 +30,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y cmake ninja-build build-essential git pkg-config libusb-1.0-0-dev
+          sudo apt-get install -y cmake ninja-build build-essential git pkg-config libusb-1.0-0-dev libopencv-dev
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -60,4 +60,4 @@ jobs:
             ${{ runner.os }}-target-
 
       - name: Build project
-        run: cargo build --debug
+        run: cargo build --release
