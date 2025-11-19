@@ -141,18 +141,10 @@ fn build_with_autocxx() {
     
     let includes = get_depthai_includes();
     
-    // Create autocxx builder
-    let mut builder = autocxx_build::Builder::new(
-        "src/lib.rs",
-        &[&PROJECT_ROOT.join("wrapper")]
-    ).expect("Failed to create autocxx builder");
-
-    // Add all include paths
-    for include in &includes {
-        println_build!("Adding include path: {}", include.display());
-        builder.include(include);
-    }
-
+    // Create autocxx builder with include paths
+    let mut include_paths: Vec<PathBuf> = vec![PROJECT_ROOT.join("wrapper")];
+    include_paths.extend(includes.clone());
+    
     // Add additional includes from deps
     let deps_includes_path = resolve_deps_includes();
     println_build!(
@@ -165,20 +157,33 @@ fn build_with_autocxx() {
             if entry.file_type().is_dir() && entry.path().join("include").exists() {
                 if let Ok(canonical) = entry.path().join("include").canonicalize() {
                     println_build!("Found include directory: {}", canonical.display());
-                    builder.include(&canonical);
+                    include_paths.push(canonical);
                 }
             }
         }
     }
 
-    // Set C++ standard
-    builder.flag_if_supported("-std=c++17");
-    if cfg!(target_os = "windows") {
-        builder.flag_if_supported("/std:c++17");
-    }
+    println_build!("Total include paths: {}", include_paths.len());
+    
+    // Convert to references
+    let include_refs: Vec<&Path> = include_paths.iter().map(|p| p.as_path()).collect();
+    
+    // Create builder
+    let mut builder = autocxx_build::Builder::new(
+        "src/lib.rs",
+        &include_refs
+    );
 
-    // Build
-    builder.build().expect("Failed to build with autocxx");
+    // Build with extra C++ flags
+    let mut build = builder.build().expect("Failed to build autocxx");
+    
+    // Set C++ standard
+    build.flag_if_supported("-std=c++17");
+    if cfg!(target_os = "windows") {
+        build.flag_if_supported("/std:c++17");
+    }
+    
+    build.compile("autocxx-daic-sys");
     
     println_build!("autocxx build completed successfully");
 }
