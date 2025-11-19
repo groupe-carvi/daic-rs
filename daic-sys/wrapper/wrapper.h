@@ -16,11 +16,11 @@ extern "C" {
 namespace daic {
 // Version informations getters
 API const char* dai_build_version();
-API const int dai_build_version_major();
-API const int dai_build_version_minor();
-API const int dai_build_version_patch();
+API int dai_build_version_major();
+API int dai_build_version_minor();
+API int dai_build_version_patch();
 API const char* dai_build_pre_release_type();
-API const int dai_build_pre_release_version();
+API int dai_build_pre_release_version();
 API const char* dai_build_commit();
 API const char* dai_build_commit_datetime();
 API const char* dai_build_build_datetime();

@@ -73,7 +73,8 @@ fn main() {
     }
 
     // Build using autocxx instead of bindgen
-    build_with_autocxx();
+    let include_paths = build_with_autocxx();
+    build_cpp_wrapper(&include_paths);
 
     if cfg!(target_os = "windows") {
         let dlls = [
@@ -136,7 +137,7 @@ fn main() {
     }
 }
 
-fn build_with_autocxx() {
+fn build_with_autocxx() -> Vec<PathBuf> {
     println_build!("Building with autocxx...");
     
     let includes = get_depthai_includes();
@@ -172,20 +173,39 @@ fn build_with_autocxx() {
     let builder = autocxx_build::Builder::new(
         "src/lib.rs",
         &include_refs
-    );
+    )
+    .extra_clang_args(&["-std=c++17"]);
 
     // Build with extra C++ flags
     let mut build = builder.build().expect("Failed to build autocxx");
     
     // Set C++ standard
-    build.flag_if_supported("-std=c++17");
     if cfg!(target_os = "windows") {
-        build.flag_if_supported("/std:c++17");
+        build.flag("/std:c++17");
+    } else {
+        build.flag("-std=c++17");
     }
     
     build.compile("autocxx-daic-sys");
     
     println_build!("autocxx build completed successfully");
+    include_paths
+}
+
+fn build_cpp_wrapper(include_paths: &[PathBuf]) {
+    println_build!("Building custom C++ wrapper sources...");
+    let mut cc_build = cc::Build::new();
+    cc_build
+        .cpp(true)
+        .flag("-std=c++17")
+        .file(PROJECT_ROOT.join("wrapper").join("wrapper.cpp"));
+
+    for include in include_paths {
+        cc_build.include(include);
+    }
+
+    cc_build.compile("daic_wrapper");
+    println_build!("C++ wrapper build completed.");
 }
 
 fn get_depthai_includes() -> Vec<PathBuf> {
@@ -618,6 +638,41 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
     let ninja_available = is_tool_available("ninja", "--version");
     let generator = if ninja_available { "Ninja" } else { "Unix Makefiles" };
 
+    let opencv_support = env_bool("DEPTHAI_OPENCV_SUPPORT").unwrap_or(false);
+    let dyn_calib_override = env_bool("DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT");
+    let events_manager_override = env_bool("DEPTHAI_ENABLE_EVENTS_MANAGER");
+
+    let dynamic_calibration_support = match (opencv_support, dyn_calib_override) {
+        (true, Some(flag)) => flag,
+        (true, None) => true,
+        (false, Some(true)) => {
+            println_build!(
+                "Ignoring DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT=ON because DEPTHAI_OPENCV_SUPPORT is disabled."
+            );
+            false
+        }
+        (false, _) => false,
+    };
+
+    let events_manager_support = match (opencv_support, events_manager_override) {
+        (true, Some(flag)) => flag,
+        (true, None) => true,
+        (false, Some(true)) => {
+            println_build!(
+                "Ignoring DEPTHAI_ENABLE_EVENTS_MANAGER=ON because DEPTHAI_OPENCV_SUPPORT is disabled."
+            );
+            false
+        }
+        (false, _) => false,
+    };
+
+    println_build!(
+        "OpenCV support via CMake: {}, Dynamic calibration support: {}, Events manager support: {}",
+        bool_to_cmake(opencv_support),
+        bool_to_cmake(dynamic_calibration_support),
+        bool_to_cmake(events_manager_support)
+    );
+
     let mut cmd = Command::new("cmake");
     cmd.arg("-S")
         .arg(get_depthai_core_root().clone())
@@ -625,7 +680,18 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         .arg(&path)
         .arg("-DCMAKE_BUILD_TYPE=Release")
         .arg("-DBUILD_SHARED_LIBS=ON")
-        .arg("-DDEPTHAI_OPENCV_SUPPORT=OFF")
+        .arg(format!(
+            "-DDEPTHAI_OPENCV_SUPPORT:BOOL={}",
+            bool_to_cmake(opencv_support)
+        ))
+        .arg(format!(
+            "-DDEPTHAI_DYNAMIC_CALIBRATION_SUPPORT:BOOL={}",
+            bool_to_cmake(dynamic_calibration_support)
+        ))
+        .arg(format!(
+            "-DDEPTHAI_ENABLE_EVENTS_MANAGER:BOOL={}",
+            bool_to_cmake(events_manager_support)
+        ))
         .arg("-G")
         .arg(generator);
 
@@ -654,6 +720,36 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
     println_build!("Built depthai-core library at: {}", dst.display());
 
     Some(dst)
+}
+
+fn env_bool(key: &str) -> Option<bool> {
+    match env::var(key) {
+        Ok(value) => {
+            let normalized = value.trim().to_ascii_lowercase();
+            match normalized.as_str() {
+                "1" | "true" | "on" | "yes" => Some(true),
+                "0" | "false" | "off" | "no" => Some(false),
+                "" => None,
+                _ => {
+                    println_build!(
+                        "Unrecognized boolean value '{}' for {}, ignoring.",
+                        value,
+                        key
+                    );
+                    None
+                }
+            }
+        }
+        Err(_) => None,
+    }
+}
+
+fn bool_to_cmake(value: bool) -> &'static str {
+    if value {
+        "ON"
+    } else {
+        "OFF"
+    }
 }
 
 fn get_daic_windows_prebuilt_binary() -> Result<PathBuf, String> {

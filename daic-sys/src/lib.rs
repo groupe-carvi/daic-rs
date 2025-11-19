@@ -1,38 +1,58 @@
 // Use autocxx to generate C++ bindings
 use autocxx::prelude::*;
 
-// Include the C++ headers and generate bindings
 include_cpp! {
-    // Security: Allow all functions and types for now, but limit includes
-    
-    // Include our wrapper header
     #include "autocxx_wrapper.h"
-    
-    // Generate bindings for version functions
-    generate!("daic::get_build_version")
-    generate!("daic::get_version_major")
-    generate!("daic::get_version_minor")
-    generate!("daic::get_version_patch")
-    generate!("daic::get_pre_release_type")
-    generate!("daic::get_pre_release_version")
-    generate!("daic::get_commit")
-    generate!("daic::get_commit_datetime")
-    generate!("daic::get_build_datetime")
-    generate!("daic::get_device_version")
-    generate!("daic::get_bootloader_version")
-    generate!("daic::get_device_rvc3_version")
-    generate!("daic::get_device_rvc4_version")
-    
-    // Generate bindings for dai namespace types
-    generate!("dai::Device")
-    generate!("dai::Pipeline")
-    generate!("dai::DeviceInfo")
-    generate!("dai::CameraBoardSocket")
-    
-    // Generate node types
-    generate_ns!("dai::node")
-    
-    // Safety settings
+
+    // Version information helpers
+    generate!("daic::dai_build_version")
+    generate!("daic::dai_build_version_major")
+    generate!("daic::dai_build_version_minor")
+    generate!("daic::dai_build_version_patch")
+    generate!("daic::dai_build_pre_release_type")
+    generate!("daic::dai_build_pre_release_version")
+    generate!("daic::dai_build_commit")
+    generate!("daic::dai_build_commit_datetime")
+    generate!("daic::dai_build_build_datetime")
+    generate!("daic::dai_build_device_version")
+    generate!("daic::dai_build_bootloader_version")
+    generate!("daic::dai_build_device_rvc3_version")
+    generate!("daic::dai_build_device_rvc4_version")
+
+    // Raw handle types
+    generate!("daic::DaiDevice")
+    generate!("daic::DaiPipeline")
+    generate!("daic::DaiCameraNode")
+    generate!("daic::DaiDataQueue")
+
+    // Device functions
+    generate!("daic::dai_device_new")
+    generate!("daic::dai_device_delete")
+    generate!("daic::dai_device_is_closed")
+    generate!("daic::dai_device_close")
+    generate!("daic::dai_device_get_connected_camera_sockets")
+
+    // Pipeline functions
+    generate!("daic::dai_pipeline_new")
+    generate!("daic::dai_pipeline_delete")
+    generate!("daic::dai_pipeline_start")
+    generate!("daic::dai_pipeline_create_camera")
+
+    // Camera helpers
+    generate!("daic::dai_camera_request_output")
+    generate!("daic::dai_camera_request_output_capability")
+    generate!("daic::dai_camera_request_full_resolution_output")
+
+    // Queue/frame helpers
+    generate!("daic::dai_queue_delete")
+
+    // Utilities
+    generate!("daic::dai_camera_socket_name")
+    generate!("daic::dai_string_to_cstring")
+    generate!("daic::dai_free_cstring")
+    generate!("daic::dai_get_last_error")
+    generate!("daic::dai_clear_last_error")
+
     safety!(unsafe_ffi)
 }
 

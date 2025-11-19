@@ -12,19 +12,19 @@ namespace daic {
 const char* dai_build_version() {
     return dai::build::VERSION;
 }
-const int dai_build_version_major() {
+int dai_build_version_major() {
     return dai::build::VERSION_MAJOR;
 }
-const int dai_build_version_minor() {
+int dai_build_version_minor() {
     return dai::build::VERSION_MINOR;
 }
-const int dai_build_version_patch() {
+int dai_build_version_patch() {
     return dai::build::VERSION_PATCH;
 }
 const char* dai_build_pre_release_type() {
     return dai::build::PRE_RELEASE_TYPE;
 }
-const int dai_build_pre_release_version() {
+int dai_build_pre_release_version() {
     return dai::build::PRE_RELEASE_VERSION;
 }
 const char* dai_build_commit() {
