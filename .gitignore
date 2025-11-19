@@ -31,3 +31,6 @@ target/
 
 # Generated files
 /daic-sys/generated
+
+# autocxx generated files
+**/autocxx-build-dir/
