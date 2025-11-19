@@ -8,9 +8,7 @@ pub unsafe fn c_str_to_string(c_str: *const std::os::raw::c_char) -> String {
     if c_str.is_null() {
         return String::new();
     }
-    unsafe {
-        CStr::from_ptr(c_str).to_string_lossy().into_owned()
-    }
+    unsafe { CStr::from_ptr(c_str).to_string_lossy().into_owned() }
 }
 
 /// Convert a Rust &str to a C-compatible string
@@ -22,5 +20,5 @@ pub fn str_to_cstring(s: &str) -> Result<CString, std::ffi::NulError> {
 // - .to_string_lossy() to convert to Rust String
 // - .as_bytes() to get the underlying bytes
 // - Direct integration with C++ std::string
-// 
+//
 // This is much cleaner than the previous opaque type approach.

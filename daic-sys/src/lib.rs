@@ -23,7 +23,9 @@ include_cpp! {
     generate!("daic::DaiDevice")
     generate!("daic::DaiPipeline")
     generate!("daic::DaiCameraNode")
+    generate!("daic::DaiOutput")
     generate!("daic::DaiDataQueue")
+    generate!("daic::DaiImgFrame")
 
     // Device functions
     generate!("daic::dai_device_new")
@@ -44,7 +46,16 @@ include_cpp! {
     generate!("daic::dai_camera_request_full_resolution_output")
 
     // Queue/frame helpers
+    generate!("daic::dai_output_create_queue")
     generate!("daic::dai_queue_delete")
+    generate!("daic::dai_queue_get_frame")
+    generate!("daic::dai_queue_try_get_frame")
+    generate!("daic::dai_frame_get_data")
+    generate!("daic::dai_frame_get_width")
+    generate!("daic::dai_frame_get_height")
+    generate!("daic::dai_frame_get_type")
+    generate!("daic::dai_frame_get_size")
+    generate!("daic::dai_frame_release")
 
     // Utilities
     generate!("daic::dai_camera_socket_name")

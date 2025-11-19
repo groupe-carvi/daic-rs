@@ -1,7 +1,9 @@
 #include "wrapper.h"
 #include "depthai/build/version.hpp"
+#include <chrono>
 #include <cstring>
 #include <cstdlib>
+#include <memory>
 #include <string>
 
 // Global error storage
@@ -208,14 +210,16 @@ dai::Node::Output* dai_camera_request_output_capability(DaiCameraNode camera, co
         return nullptr;
     }
 }
-DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline) {
+DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline, int board_socket) {
     if (!pipeline) {
         last_error = "dai_pipeline_create_camera: null pipeline";
         return nullptr;
     }
     try {
         auto pipe = static_cast<dai::Pipeline*>(pipeline);
-        auto camera = pipe->create<dai::node::Camera>();
+        auto cameraBuilder = pipe->create<dai::node::Camera>();
+        auto socket = static_cast<dai::CameraBoardSocket>(board_socket);
+        auto camera = cameraBuilder->build(socket);
         return static_cast<DaiCameraNode>(camera.get());
     } catch (const std::exception& e) {
         last_error = std::string("dai_pipeline_create_camera failed: ") + e.what();
@@ -243,11 +247,71 @@ dai::Node::Output* dai_camera_request_output(DaiCameraNode camera, int width, in
     }
 }
 
-
+DaiDataQueue dai_output_create_queue(DaiOutput output, unsigned int max_size, bool blocking) {
+    if (!output) {
+        last_error = "dai_output_create_queue: null output";
+        return nullptr;
+    }
+    try {
+        auto out = static_cast<dai::Node::Output*>(output);
+        auto queue = out->createOutputQueue(max_size, blocking);
+        return new std::shared_ptr<dai::MessageQueue>(queue);
+    } catch (const std::exception& e) {
+        last_error = std::string("dai_output_create_queue failed: ") + e.what();
+        return nullptr;
+    }
+}
 
 void dai_queue_delete(DaiDataQueue queue) {
-    // Note: In DepthAI, queues are managed by Device, so no explicit delete needed
-    // This is here for API completeness but does nothing
+    if(queue) {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        delete ptr;
+    }
+}
+
+DaiImgFrame dai_queue_get_frame(DaiDataQueue queue, int timeout_ms) {
+    if(!queue) {
+        last_error = "dai_queue_get_frame: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        std::shared_ptr<dai::ImgFrame> frame;
+        if(timeout_ms < 0) {
+            frame = (*ptr)->get<dai::ImgFrame>();
+        } else {
+            bool timedOut = false;
+            frame = (*ptr)->get<dai::ImgFrame>(std::chrono::milliseconds(timeout_ms), timedOut);
+            if(timedOut) {
+                return nullptr;
+            }
+        }
+        if(!frame) {
+            return nullptr;
+        }
+        return new std::shared_ptr<dai::ImgFrame>(frame);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiImgFrame dai_queue_try_get_frame(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_try_get_frame: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto frame = (*ptr)->tryGet<dai::ImgFrame>();
+        if(!frame) {
+            return nullptr;
+        }
+        return new std::shared_ptr<dai::ImgFrame>(frame);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_try_get_frame failed: ") + e.what();
+        return nullptr;
+    }
 }
 
 // Low-level frame operations
@@ -257,8 +321,11 @@ void* dai_frame_get_data(DaiImgFrame frame) {
         return nullptr;
     }
     try {
-        auto f = static_cast<dai::ImgFrame*>(frame);
-        return f->getData().data();
+        auto sharedFrame = static_cast<std::shared_ptr<dai::ImgFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return nullptr;
+        }
+        return (*sharedFrame)->getData().data();
     } catch (const std::exception& e) {
         last_error = std::string("dai_frame_get_data failed: ") + e.what();
         return nullptr;
@@ -271,8 +338,11 @@ int dai_frame_get_width(DaiImgFrame frame) {
         return 0;
     }
     try {
-        auto f = static_cast<dai::ImgFrame*>(frame);
-        return f->getWidth();
+        auto sharedFrame = static_cast<std::shared_ptr<dai::ImgFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return (*sharedFrame)->getWidth();
     } catch (const std::exception& e) {
         last_error = std::string("dai_frame_get_width failed: ") + e.what();
         return 0;
@@ -285,8 +355,11 @@ int dai_frame_get_height(DaiImgFrame frame) {
         return 0;
     }
     try {
-        auto f = static_cast<dai::ImgFrame*>(frame);
-        return f->getHeight();
+        auto sharedFrame = static_cast<std::shared_ptr<dai::ImgFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return (*sharedFrame)->getHeight();
     } catch (const std::exception& e) {
         last_error = std::string("dai_frame_get_height failed: ") + e.what();
         return 0;
@@ -299,8 +372,11 @@ int dai_frame_get_type(DaiImgFrame frame) {
         return 0;
     }
     try {
-        auto f = static_cast<dai::ImgFrame*>(frame);
-        return static_cast<int>(f->getType());
+        auto sharedFrame = static_cast<std::shared_ptr<dai::ImgFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return static_cast<int>((*sharedFrame)->getType());
     } catch (const std::exception& e) {
         last_error = std::string("dai_frame_get_type failed: ") + e.what();
         return 0;
@@ -313,17 +389,22 @@ size_t dai_frame_get_size(DaiImgFrame frame) {
         return 0;
     }
     try {
-        auto f = static_cast<dai::ImgFrame*>(frame);
-        return f->getData().size();
+        auto sharedFrame = static_cast<std::shared_ptr<dai::ImgFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return (*sharedFrame)->getData().size();
     } catch (const std::exception& e) {
         last_error = std::string("dai_frame_get_size failed: ") + e.what();
         return 0;
     }
 }
 
-void dai_frame_delete(DaiImgFrame frame) {
-    // Note: Frames are managed by DepthAI's shared_ptr system
-    // This is here for API completeness but does nothing
+void dai_frame_release(DaiImgFrame frame) {
+    if(frame) {
+        auto ptr = static_cast<std::shared_ptr<dai::ImgFrame>*>(frame);
+        delete ptr;
+    }
 }
 
 // Low-level utility functions  

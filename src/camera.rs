@@ -1,133 +1,202 @@
+use std::time::Duration;
+
+use autocxx::{c_int, c_uint, c_void};
 use daic_sys::daic;
-// use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct CameraBoardSocket(pub i32);
+pub use crate::common::{CameraBoardSocket, ImageFrameType, ResizeMode};
+use crate::error::{Result, clear_error_flag, last_error, take_error_if_any};
 
-/// Safe Rust wrapper for DepthAI Camera Node
 pub struct CameraNode {
     handle: daic::DaiCameraNode,
 }
 
+pub struct CameraOutput {
+    handle: daic::DaiOutput,
+}
+
+pub struct OutputQueue {
+    handle: daic::DaiDataQueue,
+}
+
+pub struct ImageFrame {
+    handle: daic::DaiImgFrame,
+}
+
+#[derive(Debug, Clone)]
+pub struct CameraOutputConfig {
+    pub size: (u32, u32),
+    pub frame_type: Option<ImageFrameType>,
+    pub resize_mode: ResizeMode,
+    pub fps: Option<f32>,
+    pub enable_undistortion: Option<bool>,
+}
+
+impl Default for CameraOutputConfig {
+    fn default() -> Self {
+        Self {
+            size: (640, 400),
+            frame_type: None,
+            resize_mode: ResizeMode::Crop,
+            fps: None,
+            enable_undistortion: None,
+        }
+    }
+}
+
+impl CameraOutputConfig {
+    pub fn new(size: (u32, u32)) -> Self {
+        Self {
+            size,
+            ..Default::default()
+        }
+    }
+}
+
 impl CameraNode {
-    pub(crate) fn new(handle: daic::DaiCameraNode) -> Self {
+    pub(crate) fn from_handle(handle: daic::DaiCameraNode) -> Self {
         Self { handle }
     }
 
-// Adapt according to the actual C++ API if build is needed
-// pub fn build(&self, socket: CameraBoardSocket) -> Result<(), String> { ... }
-
-    pub fn request_output(&self, width: i32, height: i32, type_: i32, resize_mode: i32, fps: f32, enable_undistortion: i32) -> Result<Output, String> {
+    pub fn request_output(&self, config: CameraOutputConfig) -> Result<CameraOutput> {
+        clear_error_flag();
+        let fmt = config.frame_type.map(|t| t as i32).unwrap_or(-1);
+        let resize = config.resize_mode as i32;
+        let fps = config.fps.unwrap_or(-1.0);
+        let undist = config
+            .enable_undistortion
+            .map(|v| if v { 1 } else { 0 })
+            .unwrap_or(-1);
         let handle = unsafe {
             daic::dai_camera_request_output(
                 self.handle,
-                width,
-                height,
-                type_,
-                resize_mode,
+                c_int(config.size.0 as i32),
+                c_int(config.size.1 as i32),
+                c_int(fmt),
+                c_int(resize),
                 fps,
-                enable_undistortion,
+                c_int(undist),
             )
         };
         if handle.is_null() {
-            let error = unsafe {
-                let error_ptr = daic::dai_get_last_error();
-                if !error_ptr.is_null() {
-                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
-                } else {
-                    "Failed to get camera output".to_string()
-                }
-            };
-            Err(error)
+            Err(last_error("failed to request camera output"))
         } else {
-            Ok(Output::new(handle as *mut std::ffi::c_void))
+            Ok(CameraOutput {
+                handle: handle as *mut c_void,
+            })
         }
     }
 
-
-    pub fn request_full_resolution_output(&self) -> Result<Output, String> {
+    pub fn request_full_resolution_output(&self) -> Result<CameraOutput> {
+        clear_error_flag();
         let handle = unsafe { daic::dai_camera_request_full_resolution_output(self.handle) };
         if handle.is_null() {
-            let error = unsafe {
-                let error_ptr = daic::dai_get_last_error();
-                if !error_ptr.is_null() {
-                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
-                } else {
-                    "Failed to get camera output".to_string()
-                }
-            };
-            Err(error)
+            Err(last_error("failed to request full resolution output"))
         } else {
-            Ok(Output::new(handle as *mut std::ffi::c_void))
+            Ok(CameraOutput {
+                handle: handle as *mut c_void,
+            })
         }
     }
 }
 
-/// Safe Rust wrapper for DepthAI Output
-pub struct Output {
-    handle: *mut std::ffi::c_void,
-}
-
-impl Output {
-    pub(crate) fn new(handle: *mut std::ffi::c_void) -> Self {
-        Self { handle }
-    }
-
-    pub fn create_output_queue(&self) -> Result<MessageQueue, String> {
-        // There is no dai_output_create_queue, use DaiDataQueue if needed
-        // Placeholder: returns an error
-        Err("Not implemented: output queue creation".to_string())
+impl CameraOutput {
+    pub fn create_queue(&self, max_size: u32, blocking: bool) -> Result<OutputQueue> {
+        clear_error_flag();
+        let handle =
+            unsafe { daic::dai_output_create_queue(self.handle, c_uint(max_size), blocking) };
+        if handle.is_null() {
+            Err(last_error("failed to create output queue"))
+        } else {
+            Ok(OutputQueue { handle })
+        }
     }
 }
 
-/// Safe Rust wrapper for DepthAI Message Queue
-pub struct MessageQueue {
-    handle: *mut daic::DaiDataQueue,
-}
-
-impl MessageQueue {
-    pub(crate) fn new(handle: *mut daic::DaiDataQueue) -> Self {
-        Self { handle }
-    }
-
-    pub fn get(&self) -> Option<*mut std::ffi::c_void> {
-        // There is no dai_message_queue_get, use dai_frame_get_data if needed
-        None
-    }
-}
-
-impl Drop for MessageQueue {
+impl Drop for OutputQueue {
     fn drop(&mut self) {
         if !self.handle.is_null() {
-            unsafe { daic::dai_queue_delete(self.handle as *mut ::std::os::raw::c_void) };
+            unsafe { daic::dai_queue_delete(self.handle) };
         }
     }
 }
 
-unsafe impl Send for MessageQueue {}
-unsafe impl Sync for MessageQueue {}
-
-impl CameraBoardSocket {
-    pub fn to_string(&self) -> Result<String, String> {
-        let c_str = unsafe { daic::dai_camera_socket_name(self.0) };
-        if c_str.is_null() {
-            let error = unsafe {
-                let error_ptr = daic::dai_get_last_error();
-                if !error_ptr.is_null() {
-                    std::ffi::CStr::from_ptr(error_ptr).to_string_lossy().into_owned()
-                } else {
-                    "Failed to convert socket to string".to_string()
-                }
-            };
-            Err(error)
+impl OutputQueue {
+    pub fn blocking_next(&self, timeout: Option<Duration>) -> Result<Option<ImageFrame>> {
+        clear_error_flag();
+        let timeout_ms = timeout.map(|d| d.as_millis() as i32).unwrap_or(-1);
+        let frame = unsafe { daic::dai_queue_get_frame(self.handle, c_int(timeout_ms)) };
+        if frame.is_null() {
+            if let Some(err) = take_error_if_any("failed to pull frame") {
+                Err(err)
+            } else {
+                Ok(None)
+            }
         } else {
-            let result = unsafe {
-                let rust_str = std::ffi::CStr::from_ptr(c_str).to_string_lossy().into_owned();
-                // Free the C string properly
-                daic::dai_free_cstring(c_str as *mut ::std::os::raw::c_char);
-                rust_str
-            };
-            Ok(result)
+            Ok(Some(ImageFrame { handle: frame }))
         }
+    }
+
+    pub fn try_next(&self) -> Result<Option<ImageFrame>> {
+        clear_error_flag();
+        let frame = unsafe { daic::dai_queue_try_get_frame(self.handle) };
+        if frame.is_null() {
+            if let Some(err) = take_error_if_any("failed to poll frame") {
+                Err(err)
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(Some(ImageFrame { handle: frame }))
+        }
+    }
+}
+
+impl Drop for ImageFrame {
+    fn drop(&mut self) {
+        if !self.handle.is_null() {
+            unsafe { daic::dai_frame_release(self.handle) };
+        }
+    }
+}
+
+impl ImageFrame {
+    pub fn width(&self) -> u32 {
+        let raw: ::std::os::raw::c_int = unsafe { daic::dai_frame_get_width(self.handle) }.into();
+        raw as u32
+    }
+
+    pub fn height(&self) -> u32 {
+        let raw: ::std::os::raw::c_int = unsafe { daic::dai_frame_get_height(self.handle) }.into();
+        raw as u32
+    }
+
+    pub fn format(&self) -> Option<ImageFrameType> {
+        let raw: ::std::os::raw::c_int = unsafe { daic::dai_frame_get_type(self.handle) }.into();
+        ImageFrameType::from_raw(raw)
+    }
+
+    pub fn byte_len(&self) -> usize {
+        let raw: usize = unsafe { daic::dai_frame_get_size(self.handle) }.into();
+        raw
+    }
+
+    pub fn bytes(&self) -> Vec<u8> {
+        let len = self.byte_len();
+        if len == 0 {
+            return Vec::new();
+        }
+        let data_ptr = unsafe { daic::dai_frame_get_data(self.handle) };
+        if data_ptr.is_null() {
+            return Vec::new();
+        }
+        unsafe { std::slice::from_raw_parts(data_ptr as *const u8, len).to_vec() }
+    }
+
+    pub fn describe(&self) -> String {
+        let fmt = self
+            .format()
+            .map(|f| format!("{f:?}"))
+            .unwrap_or_else(|| "unknown".into());
+        format!("{}x{} {}", self.width(), self.height(), fmt)
     }
 }

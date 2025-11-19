@@ -70,7 +70,7 @@ API void dai_pipeline_delete(DaiPipeline pipeline);
 API bool dai_pipeline_start(DaiPipeline pipeline, DaiDevice device);
 
 // Low-level camera node operations
-API DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline);
+API DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline, int board_socket);
 
 // Camera output wrappers
 API dai::Node::Output* dai_camera_request_output(DaiCameraNode camera, int width, int height, int type, int resize_mode, float fps, int enable_undistortion);
@@ -78,9 +78,12 @@ API dai::Node::Output* dai_camera_request_output_capability(DaiCameraNode camera
 API dai::Node::Output* dai_camera_request_full_resolution_output(DaiCameraNode camera);
 
 // Low-level output operations
+API DaiDataQueue dai_output_create_queue(DaiOutput output, unsigned int max_size, bool blocking);
 
 // Low-level queue operations
 API void dai_queue_delete(DaiDataQueue queue);
+API DaiImgFrame dai_queue_get_frame(DaiDataQueue queue, int timeout_ms);
+API DaiImgFrame dai_queue_try_get_frame(DaiDataQueue queue);
 
 // Low-level frame operations
 API void* dai_frame_get_data(DaiImgFrame frame);
@@ -88,7 +91,7 @@ API int dai_frame_get_width(DaiImgFrame frame);
 API int dai_frame_get_height(DaiImgFrame frame);
 API int dai_frame_get_type(DaiImgFrame frame);
 API size_t dai_frame_get_size(DaiImgFrame frame);
-API void dai_frame_delete(DaiImgFrame frame);
+API void dai_frame_release(DaiImgFrame frame);
 
 // Low-level utility functions
 API int dai_device_get_connected_camera_sockets(DaiDevice device, int* sockets, int max_count);

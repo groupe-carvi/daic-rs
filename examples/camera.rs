@@ -1,5 +1,5 @@
-use daic_rs::device::{Device, Pipeline};
 use daic_rs::camera::MessageQueue;
+use daic_rs::device::{Device, Pipeline};
 use std::collections::HashMap;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -23,13 +23,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     for socket in sockets {
         println!("Configuring camera for socket: {:?}", socket);
-        
+
         // Create camera node
         let camera = pipeline.create_camera_node()?;
-        
+
         // Get full resolution output using the correct method
         let output = camera.request_full_resolution_output()?;
-        
+
         // Create output queue (this will fail until implemented)
         match output.create_output_queue() {
             Ok(queue) => {
@@ -53,7 +53,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Main loop to get frames (simplified version)
     let mut frame_count = 0;
     let max_frames = 10; // Limit for demo purposes
-    
+
     println!("Starting frame capture loop...");
     while frame_count < max_frames {
         for (name, queue) in &output_queues {
@@ -62,7 +62,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 frame_count += 1;
             }
         }
-        
+
         // Small delay to avoid busy waiting
         std::thread::sleep(std::time::Duration::from_millis(100));
     }

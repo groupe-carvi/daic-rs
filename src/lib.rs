@@ -1,12 +1,8 @@
 pub use daic_sys as bindings;
 
-// Export the safe API
-pub mod device;
 pub mod camera;
 pub mod common;
+pub mod device;
+pub mod error;
 
-
-
-
-
-
+pub use error::{DaicError, Result};

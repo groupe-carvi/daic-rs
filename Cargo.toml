@@ -8,12 +8,13 @@ hdep-tests = [] # Hardware Dependent Tests
 
 
 [dependencies]
-image = "0.25.6"
-memmap2 = "0.9.7"
-ndarray = "0.16.1"
+image = "0.25.9"
+memmap2 = "0.9.9"
+ndarray = "0.17.1"
 daic-sys = { path = "daic-sys" }
 imageproc = "0.25.0"
-serde = { version = "1.0.219", features = ["derive"] }
+serde = { version = "1.0.228", features = ["derive"] }
+autocxx = "0.27"
 
 [workspace]
 members = [
@@ -23,7 +24,7 @@ members = [
 
 [dev-dependencies]
 kornia = "0.1.9"
-rerun = "0.24.0"
+rerun = "0.27.2"
 
 [[example]]
 name = "rgbd"
