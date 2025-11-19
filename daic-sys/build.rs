@@ -169,7 +169,7 @@ fn build_with_autocxx() {
     let include_refs: Vec<&Path> = include_paths.iter().map(|p| p.as_path()).collect();
     
     // Create builder
-    let mut builder = autocxx_build::Builder::new(
+    let builder = autocxx_build::Builder::new(
         "src/lib.rs",
         &include_refs
     );

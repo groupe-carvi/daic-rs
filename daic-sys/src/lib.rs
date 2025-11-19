@@ -4,8 +4,6 @@ use autocxx::prelude::*;
 // Include the C++ headers and generate bindings
 include_cpp! {
     // Security: Allow all functions and types for now, but limit includes
-    #![allow(non_snake_case)]
-    #![allow(non_camel_case_types)]
     
     // Include our wrapper header
     #include "autocxx_wrapper.h"
@@ -39,6 +37,10 @@ include_cpp! {
 }
 
 pub mod string_utils;
+
+// Simple test module to verify autocxx works
+#[cfg(test)]
+mod simple_test;
 
 // Re-export for convenience
 pub use ffi::*;
