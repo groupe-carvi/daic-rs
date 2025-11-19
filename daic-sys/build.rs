@@ -1,6 +1,5 @@
 #![allow(warnings)]
 
-use bindgen::Bindings;
 use cmake::Config;
 use once_cell::sync::Lazy;
 use std::{
@@ -40,16 +39,6 @@ const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-c
 
 const OPENCV_WIN_PREBUILT_URL: &str = "https://github.com/opencv/opencv/releases/download/4.11.0/opencv-4.11.0-windows.exe";
 
-static DAIC_BINDGEN_HEADER: &str = "wrapper/wrapper.h";
-
-static DAIC_ALLOWLIST_ITEMS: &'static [&str] = &[
-    "DeviceHandle",
-    "PipelineHandle",
-    "CameraHandle",
-    "NodeHandle",
-    "AssetManagerHandle",
-];
-
 macro_rules! println_build {
     ($($tokens:tt)*) => {
         println!("cargo:warning=\r\x1b[32;1m   {}", format!($($tokens)*))
@@ -79,13 +68,12 @@ fn main() {
         .unwrap();
     let deps_dir = target_dir.join("deps");
 
-    build_wrapper_cpp();
-
-    generate_bindings_if_needed();
-
     if cfg!(target_os = "windows") {
         download_and_prepare_opencv();
     }
+
+    // Build using autocxx instead of bindgen
+    build_with_autocxx();
 
     if cfg!(target_os = "windows") {
         let dlls = [
@@ -148,26 +136,51 @@ fn main() {
     }
 }
 
+fn build_with_autocxx() {
+    println_build!("Building with autocxx...");
+    
+    let includes = get_depthai_includes();
+    
+    // Create autocxx builder
+    let mut builder = autocxx_build::Builder::new(
+        "src/lib.rs",
+        &[&PROJECT_ROOT.join("wrapper")]
+    ).expect("Failed to create autocxx builder");
 
-
-
-fn build_wrapper_cpp() {
-    let mut build = cc::Build::new();
-    build.cpp(true);
-    build.file(PROJECT_ROOT.join("wrapper").join("wrapper.cpp"));
-
-    for include in get_depthai_includes() {
+    // Add all include paths
+    for include in &includes {
         println_build!("Adding include path: {}", include.display());
-        build.include(include);
+        builder.include(include);
     }
 
+    // Add additional includes from deps
+    let deps_includes_path = resolve_deps_includes();
+    println_build!(
+        "Walking through depthai-core deps directory: {}",
+        deps_includes_path.display()
+    );
+
+    for entry in WalkDir::new(&deps_includes_path) {
+        if let Ok(entry) = entry {
+            if entry.file_type().is_dir() && entry.path().join("include").exists() {
+                if let Ok(canonical) = entry.path().join("include").canonicalize() {
+                    println_build!("Found include directory: {}", canonical.display());
+                    builder.include(&canonical);
+                }
+            }
+        }
+    }
+
+    // Set C++ standard
+    builder.flag_if_supported("-std=c++17");
     if cfg!(target_os = "windows") {
-        build.flag("/std:c++17");
-    } else {
-        build.flag("-std=c++17");
+        builder.flag_if_supported("/std:c++17");
     }
 
-    build.compile("wrapper");
+    // Build
+    builder.build().expect("Failed to build with autocxx");
+    
+    println_build!("autocxx build completed successfully");
 }
 
 fn get_depthai_includes() -> Vec<PathBuf> {
@@ -224,177 +237,6 @@ fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
         .expect("Failed to create .7z output file");
     out_file.write_all(seven_z_data)
         .expect("Failed to write stripped .7z file");
-}
-
-fn generate_bindings_if_needed() {
-    let bindings_rs = GEN_FOLDER_PATH.join("bindings.rs");
-
-    let binding_needs_regen = env::var("CARGO_FEATURE_FORCE_BINDING_REGENERATION")
-        .map_or(false, |v| v == "1") || !bindings_rs.exists();
-    if binding_needs_regen {
-        println_build!("Building bindings for depthai-core..");
-
-        if bindings_rs.exists() {
-            println_build!(
-                "Bindings file already exists at {}, removing it to regenerate.",
-                bindings_rs.display()
-            );
-            fs::remove_file(&bindings_rs).expect("Failed to remove existing bindings file");
-        }
-
-
-
-        let mut includes: Vec<String> = get_depthai_includes()
-            .into_iter()
-            .map(|p| format!("-I{}", p.display()))
-            .collect();
-
-        let deps_includes_path = resolve_deps_includes();
-        println_build!(
-            "Walking through depthai-core deps directory: {}",
-            deps_includes_path.display()
-        );
-
-        for entry in WalkDir::new(&deps_includes_path) {
-            let entry = entry.expect("Failed to read entry in depthai-core deps directory");
-            if entry.file_type().is_dir() && entry.path().join("include").exists() {
-                let canonical = entry
-                    .path()
-                    .join("include")
-                    .canonicalize()
-                    .expect("Failed to canonicalize include path");
-                println_build!("Found include directory: {}", canonical.display());
-                includes.push(format!("-I{}", canonical.display()));
-            }
-        }
-
-        // dedup
-        includes.sort();
-        includes.dedup();
-
-        println_build!("Using wrapper header for Bindgen: {}", &DAIC_BINDGEN_HEADER);
-        println_build!("Includes for Bindgen: {:?}", includes);
-
-        let mut builder = bindgen::Builder::default()
-            .header(DAIC_BINDGEN_HEADER)
-            .allowlist_file(DAIC_BINDGEN_HEADER);
-
-        // builder = builder
-        //     .allowlist_file(DAIC_BINDGEN_HEADER)
-        //     .allowlist_type("dai::Platform")
-        //     .allowlist_type("dai::BoardConfig")
-        //     .allowlist_type("dai::ImgResizeMode")
-        //     .allowlist_type("dai::CameraBoardSocket")
-        //     .allowlist_type("dai::CameraExposureOffset")
-        //     .allowlist_type("dai::CameraSensorConfig")
-        //     .allowlist_type("dai::CameraFeatures")
-        //     .allowlist_type("dai::CameraInfo")
-        //     .allowlist_type("dai::CameraModel")
-        //     .allowlist_type("dai::CameraSensorType")
-        //     .allowlist_type("dai::ChipTemperature")
-        //     .allowlist_type("dai::ChipTemperatureS3")
-        //     .allowlist_type("dai::Color")
-        //     .allowlist_type("dai::Colormap")
-        //     .allowlist_type("dai::ConnectionInterface")
-        //     .allowlist_type("dai::CpuUsage")
-        //     .allowlist_type("dai::DetectionNetworkType")
-        //     .allowlist_type("dai::DetectionParserOptions")
-        //     .allowlist_type("dai::EepromData")
-        //     .allowlist_type("dai::Extrinsics")
-        //     .allowlist_type("dai::FrameEvent")
-        //     .allowlist_type("dai::ImgTransformation")
-        //     .allowlist_function("dai::getMatrixInverse")
-        //     .allowlist_type("dai::Interpolation")
-        //     .allowlist_type("dai::MedianFilter")
-        //     .allowlist_type("dai::MemoryInfo")
-        //     .allowlist_type("dai::model::ModelType")
-        //     .allowlist_function("dai::model::readModelType")
-        //     .allowlist_type("dai::Point2f")
-        //     .allowlist_type("dai::Point3d")
-        //     .allowlist_type("dai::Point3f")
-        //     .allowlist_type("dai::Point3fRGBA")
-        //     .allowlist_type("dai::ProcessorType")
-        //     .allowlist_type("dai::Quaterniond")
-        //     .allowlist_type("dai::Rect")
-        //     .allowlist_type("dai::RotatedRect")
-        //     .allowlist_type("dai::Size2f")
-        //     .allowlist_type("dai::GPIO")
-        //     .allowlist_type("dai::StereoPair")
-        //     .allowlist_type("dai::StereoRectification")
-        //     .allowlist_type("dai::TensorInfo")
-        //     .allowlist_type("dai::Timestamp")
-        //     .allowlist_type("dai::UsbSpeed")
-        //     .allowlist_type("dai::CrashDump")
-        //     .allowlist_function("dai::platform2string")
-        //     .allowlist_function("dai::string2platform")
-        //     .allowlist_type("dai::EepromError")
-        //     .allowlist_type("dai::Version");
-
-        builder = builder
-            .derive_debug(true)
-            // remove explicit impls for alias types
-            .impl_debug(false)
-            .impl_partialeq(false)
-            .new_type_alias("std::.*");
-
-        builder = builder
-            .layout_tests(false)
-            .enable_cxx_namespaces()
-            .allowlist_type("dai::.*")
-            .allowlist_type("daic::.*")
-            .allowlist_function("daic::.*")
-            // Make most std types opaque, but handle strings specially
-            .opaque_type("std::vector.*")
-            .opaque_type("std::map.*")
-            .opaque_type("std::unordered_map.*")
-            .opaque_type("std::unordered_set.*")
-            .opaque_type("std::queue.*")
-            .opaque_type("std::list.*")
-            .opaque_type("std::_List.*")
-            .opaque_type("std::_Hash.*")
-            .opaque_type("std::shared_ptr.*")
-            .opaque_type("std::unique_ptr.*")
-            .opaque_type("std::function.*")
-            .opaque_type("std::thread.*")
-            .opaque_type("std::mutex.*")
-            .opaque_type("std::condition_variable.*")
-            .opaque_type("std::filesystem::.*")
-            .opaque_type("std::chrono::.*")
-            .opaque_type("nlohmann::.*")
-            // Keep std::string as opaque array but provide utilities to work with it
-            .opaque_type("std::.*string.*")
-            .raw_line("// Type alias for C++ std::string - use helper functions to convert")
-            .raw_line("pub type CppStdString = root::__BindgenOpaqueArray<u64, 4usize>;")
-            .default_enum_style(bindgen::EnumVariation::ModuleConsts)
-            .clang_arg("-x")
-            .clang_arg("c++")
-            .clang_arg("-std=c++17")
-            .parse_callbacks(Box::new(bindgen::CargoCallbacks));
-
-        for include_arg in &includes {
-            builder = builder.clang_arg(include_arg);
-        }
-
-        let bindings = builder
-            .generate()
-            .expect("Unable to generate bindings");
-
-        if !GEN_FOLDER_PATH.exists() {
-            fs::create_dir_all(GEN_FOLDER_PATH.clone())
-                .expect("Failed to create generated bindings directory");
-        }
-
-        println_build!(
-            "Writing bindings to file: {}",
-            bindings_rs.display()
-        );
-
-        bindings
-            .write_to_file(&bindings_rs)
-            .expect("Couldn't write bindings!");
-    } else {
-        println_build!("Skipping bindings generation, already exists and DEPTHAI_FORCE_BINDING_REGEN is not set.");
-    }
 }
 
 fn download_and_prepare_opencv() {
