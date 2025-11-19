@@ -6,13 +6,15 @@ links = "depthai-core"
 
 [dependencies]
 cxx = "1.0.160"
+autocxx = "0.27"
 
 [features]
 force-binding-regeneration = []
 default = ["force-binding-regeneration"]
 
 [build-dependencies]
-bindgen = "0.72.0"
+autocxx-build = "0.27"
+cxx-build = "1.0.160"
 cc = "1.2.29"
 cmake = "0.1.54"
 num_cpus = "1.17.0"
