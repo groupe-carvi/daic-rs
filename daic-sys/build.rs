@@ -172,8 +172,11 @@ fn build_with_autocxx() -> Vec<PathBuf> {
     let include_refs: Vec<&Path> = include_paths.iter().map(|p| p.as_path()).collect();
 
     // Create builder
-    let builder =
-        autocxx_build::Builder::new("src/lib.rs", &include_refs).extra_clang_args(&["-std=c++17"]);
+    let builder = if cfg!(target_arch = "aarch64") {
+        autocxx_build::Builder::new("src/lib.rs", &include_refs).extra_clang_args(&["-std=c++17", "-I/usr/lib/gcc/aarch64-linux-gnu/13/include"])
+    } else {   
+        autocxx_build::Builder::new("src/lib.rs", &include_refs).extra_clang_args(&["-std=c++17"])
+    };
 
     // Build with extra C++ flags
     let mut build = builder.build().expect("Failed to build autocxx");
@@ -733,6 +736,8 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         .arg(&path)
         .arg("-DCMAKE_BUILD_TYPE=Release")
         .arg("-DBUILD_SHARED_LIBS=ON")
+        .arg("-DCMAKE_C_COMPILER=/usr/bin/gcc")
+        .arg("-DCMAKE_CXX_COMPILER=/usr/bin/g++")
         .arg(format!(
             "-DDEPTHAI_OPENCV_SUPPORT:BOOL={}",
             bool_to_cmake(opencv_support)
