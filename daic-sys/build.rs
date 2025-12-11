@@ -8,7 +8,7 @@ use std::{
     fs::{self, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
-    process::{Command, ExitStatus, Output},
+    process::{Command, ExitStatus, Output, Stdio},
     sync::RwLock,
     vec,
 };
@@ -676,7 +676,7 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         get_depthai_core_root().display(),
         path.display()
     );
-
+    
     let mut parallel_builds = (num_cpus::get() as f32 * 0.80).ceil().to_string();
 
     if is_wsl() {
@@ -746,17 +746,23 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
             bool_to_cmake(events_manager_support)
         ))
         .arg("-G")
-        .arg(generator);
+        .arg(generator)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
 
-    let output = cmd.output().expect("Failed to run CMake configuration");
+    let status = cmd.status().expect("Failed to run CMake configuration");
 
-    println_build!("CMake output:\n{}", String::from_utf8_lossy(&output.stdout));
+    if !status.success() {
+        panic!("CMake configuration failed with status {:?}", status);
+    }
 
     let status = Command::new("cmake")
         .arg("--build")
         .arg(&path)
         .arg("--parallel")
         .arg(&parallel_builds)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .status()
         .expect("Failed to build depthai-core with CMake");
 
