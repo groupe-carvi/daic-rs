@@ -14,17 +14,11 @@ ndarray = "0.17.1"
 daic-sys = { path = "daic-sys" }
 imageproc = "0.25.0"
 serde = { version = "1.0.228", features = ["derive"] }
-autocxx = "0.27"
-
-[workspace]
-members = [
-    ".",
-    "daic-sys",
-]
+autocxx.workspace = true
 
 [dev-dependencies]
 kornia = "0.1.9"
-rerun = "0.27.2"
+rerun = "0.27.3"
 
 [[example]]
 name = "rgbd"
@@ -33,3 +27,14 @@ path = "examples/rgbd/rgbd.rs"
 [[example]]
 name = "camera"
 path = "examples/camera.rs"
+
+[workspace]
+resolver = "3"
+members = [
+    ".",
+    "./daic-sys",
+]
+
+[workspace.dependencies]
+autocxx = "0.30.0"
+cxx = "1.0.190"

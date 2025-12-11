@@ -212,6 +212,7 @@ fn build_cpp_wrapper(include_paths: &[PathBuf], opencv_enabled: bool) {
 }
 
 fn get_depthai_includes() -> Vec<PathBuf> {
+    println_build!("Resolving depthai-core include paths...");
     let mut includes = vec![
         get_depthai_core_root().join("include"),
         get_depthai_core_root().join("include").join("depthai"),
@@ -249,6 +250,7 @@ fn get_depthai_includes() -> Vec<PathBuf> {
 }
 
 fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
+    println_build!("Stripping SFX header from OpenCV exe...");
     let header_size = 6144;
 
     let mut file = File::open(exe_path).expect("Failed to open OpenCV exe");
@@ -360,7 +362,7 @@ fn download_and_prepare_opencv() {
                     strip_sfx_header(&opencv_exe_path, &opencv_7z_path);
 
                     println_build!("Extracting .7z payload to {:?}", extract_path);
-                    zip::zip_extract(&opencv_7z_path, &extract_path)
+                    zip::zip_extract::zip_extract(&opencv_7z_path, &extract_path)
                         .expect("Failed to extract OpenCV .7z payload");
                     fs::remove_file(&opencv_7z_path).expect("Failed to remove .7z payload");
                 } else {
@@ -392,6 +394,7 @@ fn download_and_prepare_opencv() {
 }
 
 fn resolve_deps_includes() -> PathBuf {
+    println_build!("Resolving depthai-core deps include paths...");
     let build_deps = BUILD_FOLDER_PATH.join("_deps");
     let core_include = get_depthai_core_root().join("include");
 
@@ -421,6 +424,7 @@ fn resolve_deps_includes() -> PathBuf {
 }
 
 fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
+    println_build!("Resolving depthai-core library path...");
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let target_dir = Path::new(&out_dir).ancestors().nth(3).unwrap();
     let deps_dir = Path::new(&target_dir).join("deps");
@@ -588,6 +592,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
 }
 
 fn probe_depthai_core_lib(out: PathBuf) -> Option<PathBuf> {
+    println_build!("Probing for depthai-core library...");
     let out_dir = env::var("OUT_DIR").unwrap();
     let target_dir = Path::new(&out_dir).ancestors().nth(3).unwrap();
     let deps_dir = Path::new(&target_dir).join("deps");
@@ -808,7 +813,7 @@ fn get_daic_windows_prebuilt_binary() -> Result<PathBuf, String> {
     let extracted_path = BUILD_FOLDER_PATH.join("depthai-core");
 
     if !extracted_path.exists() {
-        zip::zip_extract(&zip_path, &BUILD_FOLDER_PATH)
+        zip::zip_extract::zip_extract(&zip_path, &BUILD_FOLDER_PATH)
             .expect("Failed to extract prebuilt depthai-core");
 
         let inner_folder = BUILD_FOLDER_PATH.join(
