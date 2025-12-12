@@ -1,25 +1,25 @@
 use std::time::Duration;
 
-use autocxx::{c_int, c_uint, c_void};
-use daic_sys::daic;
+use autocxx::{c_int, c_uint};
+use daic_sys::{daic, DaiCameraNode, DaiOutput, DaiDataQueue, DaiImgFrame};
 
 pub use crate::common::{CameraBoardSocket, ImageFrameType, ResizeMode};
 use crate::error::{Result, clear_error_flag, last_error, take_error_if_any};
 
 pub struct CameraNode {
-    handle: daic::DaiCameraNode,
+    handle: DaiCameraNode,
 }
 
 pub struct CameraOutput {
-    handle: daic::DaiOutput,
+    handle: DaiOutput,
 }
 
 pub struct OutputQueue {
-    handle: daic::DaiDataQueue,
+    handle: DaiDataQueue,
 }
 
 pub struct ImageFrame {
-    handle: daic::DaiImgFrame,
+    handle: DaiImgFrame,
 }
 
 #[derive(Debug, Clone)]
@@ -53,7 +53,7 @@ impl CameraOutputConfig {
 }
 
 impl CameraNode {
-    pub(crate) fn from_handle(handle: daic::DaiCameraNode) -> Self {
+    pub(crate) fn from_handle(handle: DaiCameraNode) -> Self {
         Self { handle }
     }
 
@@ -81,7 +81,7 @@ impl CameraNode {
             Err(last_error("failed to request camera output"))
         } else {
             Ok(CameraOutput {
-                handle: handle as *mut c_void,
+                handle,
             })
         }
     }
@@ -93,7 +93,7 @@ impl CameraNode {
             Err(last_error("failed to request full resolution output"))
         } else {
             Ok(CameraOutput {
-                handle: handle as *mut c_void,
+                handle,
             })
         }
     }

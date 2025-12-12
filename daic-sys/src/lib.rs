@@ -19,14 +19,6 @@ include_cpp! {
     generate!("daic::dai_build_device_rvc3_version")
     generate!("daic::dai_build_device_rvc4_version")
 
-    // Raw handle types
-    generate!("daic::DaiDevice")
-    generate!("daic::DaiPipeline")
-    generate!("daic::DaiCameraNode")
-    generate!("daic::DaiOutput")
-    generate!("daic::DaiDataQueue")
-    generate!("daic::DaiImgFrame")
-
     // Device functions
     generate!("daic::dai_device_new")
     generate!("daic::dai_device_delete")
@@ -40,9 +32,8 @@ include_cpp! {
     generate!("daic::dai_pipeline_start")
     generate!("daic::dai_pipeline_create_camera")
 
-    // Camera helpers
+    // Camera functions
     generate!("daic::dai_camera_request_output")
-    generate!("daic::dai_camera_request_output_capability")
     generate!("daic::dai_camera_request_full_resolution_output")
 
     // Queue/frame helpers
@@ -66,6 +57,15 @@ include_cpp! {
 
     safety!(unsafe_ffi)
 }
+
+// Define our own opaque handle types for type safety
+// These are just wrappers around void* but provide type distinction
+pub type DaiDevice = *mut autocxx::c_void;
+pub type DaiPipeline = *mut autocxx::c_void;
+pub type DaiCameraNode = *mut autocxx::c_void;
+pub type DaiOutput = *mut autocxx::c_void;
+pub type DaiDataQueue = *mut autocxx::c_void;
+pub type DaiImgFrame = *mut autocxx::c_void;
 
 pub mod string_utils;
 

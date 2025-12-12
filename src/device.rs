@@ -1,5 +1,5 @@
 use autocxx::c_int;
-use daic_sys::daic;
+use daic_sys::{daic, DaiDevice, DaiPipeline};
 use std::os::raw::c_int as RawInt;
 
 use crate::camera::CameraNode;
@@ -9,7 +9,7 @@ use crate::error::{Result, clear_error_flag, last_error, take_error_if_any};
 const MAX_SOCKETS: usize = 16;
 
 pub struct Device {
-    handle: daic::DaiDevice,
+    handle: DaiDevice,
 }
 
 impl Device {
@@ -51,7 +51,7 @@ impl Device {
             .collect())
     }
 
-    pub(crate) fn handle(&self) -> daic::DaiDevice {
+    pub(crate) fn handle(&self) -> DaiDevice {
         self.handle
     }
 }
@@ -68,7 +68,7 @@ unsafe impl Send for Device {}
 unsafe impl Sync for Device {}
 
 pub struct Pipeline {
-    handle: daic::DaiPipeline,
+    handle: DaiPipeline,
 }
 
 impl Pipeline {
@@ -103,7 +103,7 @@ impl Pipeline {
         }
     }
 
-    pub(crate) fn handle(&self) -> daic::DaiPipeline {
+    pub(crate) fn handle(&self) -> DaiPipeline {
         self.handle
     }
 }
