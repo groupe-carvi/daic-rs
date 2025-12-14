@@ -5,7 +5,7 @@
 /// They are separated from unit tests to avoid slowing down the development cycle.
 
 /// Tests for the high-level Rust API that require hardware
-#[cfg(feature = "hdep-tests")]
+#[cfg(feature = "hit")]
 mod hardware_integration_tests {
     use daic_rs::{DaiError, Device, Pipeline, PipelineConfig};
 
