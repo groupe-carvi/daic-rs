@@ -7,7 +7,7 @@ use daic_rs::pipeline::Pipeline;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let device = Device::new()?;
-    let pipeline = Pipeline::new()?;
+    let pipeline = Pipeline::with_device(&device)?;
 
     let camera = pipeline.create_camera(CameraBoardSocket::Auto)?;
     let preview = camera.request_output(CameraOutputConfig::new((640, 400)))?;
