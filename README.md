@@ -1,73 +1,164 @@
 # daic-rs
 
-An experimental Rust wrapper for Luxonis [DepthAI-Core V3](https://github.com/luxonis/depthai-core).
+Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
 
-> [!CAUTION]  
-> This crate is experimental and still in active development as such may not be usable.
+- High-level crate: `daic-rs` (Rust API)
+- Low-level crate: `daic-sys` (builds DepthAI-Core and exposes an FFI surface via `autocxx`)
 
-Our core goals with daic-rs are:
-- [x] To make it 'Battery Included' by resolving any native dependancies for the crate users.
-- [ ] Generates a clean raw rust binding inside the daic-sys crate using CXX and auto CXX.
-- [ ] Create a rust friendly and safe API inside the daic-rs crate.
-- [ ] Use alternative library or tools from the rust ecosystem where we can. (Like [kornia](https://github.com/kornia/kornia) and [rerun](https://github.com/rerun-io/rerun) instead of OpenCV for the examples).
+> [!CAUTION]
+> This project is experimental and in active development. APIs and behavior can change.
 
 > [!WARNING]
-> ### About DepthAI-Core API Unstability
-> As your can read in the DepthAI-Core repository disclaimer, luxonis don't yet provides API stability guaranties. It means that there could be some breaking changes to DepthAI-Core API that could impact daic-rs own API down the road and so we cannot guaranty any stability neither.
-> The current version of the crate currently target [DepthAI-Core v3.2.1](https://github.com/luxonis/depthai-core/tree/v3.2.1).
-> 
-> <ins>We will try to follow the latest release offering a Windows prebuilt binary for the moment</ins>.
+> DepthAI-Core itself does not provide strong API stability guarantees yet. This repo currently targets **DepthAI-Core `v3.2.1`**.
 
-## Environment Setup
+## What’s in this repo
 
-### Linux
+### Crates
 
-> [!WARNING]
-> For Linux system we only support debian based distributions for the moment and will investigate more as we go. Also the initial build can take a while as it will build DepthAI-Core and opencv from source and need to resolve every dependancy.
+- `daic-sys`
+	- Builds DepthAI-Core and its dependencies (in `daic-sys/builds/`).
+	- Compiles a small C++ wrapper (`daic-sys/wrapper/wrapper.cpp`) and generates Rust bindings using `autocxx`.
+- `daic-rs`
+	- Safe(-er) Rust wrapper types like `Device`, `Pipeline`, typed camera helpers, and a generic node API.
 
-You will need to make sure that your system has the required dependancies.
+### Repository layout (high-level)
 
-#### Ubuntu / Debian
-```sh
-# Install dependencies
-
-sudo apt -y install libclang-dev pkg-config cmake ninja-build python3 autoconf automake autoconf-archive libudev-dev libtool clang libssl-dev nasm
 ```
+daic-sys/            # FFI crate (build script + wrapper)
+	build.rs           # clones/builds DepthAI-Core (Linux) or downloads prebuilt (Windows)
+	wrapper/           # C ABI functions used by Rust
+src/                 # Rust API (`Device`, `Pipeline`, nodes, camera helpers)
+examples/            # runnable examples
+tests/               # tests (some are ignored unless you enable hardware testing)
+```
+
+## Supported platforms
+
+- Linux: primarily **Debian/Ubuntu**-like systems (today).
+- Windows: intended to use prebuilt DepthAI-Core artifacts.
+
+If you’re on another distro/OS, it may still work, but you may need to adjust packages and toolchain paths.
+
+## Prerequisites
+
+### Linux (Ubuntu/Debian)
+
+Install build tooling used by `autocxx` + CMake builds:
+
+```bash
+sudo apt -y install \
+	clang libclang-dev \
+	cmake ninja-build pkg-config \
+	python3 \
+	autoconf automake autoconf-archive libtool \
+	libudev-dev libssl-dev \
+	nasm \
+	libdw-dev libelf-dev
+```
+
+Optional (not required for core builds, but useful for local OpenCV tooling):
+
+```bash
+sudo apt -y install libopencv-dev
+```
+
+#### USB permissions (recommended)
+
+While normally accessed through netork, there is a new support comming to later versions that will make it possible to use usb connection and as such devices may require udev rules so you can access the device without running as root.
+If you hit permission errors (or see the device only under `sudo`), consult the official DepthAI/DepthAI-Core docs for the recommended udev rules for your device.
 
 ### Windows
 
-For Windows we use the prebuilt binary of DepthAI-Core found in the repository release section.
+Install:
+
+- LLVM/Clang (for `autocxx`/libclang)
+- Visual Studio Build Tools (C++ workload)
+- CMake (if not already installed)
+
+Example (PowerShell):
 
 ```powershell
-# Install dependencies
-
-# Install clang
 winget install -e --id LLVM.LLVM
-
 ```
 
 ## Build
 
-```sh
+From the repo root:
+
+```bash
 cargo build
 ```
 
-## Archive: Reminder on how to build depthai-core
+Notes:
 
-### Linux
+- The first build can take a while because DepthAI-Core is fetched/built and dependencies are prepared.
+- Build artifacts for native code live under `daic-sys/builds/`.
 
-```sh
-git clone --recurse-submodules https://github.com/luxonis/depthai-core.git
+## Run examples
 
-export VCPKG_CMAKE_GENERATOR=Ninja && export CMAKE_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu && export CMAKE_INCLUDE_PATH=/usr/include && cmake --fresh  -S . -B build -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCMAKE_MAKE_PROGRAM=/usr/bin/ninja -DCMAKE_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu -DDEPTHAI_OPENCV_SUPPORT=OFF -DCMAKE_INCLUDE_PATH=/usr/include -G Ninja
+```bash
+cargo run --example pipeline_creation
+cargo run --example camera
+cargo run --example camera_output
 ```
 
-### Windows
+## API overview
 
-```powershell
+### Device ownership
 
-git clone --recurse-submodules https://github.com/luxonis/depthai-core.git
-cmake --fresh -S . -B build -D'BUILD_SHARED_LIBS=ON' -'DDEPTHAI_OPENCV_SUPPORT=OFF' -G 'Visual Studio 17 2022'
-cmake --build build --parallel [num CPU cores]
+DepthAI device connections are typically exclusive. `daic-rs` mirrors the common C++ pattern of sharing one device connection:
 
+- `Device::new()` opens/returns a device handle.
+- `Device::clone()` / `Device::try_clone()` creates another handle to the same underlying connection.
+- `Pipeline::with_device(&device)` binds a pipeline to an existing device connection (recommended).
+- `Pipeline::start_default()` starts the pipeline using its internally-held device.
+
+### Generic node linking
+
+The generic node API supports linking by explicit port names *or* by choosing a compatible default when you omit port names.
+For example, `StereoDepth` expects inputs named `"left"` and `"right"`:
+
+```rust
+let stereo = pipeline.create_node(NodeKind::StereoDepth)?;
+left_camera.as_node().link(None, None, &stereo, None, Some("left"))?;
+right_camera.as_node().link(None, None, &stereo, None, Some("right"))?;
 ```
+
+## Environment variables (advanced)
+
+`daic-sys` exposes a few environment variables that affect native builds:
+
+- `DEPTHAI_CORE_ROOT`: override the DepthAI-Core checkout directory.
+- `DAIC_SYS_LINK_SHARED=1`: prefer linking against `libdepthai-core.so` (otherwise static is preferred).
+- `DEPTHAI_OPENCV_SUPPORT=1`: enable DepthAI-Core OpenCV support (if available).
+- `DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT=1`: toggle DepthAI-Core dynamic calibration support.
+- `DEPTHAI_ENABLE_EVENTS_MANAGER=1`: toggle DepthAI-Core events manager.
+
+## Troubleshooting
+
+### “No available devices (… connected, but in use)”
+
+This usually means another process already owns the device connection.
+
+- Close other DepthAI apps (including Python scripts) and try again.
+- Prefer `Pipeline::with_device(&device)` so you don’t accidentally open two connections.
+
+### Clang/libclang errors while building bindings
+
+Make sure `clang` and `libclang-dev` are installed on Linux, and that LLVM is installed on Windows.
+
+### Missing native libraries at runtime
+
+By default, the build prefers static linking where possible. If you opt into shared linking (`DAIC_SYS_LINK_SHARED=1`) you may need to ensure the runtime loader can find the shared libraries.
+
+## Hardware integration tests
+
+There is a `hit` feature flag intended for hardware integration testing:
+
+```bash
+cargo test --features hit
+```
+
+## License
+
+See `LICENSE`.
