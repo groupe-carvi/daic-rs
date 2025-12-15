@@ -1,5 +1,8 @@
 #include "wrapper.h"
+#include "depthai/depthai.hpp"
 #include "depthai/build/version.hpp"
+#include "XLink/XLink.h"
+#include "XLink/XLinkPublicDefines.h"
 #include <chrono>
 #include <cstring>
 #include <cstdlib>
@@ -97,13 +100,13 @@ const char* dai_build_device_rvc4_version() {
 }
 
 // Basic string utilities
-char* dai_string_to_cstring(const char* std_string) {
-    if (!std_string) return nullptr;
-    
-    size_t len = strlen(std_string);
+char* dai_string_to_cstring(const char* str) {
+    if(!str) return nullptr;
+
+    size_t len = strlen(str);
     char* result = static_cast<char*>(malloc(len + 1));
-    if (result) {
-        strcpy(result, std_string);
+    if(result) {
+        strcpy(result, str);
     }
     return result;
 }
@@ -112,36 +115,6 @@ void dai_free_cstring(char* cstring) {
     if (cstring) {
         free(cstring);
     }
-}
-
-char* dai_std_string_to_cstring(const std::string& str) {
-    size_t len = str.length();
-    char* result = static_cast<char*>(malloc(len + 1));
-    if (result) {
-        strcpy(result, str.c_str());
-    }
-    return result;
-}
-
-void dai_std_string_destroy(const std::string* str) {
-    if (str) {
-        delete str;
-    }
-}
-
-std::string* dai_create_std_string(const char* cstr) {
-    if (!cstr) return new std::string();
-    return new std::string(cstr);
-}
-
-const char* dai_std_string_c_str(const std::string* str) {
-    if (!str) return nullptr;
-    return str->c_str();
-}
-
-size_t dai_std_string_length(const std::string* str) {
-    if (!str) return 0;
-    return str->length();
 }
 
 // Low-level device operations - direct pointer manipulation
@@ -286,29 +259,9 @@ void dai_pipeline_delete(DaiPipeline pipeline) {
     }
 }
 
-bool dai_pipeline_start(DaiPipeline pipeline, DaiDevice device) {
-    if (!pipeline || !device) {
-        last_error = "dai_pipeline_start: null pipeline or device";
-        return false;
-    }
-    try {
-        auto pipe = static_cast<dai::Pipeline*>(pipeline);
-        auto dev = static_cast<std::shared_ptr<dai::Device>*>(device);
-        if(!dev->get() || !(*dev)) {
-            last_error = "dai_pipeline_start: invalid device";
-            return false;
-        }
-        (*dev)->startPipeline(*pipe);
-        return true;
-    } catch (const std::exception& e) {
-        last_error = std::string("dai_pipeline_start failed: ") + e.what();
-        return false;
-    }
-}
-
-bool dai_pipeline_start_default(DaiPipeline pipeline) {
+bool dai_pipeline_start(DaiPipeline pipeline) {
     if(!pipeline) {
-        last_error = "dai_pipeline_start_default: null pipeline";
+        last_error = "dai_pipeline_start: null pipeline";
         return false;
     }
     try {
@@ -316,9 +269,15 @@ bool dai_pipeline_start_default(DaiPipeline pipeline) {
         pipe->start();
         return true;
     } catch (const std::exception& e) {
-        last_error = std::string("dai_pipeline_start_default failed: ") + e.what();
+        last_error = std::string("dai_pipeline_start failed: ") + e.what();
         return false;
     }
+}
+
+// Backwards-compatible alias. Historically the Rust wrapper exposed `start_default()`,
+// but DepthAI's `dai::Pipeline` already manages a default device internally.
+bool dai_pipeline_start_default(DaiPipeline pipeline) {
+    return dai_pipeline_start(pipeline);
 }
 
 DaiDevice dai_pipeline_get_default_device(DaiPipeline pipeline) {
@@ -638,7 +597,7 @@ bool dai_node_unlink(DaiNode from, const char* out_group, const char* out_name, 
 }
 
 // Low-level camera operations
-dai::Node::Output* dai_camera_request_full_resolution_output(DaiCameraNode camera) {
+DaiOutput dai_camera_request_full_resolution_output(DaiCameraNode camera) {
     if (!camera) {
         last_error = "dai_camera_request_full_resolution_output: null camera";
         return nullptr;
@@ -646,24 +605,9 @@ dai::Node::Output* dai_camera_request_full_resolution_output(DaiCameraNode camer
     try {
         auto cam = static_cast<dai::node::Camera*>(camera);
         dai::Node::Output* output = cam->requestFullResolutionOutput();
-        return output;
+        return static_cast<DaiOutput>(output);
     } catch (const std::exception& e) {
         last_error = std::string("dai_camera_request_full_resolution_output failed: ") + e.what();
-        return nullptr;
-    }
-}
-dai::Node::Output* dai_camera_request_output_capability(DaiCameraNode camera, const dai::Capability* capability, int on_host) {
-    if (!camera || !capability) {
-        last_error = "dai_camera_request_output_capability: null camera or capability";
-        return nullptr;
-    }
-    try {
-        auto cam = static_cast<dai::node::Camera*>(camera);
-        bool host = (on_host != 0);
-        dai::Node::Output* output = cam->requestOutput(*capability, host);
-        return output;
-    } catch (const std::exception& e) {
-        last_error = std::string("dai_camera_request_output_capability failed: ") + e.what();
         return nullptr;
     }
 }
@@ -684,7 +628,7 @@ DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline, int board_socket)
     }
 }
 
-dai::Node::Output* dai_camera_request_output(DaiCameraNode camera, int width, int height, int type, int resize_mode, float fps, int enable_undistortion) {
+DaiOutput dai_camera_request_output(DaiCameraNode camera, int width, int height, int type, int resize_mode, float fps, int enable_undistortion) {
     if (!camera) {
         last_error = "dai_camera_request_output: null camera";
         return nullptr;
@@ -697,7 +641,7 @@ dai::Node::Output* dai_camera_request_output(DaiCameraNode camera, int width, in
         std::optional<float> opt_fps = (fps > 0.0f) ? std::optional<float>(fps) : std::nullopt;
         std::optional<bool> opt_undist = (enable_undistortion >= 0) ? std::optional<bool>(enable_undistortion != 0) : std::nullopt;
         dai::Node::Output* output = cam->requestOutput(size, opt_type, resize, opt_fps, opt_undist);
-        return output;
+        return static_cast<DaiOutput>(output);
     } catch (const std::exception& e) {
         last_error = std::string("dai_camera_request_output failed: ") + e.what();
         return nullptr;

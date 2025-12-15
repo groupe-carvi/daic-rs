@@ -41,8 +41,8 @@ fn main() -> Result<()> {
     right.as_node().link(None, None, &stereo, None, Some("right"))?;
     println!("Linked cameras into StereoDepth");
     
-    // Start the pipeline using its default device (the one we provided)
-    pipeline.start_default()?;
+    // Start the pipeline (mirrors DepthAI C++: pipeline.start())
+    pipeline.start()?;
     println!("Pipeline started successfully!");
     
     Ok(())

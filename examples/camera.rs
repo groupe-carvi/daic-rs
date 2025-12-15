@@ -11,9 +11,9 @@ fn main() -> Result<()> {
     println!("Device created successfully");
     println!("Device connected: {}", device.is_connected());
 
-    // Create pipeline
-    let pipeline = Pipeline::new()?;
-    println!("Pipeline created successfully");
+    // Create pipeline bound to the same device (avoids opening a second connection)
+    let pipeline = Pipeline::with_device(&device)?;
+    println!("Pipeline created successfully (bound to device)");
 
     // Get connected cameras
     let sockets = device.connected_cameras()?;
@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     }
 
     // Start the pipeline
-    pipeline.start_with_device(&device)?;
+    pipeline.start()?;
     println!("Pipeline started successfully");
 
     println!("Pipeline started; exiting.");

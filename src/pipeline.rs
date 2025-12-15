@@ -112,9 +112,16 @@ impl Pipeline {
         node::create_node(self.inner_arc(), kind)
     }
 
-    pub fn start_with_device(&self, device: &Device) -> Result<()> {
+    /// Start the pipeline.
+    ///
+    /// This mirrors the DepthAI C++ API: `pipeline.start()`.
+    ///
+    /// If the pipeline was created via [`Pipeline::with_device`], it will start using
+    /// that device. If it was created via [`Pipeline::new`], DepthAI will use the
+    /// pipeline's internally-managed default device.
+    pub fn start(&self) -> Result<()> {
         clear_error_flag();
-        let started = unsafe { daic::dai_pipeline_start(self.inner.handle, device.handle()) };
+        let started = unsafe { daic::dai_pipeline_start(self.inner.handle) };
         if started {
             Ok(())
         } else {
@@ -123,14 +130,11 @@ impl Pipeline {
     }
 
     /// Start the pipeline using its internally-held default device.
+    ///
+    /// Deprecated in favor of [`Pipeline::start`].
+    #[deprecated(note = "use Pipeline::start()")]
     pub fn start_default(&self) -> Result<()> {
-        clear_error_flag();
-        let started = unsafe { daic::dai_pipeline_start_default(self.inner.handle) };
-        if started {
-            Ok(())
-        } else {
-            Err(last_error("failed to start pipeline"))
-        }
+        self.start()
     }
 
     pub(crate) fn handle(&self) -> DaiPipeline {

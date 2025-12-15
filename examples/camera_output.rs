@@ -13,7 +13,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let preview = camera.request_output(CameraOutputConfig::new((640, 400)))?;
     let queue = preview.create_queue(8, false)?;
 
-    pipeline.start_with_device(&device)?;
+    pipeline.start()?;
 
     for index in 0..100 {
         match queue.blocking_next(Some(Duration::from_millis(500)))? {
