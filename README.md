@@ -14,7 +14,7 @@ Our core goals with daic-rs are:
 > [!WARNING]
 > ### About DepthAI-Core API Unstability
 > As your can read in the DepthAI-Core repository disclaimer, luxonis don't yet provides API stability guaranties. It means that there could be some breaking changes to DepthAI-Core API that could impact daic-rs own API down the road and so we cannot guaranty any stability neither.
-> The current version of the crate currently target [DepthAI-Core v3.1.0](https://github.com/luxonis/depthai-core/tree/v3.1.0).
+> The current version of the crate currently target [DepthAI-Core v3.2.1](https://github.com/luxonis/depthai-core/tree/v3.2.1).
 > 
 > <ins>We will try to follow the latest release offering a Windows prebuilt binary for the moment</ins>.
 

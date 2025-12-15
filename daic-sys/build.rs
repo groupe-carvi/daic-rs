@@ -42,9 +42,9 @@ static DEPTHAI_CORE_ROOT: Lazy<RwLock<PathBuf>> = Lazy::new(|| {
 
 const DEPTHAI_CORE_REPOSITORY: &str = "https://github.com/luxonis/depthai-core.git";
 
-const DEPTHAI_CORE_BRANCH: &str = "v3.1.0";
+const DEPTHAI_CORE_BRANCH: &str = "v3.2.1";
 
-const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-core/releases/download/v3.1.0/depthai-core-v3.1.0-win64.zip";
+const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-core/releases/download/v3.2.1/depthai-core-v3.2.1-win64.zip";
 
 const OPENCV_WIN_PREBUILT_URL: &str =
     "https://github.com/opencv/opencv/releases/download/4.11.0/opencv-4.11.0-windows.exe";
@@ -58,6 +58,10 @@ macro_rules! println_build {
 fn main() {
     println!("cargo:rerun-if-changed=wrapper/");
     println!("cargo:rerun-if-changed=builds/depthai-core/include/");
+    println!("cargo:rerun-if-env-changed=DAIC_SYS_LINK_SHARED");
+    println!("cargo:rerun-if-env-changed=DEPTHAI_OPENCV_SUPPORT");
+    println!("cargo:rerun-if-env-changed=DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT");
+    println!("cargo:rerun-if-env-changed=DEPTHAI_ENABLE_EVENTS_MANAGER");
     println_build!("Checking for depthai-core...");
 
     let depthai_core_lib = resolve_depthai_core_lib().expect("Failed to resolve depthai-core path");
@@ -69,6 +73,7 @@ fn main() {
     let out_dir = env::var("OUT_DIR").unwrap();
     let target_dir = Path::new(&out_dir).ancestors().nth(3).unwrap();
     let deps_dir = target_dir.join("deps");
+    let examples_dir = target_dir.join("examples");
 
     if cfg!(target_os = "windows") {
         download_and_prepare_opencv();
@@ -105,6 +110,11 @@ fn main() {
                 //fs::create_dir_all(&deps_dir).expect("Failed to create deps dir");
                 fs::copy(&dll_path, deps_dir.join(dll))
                     .expect(&format!("Failed to copy {} to deps dir", dll));
+
+                println_build!("Copying {} to {:?}", dll, examples_dir);
+                //fs::create_dir_all(&examples_dir).expect("Failed to create examples dir");
+                fs::copy(&dll_path, examples_dir.join(dll))
+                    .expect(&format!("Failed to copy {} to examples dir", dll));
             } else {
                 println_build!("DLL not found: {:?}", dll_path);
             }
@@ -119,22 +129,39 @@ fn main() {
             env::var("PATH").unwrap()
         );
     } else {
-        let lib_name = "libdepthai-core.so";
-        let dest_main = target_dir.join(lib_name);
-        if depthai_core_lib != dest_main {
-            fs::copy(&depthai_core_lib, &dest_main)
-                .expect("Failed to copy depthai-core to target dir");
+        match depthai_core_lib.extension().and_then(|e| e.to_str()) {
+            Some("so") => {
+                let lib_name = "libdepthai-core.so";
+                let dest_main = target_dir.join(lib_name);
+                if depthai_core_lib != dest_main {
+                    fs::copy(&depthai_core_lib, &dest_main)
+                        .expect("Failed to copy depthai-core to target dir");
+                }
+                let dest_deps = target_dir.join("deps").join(lib_name);
+                if depthai_core_lib != dest_deps {
+                    fs::copy(&depthai_core_lib, &dest_deps)
+                        .expect("Failed to copy depthai-core to deps dir");
+                }
+                let dest_examples = target_dir.join("examples").join(lib_name);
+                if depthai_core_lib != dest_examples {
+                    fs::copy(&depthai_core_lib, &dest_examples)
+                        .expect("Failed to copy depthai-core to examples dir");
+                }
+                println_build!(
+                    "Depthai-core library copied to: {} and {} and {}",
+                    target_dir.to_string_lossy(),
+                    dest_deps.display(),
+                    dest_examples.display()
+                );
+            }
+            Some("a") => {
+                println_build!("Using static libdepthai-core.a (no runtime .so to copy)");
+            }
+            _ => {
+                println_build!("Unknown depthai-core artifact type: {}", depthai_core_lib.display());
+            }
         }
-        let dest_deps = target_dir.join("deps").join(lib_name);
-        if depthai_core_lib != dest_deps {
-            fs::copy(&depthai_core_lib, &dest_deps)
-                .expect("Failed to copy depthai-core to deps dir");
-        }
-        println_build!(
-            "Depthai-core library copied to: {} and {}",
-            target_dir.to_string_lossy(),
-            target_dir.join("deps").display()
-        );
+
         println_build!("Linux build configuration complete.");
     }
 }
@@ -220,6 +247,13 @@ fn get_depthai_includes() -> Vec<PathBuf> {
         get_depthai_core_root().join("include"),
         get_depthai_core_root().join("include").join("depthai"),
     ];
+
+    // When depthai-core is built via CMake, some headers are generated into the build tree
+    // (e.g. builds/include/depthai/build/version.hpp). Include that output include dir.
+    let build_include = BUILD_FOLDER_PATH.join("include");
+    if build_include.exists() {
+        includes.push(build_include);
+    }
 
     let deps_path = BUILD_FOLDER_PATH.join("_deps");
 
@@ -428,19 +462,37 @@ fn resolve_deps_includes() -> PathBuf {
 
 fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
     println_build!("Resolving depthai-core library path...");
+    let prefer_static = !env_bool("DAIC_SYS_LINK_SHARED").unwrap_or(false);
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let target_dir = Path::new(&out_dir).ancestors().nth(3).unwrap();
     let deps_dir = Path::new(&target_dir).join("deps");
 
-    let build_candidates = if cfg!(target_os = "windows") {
-        vec!["depthai-core.dll"]
-    } else {
-        vec!["libdepthai-core.so"]
-    };
-    for candidate in build_candidates {
-        let builds_lib = BUILD_FOLDER_PATH.join(candidate);
+    if cfg!(target_os = "windows") {
+        let builds_lib = BUILD_FOLDER_PATH.join("depthai-core.dll");
         if builds_lib.exists() {
-            println_build!("Found {} in builds directory.", candidate);
+            println_build!("Found depthai-core.dll in builds directory.");
+            emit_link_directives(&builds_lib);
+            return Ok(builds_lib);
+        }
+    } else if prefer_static {
+        // Static is the default: don't silently pick a leftover .so.
+        let static_candidates = [
+            BUILD_FOLDER_PATH.join("libdepthai-core.a"),
+            target_dir.join("libdepthai-core.a"),
+            deps_dir.join("libdepthai-core.a"),
+        ];
+        for candidate in static_candidates {
+            if candidate.exists() {
+                println_build!("Found libdepthai-core.a at: {}", candidate.display());
+                emit_link_directives(&candidate);
+                return Ok(candidate);
+            }
+        }
+    } else {
+        // Shared explicitly requested.
+        let builds_lib = BUILD_FOLDER_PATH.join("libdepthai-core.so");
+        if builds_lib.exists() {
+            println_build!("Found libdepthai-core.so in builds directory.");
             emit_link_directives(&builds_lib);
             return Ok(builds_lib);
         }
@@ -459,29 +511,43 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
             target_dir.display()
         );
         return Ok(target_dir.join("depthai-core.dll"));
-    } else if target_dir.join("libdepthai-core.so").exists() {
-        println_build!(
-            "Found libdepthai-core.so in OUT_DIR: {}",
-            target_dir.display()
-        );
-        let lib_path = target_dir.join("libdepthai-core.so");
-        emit_link_directives(&lib_path);
-        return Ok(lib_path);
+    } else if !prefer_static {
+        // Shared path only when explicitly requested.
+        let candidate = target_dir.join("libdepthai-core.so");
+        if candidate.exists() {
+            println_build!("Found {} in OUT_DIR: {}", candidate.display(), target_dir.display());
+            emit_link_directives(&candidate);
+            return Ok(candidate);
+        }
     }
 
-    if let Some(found_lib) = probe_depthai_core_lib(BUILD_FOLDER_PATH.clone()) {
-        println_build!("Found depthai-core library at: {}", found_lib.display());
-
-        if cfg!(target_os = "windows") {
-            // Windows-specific handling
-            if found_lib
+    if let Some(found_lib) = probe_depthai_core_lib(BUILD_FOLDER_PATH.clone(), prefer_static) {
+        // If we're in static-by-default mode, only accept a static archive.
+        if prefer_static
+            && found_lib
                 .extension()
                 .and_then(|e| e.to_str())
-                .map(|ext| ext.eq_ignore_ascii_case("dll"))
-                .unwrap_or(false)
-            {
-                let lib_path =
-                    if found_lib == get_depthai_core_root().join("bin").join("depthai-core.dll") {
+                .map(|e| e != "a")
+                .unwrap_or(true)
+        {
+            println_build!(
+                "Found depthai-core artifact, but static is required by default: {}",
+                found_lib.display()
+            );
+        } else {
+            println_build!("Found depthai-core library at: {}", found_lib.display());
+
+            if cfg!(target_os = "windows") {
+                // Windows-specific handling
+                if found_lib
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|ext| ext.eq_ignore_ascii_case("dll"))
+                    .unwrap_or(false)
+                {
+                    let lib_path = if found_lib
+                        == get_depthai_core_root().join("bin").join("depthai-core.dll")
+                    {
                         found_lib
                             .parent() // bin
                             .and_then(|p| p.parent()) // depthai-core
@@ -493,43 +559,44 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                         get_depthai_core_root().join("lib").join("depthai-core.lib")
                     };
 
-                if !lib_path.exists() {
-                    panic!(
-                        "Found depthai-core.dll but depthai-core.lib not found at expected location: {}",
+                    if !lib_path.exists() {
+                        panic!(
+                            "Found depthai-core.dll but depthai-core.lib not found at expected location: {}",
+                            lib_path.display()
+                        );
+                    }
+
+                    println_build!(
+                        "Using Windows import library for linking: {}",
                         lib_path.display()
                     );
+                    println!(
+                        "cargo:rustc-link-search=native={}",
+                        lib_path.parent().unwrap().display()
+                    );
+                    println!("cargo:rustc-link-lib=depthai-core");
+
+                    return Ok(lib_path);
+                } else if found_lib
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .map(|ext| ext.eq_ignore_ascii_case("lib"))
+                    .unwrap_or(false)
+                {
+                    println!(
+                        "cargo:rustc-link-search=native={}",
+                        found_lib.parent().unwrap().display()
+                    );
+                    println!("cargo:rustc-link-lib=depthai-core");
+                    return Ok(found_lib);
+                } else {
+                    return Err("Unsupported library type found on Windows.");
                 }
-
-                println_build!(
-                    "Using Windows import library for linking: {}",
-                    lib_path.display()
-                );
-                println!(
-                    "cargo:rustc-link-search=native={}",
-                    lib_path.parent().unwrap().display()
-                );
-                println!("cargo:rustc-link-lib=depthai-core");
-
-                return Ok(lib_path);
-            } else if found_lib
-                .extension()
-                .and_then(|e| e.to_str())
-                .map(|ext| ext.eq_ignore_ascii_case("lib"))
-                .unwrap_or(false)
-            {
-                println!(
-                    "cargo:rustc-link-search=native={}",
-                    found_lib.parent().unwrap().display()
-                );
-                println!("cargo:rustc-link-lib=depthai-core");
-                return Ok(found_lib);
             } else {
-                return Err("Unsupported library type found on Windows.");
+                // Linux
+                emit_link_directives(&found_lib);
+                return Ok(found_lib);
             }
-        } else {
-            // Linux
-            emit_link_directives(&found_lib);
-            return Ok(found_lib);
         }
     }
 
@@ -543,7 +610,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                 .map_err(|_| "Failed to download prebuilt depthai-core.")?;
 
             // After extracting, check if the library exists
-            if let Some(lib) = probe_depthai_core_lib(depthai_core_install.clone()) {
+            if let Some(lib) = probe_depthai_core_lib(depthai_core_install.clone(), prefer_static) {
                 return resolve_depthai_core_lib();
             } else {
                 panic!("Failed to find depthai-core after downloading prebuilt binary.");
@@ -577,16 +644,8 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
         let built_lib = cmake_build_depthai_core(BUILD_FOLDER_PATH.clone())
             .expect("Failed to build depthai-core via CMake.");
 
-        println_build!(
-            "Built depthai-core dynamic library at: {}",
-            built_lib.display()
-        );
-
-        println!(
-            "cargo:rustc-link-search=native={}",
-            built_lib.parent().unwrap().display()
-        );
-        println!("cargo:rustc-link-lib=dylib=depthai-core");
+        println_build!("Built depthai-core library at: {}", built_lib.display());
+        emit_link_directives(&built_lib);
 
         return Ok(built_lib);
     }
@@ -594,7 +653,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
     Err("Failed to resolve depthai-core library path.")
 }
 
-fn probe_depthai_core_lib(out: PathBuf) -> Option<PathBuf> {
+fn probe_depthai_core_lib(out: PathBuf, prefer_static: bool) -> Option<PathBuf> {
     println_build!("Probing for depthai-core library...");
     let out_dir = env::var("OUT_DIR").unwrap();
     let target_dir = Path::new(&out_dir).ancestors().nth(3).unwrap();
@@ -602,6 +661,8 @@ fn probe_depthai_core_lib(out: PathBuf) -> Option<PathBuf> {
 
     let lib_path = if cfg!(target_os = "windows") {
         deps_dir.join("depthai-core.dll")
+    } else if prefer_static {
+        deps_dir.join("libdepthai-core.a")
     } else {
         deps_dir.join("libdepthai-core.so")
     };
@@ -617,7 +678,7 @@ fn probe_depthai_core_lib(out: PathBuf) -> Option<PathBuf> {
             None
         };
 
-    if lib_path.exists() && win_static_lib_path.is_some_and(|p| p.exists()) {
+    if lib_path.exists() && (cfg!(not(target_os = "windows")) || win_static_lib_path.is_some_and(|p| p.exists())) {
         println_build!("Found depthai-core library at: {}", lib_path.display());
         return Some(lib_path);
     }
@@ -648,29 +709,33 @@ fn probe_depthai_core_lib(out: PathBuf) -> Option<PathBuf> {
         return None;
     }
 
-    let w = WalkDir::new(&out)
-        .into_iter()
-        .filter_entry(|entry| {
-            entry.file_name() != ".git"
-                && entry.file_name() != "include"
-                && entry.file_name() != "tests"
-                && entry.file_name() != "examples"
-                && entry.file_name() != "bindings"
-        })
-        .filter_map(|e| e.ok())
-        .find(|e| {
-            let path = e.path();
-            path.is_file()
-                && matches!(
-                    path.file_name().and_then(|n| n.to_str()),
-                    Some("libdepthai-core.a")
-                        | Some("libdepthai-core.so")
-                        | Some("depthai-core.lib")
-                        | Some("depthai-core.dll")
-                )
-        });
+    // Deterministic probing: prefer the requested artifact type first.
+    let preferred_names: &[&str] = if cfg!(target_os = "windows") {
+        &["depthai-core.dll", "depthai-core.lib"]
+    } else if prefer_static {
+        &["libdepthai-core.a", "libdepthai-core.so"]
+    } else {
+        &["libdepthai-core.so", "libdepthai-core.a"]
+    };
 
-    w.map(|entry| entry.path().to_path_buf())
+    for name in preferred_names {
+        if let Some(found) = WalkDir::new(&out)
+            .into_iter()
+            .filter_entry(|entry| {
+                entry.file_name() != ".git"
+                    && entry.file_name() != "include"
+                    && entry.file_name() != "tests"
+                    && entry.file_name() != "examples"
+                    && entry.file_name() != "bindings"
+            })
+            .filter_map(|e| e.ok())
+            .find(|e| e.path().is_file() && e.path().file_name().and_then(|n| n.to_str()) == Some(*name))
+        {
+            return Some(found.path().to_path_buf());
+        }
+    }
+
+    None
 }
 
 fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
@@ -694,7 +759,17 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         "Unix Makefiles"
     };
 
-    let opencv_support = env_bool("DEPTHAI_OPENCV_SUPPORT").unwrap_or(false);
+    let prefer_static = !env_bool("DAIC_SYS_LINK_SHARED").unwrap_or(false);
+    // depthai-core compiles some sources which unconditionally include OpenCV headers.
+    // Disabling OpenCV support causes compilation failures (e.g. missing <opencv2/...> and
+    // API methods guarded by DEPTHAI_HAVE_OPENCV_SUPPORT), so we always build depthai-core
+    // with OpenCV support enabled.
+    if env_bool("DEPTHAI_OPENCV_SUPPORT") == Some(false) {
+        println_build!(
+            "Ignoring DEPTHAI_OPENCV_SUPPORT=OFF for depthai-core build (core sources require OpenCV headers)."
+        );
+    }
+    let opencv_support = true;
     let dyn_calib_override = env_bool("DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT");
     let events_manager_override = env_bool("DEPTHAI_ENABLE_EVENTS_MANAGER");
 
@@ -735,13 +810,16 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         .arg("-B")
         .arg(&path)
         .arg("-DCMAKE_BUILD_TYPE=Release")
-        .arg("-DBUILD_SHARED_LIBS=ON")
+        .arg(format!("-DBUILD_SHARED_LIBS={}", if prefer_static { "OFF" } else { "ON" }))
         .arg("-DCMAKE_C_COMPILER=/usr/bin/gcc")
         .arg("-DCMAKE_CXX_COMPILER=/usr/bin/g++")
+        // Ensure vcpkg manifest features are enabled (notably `opencv-support`).
+        .arg("-DDEPTHAI_VCPKG_INTERNAL_ONLY:BOOL=OFF")
         .arg(format!(
             "-DDEPTHAI_OPENCV_SUPPORT:BOOL={}",
             bool_to_cmake(opencv_support)
         ))
+        .arg("-DDEPTHAI_MERGED_TARGET:BOOL=ON")
         .arg(format!(
             "-DDEPTHAI_DYNAMIC_CALIBRATION_SUPPORT:BOOL={}",
             bool_to_cmake(dynamic_calibration_support)
@@ -775,10 +853,8 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         panic!("Failed to build depthai-core.");
     }
 
-    let dst = path.join("libdepthai-core.so");
-    println_build!("Built depthai-core library at: {}", dst.display());
-
-    Some(dst)
+    // Find the produced artifact (static or shared).
+    probe_depthai_core_lib(path, prefer_static)
 }
 
 fn env_bool(key: &str) -> Option<bool> {
@@ -945,9 +1021,251 @@ fn get_depthai_core_root() -> PathBuf {
     DEPTHAI_CORE_ROOT.read().unwrap().to_path_buf()
 }
 
+fn vcpkg_lib_dir() -> Option<PathBuf> {
+    let root = BUILD_FOLDER_PATH.join("vcpkg_installed");
+    if !root.exists() {
+        return None;
+    }
+
+    let target = env::var("TARGET").ok();
+    let mut candidates: Vec<PathBuf> = fs::read_dir(&root)
+        .ok()?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().ok().is_some_and(|t| t.is_dir()))
+        .map(|e| e.path())
+        .collect();
+
+    candidates.sort();
+
+    let chosen = if let Some(target) = target {
+        // Best-effort mapping: depthai-core's internal vcpkg uses triplet-like folder names.
+        // Prefer the one that matches the current Rust target.
+        if target.contains("aarch64") {
+            candidates
+                .iter()
+                .find(|p| p.file_name().and_then(|n| n.to_str()) == Some("arm64-linux"))
+                .cloned()
+        } else if target.contains("x86_64") {
+            candidates
+                .iter()
+                .find(|p| {
+                    p.file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| n == "x64-linux" || n == "x86_64-linux")
+                })
+                .cloned()
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
+    let chosen = chosen.or_else(|| candidates.first().cloned())?;
+    let lib = chosen.join("lib");
+    lib.exists().then_some(lib)
+}
+
+fn link_all_static_libs_with_prefix(libdir: &Path, prefix: &str) {
+    let mut libs: Vec<String> = fs::read_dir(libdir)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .filter_map(|e| e.file_name().into_string().ok())
+        .filter(|name| name.starts_with(prefix) && name.ends_with(".a"))
+        .filter_map(|name| {
+            let name = name.strip_suffix(".a")?;
+            let name = name.strip_prefix("lib")?;
+            Some(name.to_string())
+        })
+        .collect();
+
+    libs.sort();
+    libs.dedup();
+
+    for lib in libs {
+        println!("cargo:rustc-link-lib=static={}", lib);
+    }
+}
+
 fn emit_link_directives(path: &Path) {
     if let Some(parent) = path.parent() {
         println!("cargo:rustc-link-search=native={}", parent.display());
     }
-    println!("cargo:rustc-link-lib=dylib=depthai-core");
+
+    match path.extension().and_then(|e| e.to_str()) {
+        Some("a") => {
+            // Prefer static linkage by default.
+
+            // If a system OpenCV is available, prefer it over the vcpkg-built OpenCV.
+            // This avoids OpenCV header/library ABI mismatches (e.g. cv::cvtColor signature changes)
+            // when depthai-core was built against system OpenCV.
+            let system_opencv_available = (cfg!(target_os = "linux") || cfg!(target_os = "macos"))
+                && PkgConfig::new()
+                    .cargo_metadata(false)
+                    .probe("opencv4")
+                    .is_ok();
+
+            // When linking statically, we must also link depthai-core's transitive deps.
+            // Many of these are provided by the internal vcpkg build under builds/vcpkg_installed.
+            let vcpkg_lib = vcpkg_lib_dir();
+            if let Some(ref libdir) = vcpkg_lib {
+                println!("cargo:rustc-link-search=native={}", libdir.display());
+
+                // If we end up linking any shared libs from vcpkg (e.g. ffmpeg, libusb),
+                // set an rpath so binaries can run without manual LD_LIBRARY_PATH.
+                if cfg!(target_os = "linux") {
+                    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", libdir.display());
+                }
+            }
+
+            let protos_dir = BUILD_FOLDER_PATH.join("protos");
+            if protos_dir.join("libmessages.a").exists() {
+                println!("cargo:rustc-link-search=native={}", protos_dir.display());
+            }
+
+            // Avoid painful static library ordering issues (and cycles) by grouping.
+            if cfg!(target_os = "linux") {
+                println!("cargo:rustc-link-arg=-Wl,--start-group");
+            }
+
+            println!("cargo:rustc-link-lib=static=depthai-core");
+
+            // depthai-core commonly requires these when linked statically.
+            let xlink_dir = BUILD_FOLDER_PATH.join("_deps").join("xlink-build");
+            if xlink_dir.join("libXLink.a").exists() {
+                println!("cargo:rustc-link-search=native={}", xlink_dir.display());
+                println!("cargo:rustc-link-lib=static=XLink");
+            }
+
+            let resources = BUILD_FOLDER_PATH.join("libdepthai-resources.a");
+            if resources.exists() {
+                println!("cargo:rustc-link-search=native={}", BUILD_FOLDER_PATH.display());
+                println!("cargo:rustc-link-lib=static=depthai-resources");
+            }
+
+            // Protobuf-generated messages for depthai-core live in a separate archive.
+            if protos_dir.join("libmessages.a").exists() {
+                println!("cargo:rustc-link-lib=static=messages");
+            }
+
+            // vcpkg-provided deps used by depthai-core when OpenCV support is enabled.
+            if let Some(ref libdir) = vcpkg_lib {
+                let static_if_exists = |fname: &str, name: &str| {
+                    if libdir.join(fname).exists() {
+                        println!("cargo:rustc-link-lib=static={}", name);
+                    }
+                };
+
+                let static_whole_if_exists = |fname: &str, name: &str| {
+                    if libdir.join(fname).exists() {
+                        // Ensures symbols are available regardless of archive ordering.
+                        println!("cargo:rustc-link-lib=static:+whole-archive={}", name);
+                    }
+                };
+
+                let dylib_if_exists = |fname: &str, name: &str| {
+                    if libdir.join(fname).exists() {
+                        println!("cargo:rustc-link-lib={}", name);
+                    }
+                };
+
+                if system_opencv_available {
+                    // Use system OpenCV module names (no version suffix).
+                    println!("cargo:rustc-link-lib=opencv_core");
+                    println!("cargo:rustc-link-lib=opencv_imgproc");
+                    println!("cargo:rustc-link-lib=opencv_calib3d");
+                    println!("cargo:rustc-link-lib=opencv_imgcodecs");
+                    println!("cargo:rustc-link-lib=opencv_videoio");
+                    println!("cargo:rustc-link-lib=opencv_highgui");
+                } else {
+                    // OpenCV (vcpkg names include the major version suffix).
+                    static_whole_if_exists("libopencv_core4.a", "opencv_core4");
+                    static_whole_if_exists("libopencv_imgproc4.a", "opencv_imgproc4");
+                    static_whole_if_exists("libopencv_calib3d4.a", "opencv_calib3d4");
+                    static_whole_if_exists("libopencv_imgcodecs4.a", "opencv_imgcodecs4");
+                    static_whole_if_exists("libopencv_videoio4.a", "opencv_videoio4");
+                    static_whole_if_exists("libopencv_highgui4.a", "opencv_highgui4");
+
+                    // OpenCV image codecs can pull in these deps.
+                    static_if_exists("libpng16.a", "png16");
+                    static_if_exists("libtiff.a", "tiff");
+                    static_if_exists("libjpeg.a", "jpeg");
+                    static_if_exists("libwebp.a", "webp");
+                    static_if_exists("libwebpdecoder.a", "webpdecoder");
+                    static_if_exists("libwebpdemux.a", "webpdemux");
+                    static_if_exists("libwebpmux.a", "webpmux");
+                    static_if_exists("libsharpyuv.a", "sharpyuv");
+                }
+
+                // Logging stack.
+                static_if_exists("libspdlog.a", "spdlog");
+                static_if_exists("libfmt.a", "fmt");
+
+                // Compression/archive utilities.
+                static_if_exists("libz.a", "z");
+                static_if_exists("libbz2.a", "bz2");
+                static_if_exists("liblz4.a", "lz4");
+                static_if_exists("liblzma.a", "lzma");
+                static_if_exists("libarchive.a", "archive");
+
+                // MP4 recorder.
+                static_if_exists("libmp4v2.a", "mp4v2");
+
+                // Protobuf runtime.
+                static_if_exists("libprotobuf.a", "protobuf");
+                static_if_exists("libprotobuf-lite.a", "protobuf-lite");
+
+                // Protobuf depends on utf8_range for UTF-8 validation.
+                static_if_exists("libutf8_range.a", "utf8_range");
+                static_if_exists("libutf8_validity.a", "utf8_validity");
+
+                // depthai-core log collection uses cpr (libcurl).
+                static_if_exists("libcpr.a", "cpr");
+                static_if_exists("libcurl.a", "curl");
+                static_if_exists("libssl.a", "ssl");
+                static_if_exists("libcrypto.a", "crypto");
+
+                // Newer protobuf builds rely on abseil.
+                if libdir
+                    .read_dir()
+                    .ok()
+                    .is_some_and(|mut it| it.any(|e| e.ok().is_some_and(|e| e.file_name().to_string_lossy().starts_with("libabsl_"))))
+                {
+                    link_all_static_libs_with_prefix(libdir, "libabsl_");
+                }
+
+                // OpenCV videoio can be built with FFmpeg; vcpkg provides these as shared libs.
+                if !system_opencv_available {
+                    dylib_if_exists("libavcodec.so", "avcodec");
+                    dylib_if_exists("libavformat.so", "avformat");
+                    dylib_if_exists("libavutil.so", "avutil");
+                    dylib_if_exists("libavfilter.so", "avfilter");
+                    dylib_if_exists("libavdevice.so", "avdevice");
+                    dylib_if_exists("libswscale.so", "swscale");
+                    dylib_if_exists("libswresample.so", "swresample");
+                }
+
+                // libusb is typically shared; link dynamically if present.
+                if libdir.join("libusb-1.0.so").exists() {
+                    println!("cargo:rustc-link-lib=usb-1.0");
+                }
+            }
+
+            if cfg!(target_os = "linux") {
+                println!("cargo:rustc-link-arg=-Wl,--end-group");
+            }
+
+            // Common system libs on Linux.
+            if cfg!(target_os = "linux") {
+                println!("cargo:rustc-link-lib=pthread");
+                println!("cargo:rustc-link-lib=dl");
+                println!("cargo:rustc-link-lib=m");
+            }
+        }
+        _ => {
+            println!("cargo:rustc-link-lib=dylib=depthai-core");
+        }
+    }
 }

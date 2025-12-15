@@ -1,16 +1,21 @@
 use std::time::Duration;
+use std::sync::Arc;
 
 use autocxx::{c_int, c_uint};
 use daic_sys::{daic, DaiCameraNode, DaiOutput, DaiDataQueue, DaiImgFrame};
 
 pub use crate::common::{CameraBoardSocket, ImageFrameType, ResizeMode};
 use crate::error::{Result, clear_error_flag, last_error, take_error_if_any};
+use crate::pipeline::device_node::CreateInPipelineWith;
+use crate::pipeline::{Pipeline, PipelineInner};
 
 pub struct CameraNode {
+    pipeline: Arc<PipelineInner>,
     handle: DaiCameraNode,
 }
 
 pub struct CameraOutput {
+    pipeline: Arc<PipelineInner>,
     handle: DaiOutput,
 }
 
@@ -53,8 +58,8 @@ impl CameraOutputConfig {
 }
 
 impl CameraNode {
-    pub(crate) fn from_handle(handle: DaiCameraNode) -> Self {
-        Self { handle }
+    pub(crate) fn from_handle(pipeline: Arc<PipelineInner>, handle: DaiCameraNode) -> Self {
+        Self { pipeline, handle }
     }
 
     pub fn request_output(&self, config: CameraOutputConfig) -> Result<CameraOutput> {
@@ -81,6 +86,7 @@ impl CameraNode {
             Err(last_error("failed to request camera output"))
         } else {
             Ok(CameraOutput {
+                pipeline: Arc::clone(&self.pipeline),
                 handle,
             })
         }
@@ -93,6 +99,7 @@ impl CameraNode {
             Err(last_error("failed to request full resolution output"))
         } else {
             Ok(CameraOutput {
+                pipeline: Arc::clone(&self.pipeline),
                 handle,
             })
         }
@@ -198,5 +205,12 @@ impl ImageFrame {
             .map(|f| format!("{f:?}"))
             .unwrap_or_else(|| "unknown".into());
         format!("{}x{} {}", self.width(), self.height(), fmt)
+    }
+}
+
+// Implement DeviceNodeWithParams for CameraNode to enable pipeline.create_with::<CameraNode, _>(socket)
+impl CreateInPipelineWith<CameraBoardSocket> for CameraNode {
+    fn create_with(pipeline: &Pipeline, socket: CameraBoardSocket) -> Result<Self> {
+        pipeline.create_camera(socket)
     }
 }

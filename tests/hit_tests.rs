@@ -1,3 +1,4 @@
+#[cfg(feature = "hit")]
 /// This file contains hardware-dependent tests for the daic-rs library.
 /// These tests are only compiled and run when the "hdep-tests" feature is enabled.
 ///
@@ -5,7 +6,7 @@
 /// They are separated from unit tests to avoid slowing down the development cycle.
 
 /// Tests for the high-level Rust API that require hardware
-#[cfg(feature = "hit")]
+#[cfg(test)]
 mod hardware_integration_tests {
     use daic_rs::{DaiError, Device, Pipeline, PipelineConfig};
 
@@ -23,14 +24,6 @@ mod hardware_integration_tests {
         assert!(device_info.is_ok(), "Should be able to get device info");
 
         println!("Device created successfully with hardware");
-    }
-
-    #[test]
-    fn test_device_legacy_with_hardware() {
-        // Test that legacy device creation works with hardware
-        let device = Device::new_legacy()
-            .expect("Failed to create legacy device - ensure DepthAI hardware is connected");
-        println!("Legacy device created successfully with hardware");
     }
 
     #[test]

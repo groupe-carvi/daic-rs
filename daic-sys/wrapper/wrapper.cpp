@@ -180,6 +180,134 @@ bool dai_pipeline_start(DaiPipeline pipeline, DaiDevice device) {
     }
 }
 
+// Generic node creation / linking
+// Keep in sync with Rust-side NodeKind discriminants.
+enum class DaiNodeKind : int {
+    Camera = 1,
+    StereoDepth = 2,
+    ImageAlign = 3,
+    RGBD = 4,
+};
+
+DaiNode dai_pipeline_create_node(DaiPipeline pipeline, int kind) {
+    if (!pipeline) {
+        last_error = "dai_pipeline_create_node: null pipeline";
+        return nullptr;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        const auto k = static_cast<DaiNodeKind>(kind);
+        switch (k) {
+            case DaiNodeKind::Camera: {
+                auto node = pipe->create<dai::node::Camera>();
+                return static_cast<DaiNode>(node.get());
+            }
+            case DaiNodeKind::StereoDepth: {
+                auto node = pipe->create<dai::node::StereoDepth>();
+                return static_cast<DaiNode>(node.get());
+            }
+            case DaiNodeKind::ImageAlign: {
+                auto node = pipe->create<dai::node::ImageAlign>();
+                return static_cast<DaiNode>(node.get());
+            }
+            case DaiNodeKind::RGBD: {
+                auto node = pipe->create<dai::node::RGBD>();
+                return static_cast<DaiNode>(node.get());
+            }
+            default:
+                last_error = "dai_pipeline_create_node: unknown kind";
+                return nullptr;
+        }
+    } catch (const std::exception& e) {
+        last_error = std::string("dai_pipeline_create_node failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+static inline std::string _dai_opt_cstr(const char* s) {
+    return s ? std::string(s) : std::string();
+}
+
+bool dai_node_link(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name) {
+    if (!from || !to) {
+        last_error = "dai_node_link: null from/to";
+        return false;
+    }
+    if (!out_name || !in_name) {
+        last_error = "dai_node_link: null out_name/in_name";
+        return false;
+    }
+    try {
+        auto fromNode = static_cast<dai::Node*>(from);
+        auto toNode = static_cast<dai::Node*>(to);
+        const auto on = std::string(out_name);
+        const auto in = std::string(in_name);
+
+        dai::Node::Output* out = nullptr;
+        if(out_group) {
+            out = fromNode->getOutputRef(std::string(out_group), on);
+        } else {
+            out = fromNode->getOutputRef(on);
+        }
+
+        dai::Node::Input* input = nullptr;
+        if(in_group) {
+            input = toNode->getInputRef(std::string(in_group), in);
+        } else {
+            input = toNode->getInputRef(in);
+        }
+        if(!out || !input) {
+            last_error = "dai_node_link: output or input not found";
+            return false;
+        }
+        out->link(*input);
+        return true;
+    } catch (const std::exception& e) {
+        last_error = std::string("dai_node_link failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_node_unlink(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name) {
+    if (!from || !to) {
+        last_error = "dai_node_unlink: null from/to";
+        return false;
+    }
+    if (!out_name || !in_name) {
+        last_error = "dai_node_unlink: null out_name/in_name";
+        return false;
+    }
+    try {
+        auto fromNode = static_cast<dai::Node*>(from);
+        auto toNode = static_cast<dai::Node*>(to);
+        const auto on = std::string(out_name);
+        const auto in = std::string(in_name);
+
+        dai::Node::Output* out = nullptr;
+        if(out_group) {
+            out = fromNode->getOutputRef(std::string(out_group), on);
+        } else {
+            out = fromNode->getOutputRef(on);
+        }
+
+        dai::Node::Input* input = nullptr;
+        if(in_group) {
+            input = toNode->getInputRef(std::string(in_group), in);
+        } else {
+            input = toNode->getInputRef(in);
+        }
+        if(!out || !input) {
+            last_error = "dai_node_unlink: output or input not found";
+            return false;
+        }
+        out->unlink(*input);
+        return true;
+    } catch (const std::exception& e) {
+        last_error = std::string("dai_node_unlink failed: ") + e.what();
+        return false;
+    }
+}
+
 // Low-level camera operations
 dai::Node::Output* dai_camera_request_full_resolution_output(DaiCameraNode camera) {
     if (!camera) {

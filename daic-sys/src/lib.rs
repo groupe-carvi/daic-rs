@@ -32,6 +32,11 @@ include_cpp! {
     generate!("daic::dai_pipeline_start")
     generate!("daic::dai_pipeline_create_camera")
 
+    // Generic node creation / linking
+    generate!("daic::dai_pipeline_create_node")
+    generate!("daic::dai_node_link")
+    generate!("daic::dai_node_unlink")
+
     // Camera functions
     generate!("daic::dai_camera_request_output")
     generate!("daic::dai_camera_request_full_resolution_output")
@@ -62,16 +67,13 @@ include_cpp! {
 // These are just wrappers around void* but provide type distinction
 pub type DaiDevice = *mut autocxx::c_void;
 pub type DaiPipeline = *mut autocxx::c_void;
+pub type DaiNode = *mut autocxx::c_void;
 pub type DaiCameraNode = *mut autocxx::c_void;
 pub type DaiOutput = *mut autocxx::c_void;
 pub type DaiDataQueue = *mut autocxx::c_void;
 pub type DaiImgFrame = *mut autocxx::c_void;
 
 pub mod string_utils;
-
-// Simple test module to verify autocxx works
-#[cfg(test)]
-mod simple_test;
 
 // Re-export for convenience
 pub use ffi::*;

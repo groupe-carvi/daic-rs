@@ -14,14 +14,14 @@ default = ["force-binding-regeneration"]
 
 [build-dependencies]
 autocxx-build = "0.30.0"
-cxx-build = "1.0.160"
-cc = "1.2.29"
-cmake = "0.1.54"
+cxx-build = "1.0.191"
+cc = "1.2.49"
+cmake = "0.1.56"
 num_cpus = "1.17.0"
 walkdir = "2.5.0"
 once_cell = "1.21.3"
 zip-extensions = "0.13.0"
-reqwest = { version = "0.12.22", features = ["blocking", "json"] }
+reqwest = { version = "0.12.26", features = ["blocking", "json"] }
 sevenz-rust2 = "0.20.0"
 pkg-config = "0.3.32"
 zip = "6.0.0"

@@ -1,7 +1,9 @@
 use std::time::Duration;
 
 use daic_rs::camera::{CameraBoardSocket, CameraOutputConfig};
-use daic_rs::device::{Device, Pipeline};
+use daic_rs::device::{Device};
+use daic_rs::pipeline::Pipeline;
+
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let device = Device::new()?;

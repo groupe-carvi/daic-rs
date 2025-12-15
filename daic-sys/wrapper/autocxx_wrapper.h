@@ -47,6 +47,11 @@ API void* dai_pipeline_new();
 API void dai_pipeline_delete(void* pipeline);
 API bool dai_pipeline_start(void* pipeline, void* device);
 
+// Generic node creation / linking
+API void* dai_pipeline_create_node(void* pipeline, int kind);
+API bool dai_node_link(void* from, const char* out_group, const char* out_name, void* to, const char* in_group, const char* in_name);
+API bool dai_node_unlink(void* from, const char* out_group, const char* out_name, void* to, const char* in_group, const char* in_name);
+
 // Low-level camera node operations
 API void* dai_pipeline_create_camera(void* pipeline, int board_socket);
 API void* dai_camera_request_output(void* camera, int width, int height, int type, int resize_mode, float fps, int enable_undistortion);

@@ -53,6 +53,7 @@ API void dai_free_cstring(char* cstring);
 // Low-level raw pointer types - direct exposure of C++ objects
 typedef void* DaiDevice;        // Raw dai::Device*
 typedef void* DaiPipeline;      // Raw dai::Pipeline*
+typedef void* DaiNode;          // Raw dai::Node* (actually points to a derived dai::node::*)
 typedef void* DaiCameraNode;    // Raw dai::node::Camera*
 typedef void* DaiOutput;        // Raw dai::Node::Output*
 typedef void* DaiDataQueue;     // Raw dai::DataOutputQueue*
@@ -68,6 +69,13 @@ API void dai_device_close(DaiDevice device);
 API DaiPipeline dai_pipeline_new();
 API void dai_pipeline_delete(DaiPipeline pipeline);
 API bool dai_pipeline_start(DaiPipeline pipeline, DaiDevice device);
+
+// Generic node creation / linking
+// Note: `DaiNode` is an erased node pointer; it must originate from the same pipeline.
+// kind values are defined by the Rust-side `NodeKind` enum.
+API DaiNode dai_pipeline_create_node(DaiPipeline pipeline, int kind);
+API bool dai_node_link(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name);
+API bool dai_node_unlink(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name);
 
 // Low-level camera node operations
 API DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline, int board_socket);

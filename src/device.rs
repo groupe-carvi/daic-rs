@@ -1,8 +1,7 @@
 use autocxx::c_int;
-use daic_sys::{daic, DaiDevice, DaiPipeline};
+use daic_sys::{daic, DaiDevice};
 use std::os::raw::c_int as RawInt;
 
-use crate::camera::CameraNode;
 use crate::common::CameraBoardSocket;
 use crate::error::{Result, clear_error_flag, last_error, take_error_if_any};
 
@@ -66,55 +65,3 @@ impl Drop for Device {
 
 unsafe impl Send for Device {}
 unsafe impl Sync for Device {}
-
-pub struct Pipeline {
-    handle: DaiPipeline,
-}
-
-impl Pipeline {
-    pub fn new() -> Result<Self> {
-        clear_error_flag();
-        let handle = daic::dai_pipeline_new();
-        if handle.is_null() {
-            Err(last_error("failed to create pipeline"))
-        } else {
-            Ok(Self { handle })
-        }
-    }
-
-    pub fn create_camera(&self, socket: CameraBoardSocket) -> Result<CameraNode> {
-        clear_error_flag();
-        let handle =
-            unsafe { daic::dai_pipeline_create_camera(self.handle, c_int(socket.as_raw())) };
-        if handle.is_null() {
-            Err(last_error("failed to create camera node"))
-        } else {
-            Ok(CameraNode::from_handle(handle))
-        }
-    }
-
-    pub fn start(&self, device: &Device) -> Result<()> {
-        clear_error_flag();
-        let started = unsafe { daic::dai_pipeline_start(self.handle, device.handle()) };
-        if started {
-            Ok(())
-        } else {
-            Err(last_error("failed to start pipeline"))
-        }
-    }
-
-    pub(crate) fn handle(&self) -> DaiPipeline {
-        self.handle
-    }
-}
-
-impl Drop for Pipeline {
-    fn drop(&mut self) {
-        if !self.handle.is_null() {
-            unsafe { daic::dai_pipeline_delete(self.handle) };
-        }
-    }
-}
-
-unsafe impl Send for Pipeline {}
-unsafe impl Sync for Pipeline {}
