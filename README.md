@@ -64,7 +64,7 @@ sudo apt -y install libopencv-dev
 
 #### USB permissions (recommended)
 
-While normally accessed through netork, there is a new support comming to later versions that will make it possible to use usb connection and as such devices may require udev rules so you can access the device without running as root.
+Some DepthAI devices require udev rules so you can access them without running as root.
 If you hit permission errors (or see the device only under `sudo`), consult the official DepthAI/DepthAI-Core docs for the recommended udev rules for your device.
 
 ### Windows
