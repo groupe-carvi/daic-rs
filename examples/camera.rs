@@ -35,7 +35,7 @@ fn main() -> Result<()> {
     }
 
     // Start the pipeline
-    pipeline.start(&device)?;
+    pipeline.start_with_device(&device)?;
     println!("Pipeline started successfully");
 
     println!("Pipeline started; exiting.");

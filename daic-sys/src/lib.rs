@@ -21,12 +21,16 @@ include_cpp! {
 
     // Device functions
     generate!("daic::dai_device_new")
+    generate!("daic::dai_device_clone")
     generate!("daic::dai_device_delete")
     generate!("daic::dai_device_is_closed")
     generate!("daic::dai_device_close")
     generate!("daic::dai_device_get_connected_camera_sockets")
+    generate!("daic::dai_pipeline_new_with_device")
 
     // Pipeline functions
+    generate!("daic::dai_pipeline_start_default")
+    generate!("daic::dai_pipeline_get_default_device")
     generate!("daic::dai_pipeline_new")
     generate!("daic::dai_pipeline_delete")
     generate!("daic::dai_pipeline_start")

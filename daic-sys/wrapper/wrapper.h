@@ -51,7 +51,7 @@ API char* dai_string_to_cstring(const char* std_string);
 API void dai_free_cstring(char* cstring);
 
 // Low-level raw pointer types - direct exposure of C++ objects
-typedef void* DaiDevice;        // Raw dai::Device*
+typedef void* DaiDevice;        // Opaque handle (currently a `std::shared_ptr<dai::Device>*`)
 typedef void* DaiPipeline;      // Raw dai::Pipeline*
 typedef void* DaiNode;          // Raw dai::Node* (actually points to a derived dai::node::*)
 typedef void* DaiCameraNode;    // Raw dai::node::Camera*
@@ -61,14 +61,20 @@ typedef void* DaiImgFrame;      // Raw dai::ImgFrame*
 
 // Low-level device operations
 API DaiDevice dai_device_new();
+API DaiDevice dai_device_clone(DaiDevice device);
 API void dai_device_delete(DaiDevice device);
 API bool dai_device_is_closed(DaiDevice device);
 API void dai_device_close(DaiDevice device);
 
 // Low-level pipeline operations  
 API DaiPipeline dai_pipeline_new();
+API DaiPipeline dai_pipeline_new_with_device(DaiDevice device);
 API void dai_pipeline_delete(DaiPipeline pipeline);
 API bool dai_pipeline_start(DaiPipeline pipeline, DaiDevice device);
+API bool dai_pipeline_start_default(DaiPipeline pipeline);
+
+// Pipeline <-> device interop
+API DaiDevice dai_pipeline_get_default_device(DaiPipeline pipeline);
 
 // Generic node creation / linking
 // Note: `DaiNode` is an erased node pointer; it must originate from the same pipeline.

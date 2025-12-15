@@ -44,6 +44,36 @@ impl Pipeline {
         }
     }
 
+    /// Create a pipeline that is explicitly bound to an existing device connection.
+    ///
+    /// This matches the DepthAI C++ pattern:
+    /// `auto device = std::make_shared<dai::Device>(); dai::Pipeline pipeline(device);`
+    pub fn with_device(device: &Device) -> Result<Self> {
+        clear_error_flag();
+        let handle = unsafe { daic::dai_pipeline_new_with_device(device.handle()) };
+        if handle.is_null() {
+            Err(last_error("failed to create pipeline with device"))
+        } else {
+            Ok(Self {
+                inner: Arc::new(PipelineInner { handle }),
+            })
+        }
+    }
+
+    /// Get the pipeline's default device handle (shared).
+    ///
+    /// Use this to avoid accidentally opening a second device connection when the pipeline
+    /// was created with an implicit/default device.
+    pub fn default_device(&self) -> Result<Device> {
+        clear_error_flag();
+        let handle = unsafe { daic::dai_pipeline_get_default_device(self.inner.handle) };
+        if handle.is_null() {
+            Err(last_error("failed to get pipeline default device"))
+        } else {
+            Ok(Device::from_handle(handle))
+        }
+    }
+
     /// Generic method to create device nodes of any type implementing DeviceNode
     /// 
     /// # Example
@@ -82,9 +112,20 @@ impl Pipeline {
         node::create_node(self.inner_arc(), kind)
     }
 
-    pub fn start(&self, device: &Device) -> Result<()> {
+    pub fn start_with_device(&self, device: &Device) -> Result<()> {
         clear_error_flag();
         let started = unsafe { daic::dai_pipeline_start(self.inner.handle, device.handle()) };
+        if started {
+            Ok(())
+        } else {
+            Err(last_error("failed to start pipeline"))
+        }
+    }
+
+    /// Start the pipeline using its internally-held default device.
+    pub fn start_default(&self) -> Result<()> {
+        clear_error_flag();
+        let started = unsafe { daic::dai_pipeline_start_default(self.inner.handle) };
         if started {
             Ok(())
         } else {

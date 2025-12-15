@@ -2,7 +2,7 @@ use std::time::Duration;
 use std::sync::Arc;
 
 use autocxx::{c_int, c_uint};
-use daic_sys::{daic, DaiCameraNode, DaiOutput, DaiDataQueue, DaiImgFrame};
+use daic_sys::{daic, DaiCameraNode, DaiDataQueue, DaiImgFrame, DaiNode, DaiOutput};
 
 pub use crate::common::{CameraBoardSocket, ImageFrameType, ResizeMode};
 use crate::error::{Result, clear_error_flag, last_error, take_error_if_any};
@@ -60,6 +60,13 @@ impl CameraOutputConfig {
 impl CameraNode {
     pub(crate) fn from_handle(pipeline: Arc<PipelineInner>, handle: DaiCameraNode) -> Self {
         Self { pipeline, handle }
+    }
+
+    /// View this camera node as a generic pipeline node.
+    ///
+    /// This is useful for calling generic node APIs like `Node::link`.
+    pub fn as_node(&self) -> crate::pipeline::Node {
+        crate::pipeline::node::Node::from_handle(Arc::clone(&self.pipeline), self.handle as DaiNode)
     }
 
     pub fn request_output(&self, config: CameraOutputConfig) -> Result<CameraOutput> {

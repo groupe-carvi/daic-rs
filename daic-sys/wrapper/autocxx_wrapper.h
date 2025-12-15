@@ -38,14 +38,18 @@ API void dai_free_cstring(char* cstring);
 
 // Low-level device operations - use void* directly
 API void* dai_device_new();
+API void* dai_device_clone(void* device);
 API void dai_device_delete(void* device);
 API bool dai_device_is_closed(void* device);
 API void dai_device_close(void* device);
 
 // Low-level pipeline operations  
 API void* dai_pipeline_new();
+API void* dai_pipeline_new_with_device(void* device);
 API void dai_pipeline_delete(void* pipeline);
 API bool dai_pipeline_start(void* pipeline, void* device);
+API bool dai_pipeline_start_default(void* pipeline);
+API void* dai_pipeline_get_default_device(void* pipeline);
 
 // Generic node creation / linking
 API void* dai_pipeline_create_node(void* pipeline, int kind);

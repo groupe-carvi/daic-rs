@@ -6,28 +6,12 @@ tasks:
     cmds:
       - cmd: set RUSTFLAGS=-C link-args=/VERBOSE
       - cmd: cargo build -vvv
-  build-gen:
-    desc: Build and force binding gen
-    cmds:
-      - task: build
-    env:
-      CARGO_FEATURE_FORCE_BINDING_REGENERATION: 1
   clean-build:
     desc: Build the crate with verbose output to debug
     cmds:
       - cmd: set RUSTFLAGS=-C link-args=/VERBOSE
       - cmd: cargo clean
       - cmd: cargo build -vvv
-  gen-binding:
-    cmds:
-      - cmd: bindgen ./wrapper/wrapper.h -o generated/bindings.rs -- -I./builds/depthai-core/include
-        platforms: [windows/amd64]
-      - cmd: bindgen ./wrapper/wrapper.h -o generated/bindings.rs -- -I./builds/depthai-core/include -I./builds/_deps/include
-        platforms: [linux]
-
-  install-bindgen:
-    cmds:
-      - cargo install bindgen-cli
   test:hdep:
     cmds:
       - cargo test --features hdep_tests

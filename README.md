@@ -1,9 +1,9 @@
 # daic-rs
 
-A Rust wrapper for Luxonis [DepthAI-Core V3](https://github.com/luxonis/depthai-core).
+An experimental Rust wrapper for Luxonis [DepthAI-Core V3](https://github.com/luxonis/depthai-core).
 
 > [!CAUTION]  
-> The crate is still in active development and may not be usable.
+> This crate is experimental and still in active development as such may not be usable.
 
 Our core goals with daic-rs are:
 - [x] To make it 'Battery Included' by resolving any native dependancies for the crate users.
@@ -48,7 +48,9 @@ winget install -e --id LLVM.LLVM
 
 ## Build
 
-
+```sh
+cargo build
+```
 
 ## Archive: Reminder on how to build depthai-core
 

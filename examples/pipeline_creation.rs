@@ -9,27 +9,14 @@ use daic_rs::device::Device;
 use daic_rs::pipeline::{NodeKind, Pipeline};
 use daic_rs::Result;
 
-struct RgbdComposite {
-    _rgbd: daic_rs::pipeline::Node,
-}
-
-impl daic_rs::pipeline::CreateInPipeline for RgbdComposite {
-    fn create(pipeline: &Pipeline) -> Result<Self> {
-        // Minimal demo: create a couple nodes and link a default output -> default input.
-        // (Port names are highly node-specific; this uses DepthAI default ports.)
-        let cam = pipeline.create_node(NodeKind::Camera)?;
-        let rgbd = pipeline.create_node(NodeKind::Rgbd)?;
-        cam.link(None, None, &rgbd, None, None)?;
-        Ok(Self { _rgbd: rgbd })
-    }
-}
-
 fn main() -> Result<()> {
     println!("Creating pipeline with generic create() API...");
     
-    // Create pipeline
-    let pipeline = Pipeline::new()?;
+    // Create device (single connection)
     let device = Device::new()?;
+
+    // Create pipeline bound to that device (matches DepthAI C++ `Pipeline(device)`)
+    let pipeline = Pipeline::with_device(&device)?;
     
     // Using the generic create_with API for creating camera nodes
     let left = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamB)?;
@@ -47,12 +34,15 @@ fn main() -> Result<()> {
     
     println!("Configured camera outputs");
 
-    // Create a Rust composite (built from generic nodes)
-    let _composite = pipeline.create::<RgbdComposite>()?;
-    println!("Created composite node");
+    // Demonstrate the generic node API: create a StereoDepth node and link the cameras into it.
+    // (StereoDepth expects inputs named "left" and "right".)
+    let stereo = pipeline.create_node(NodeKind::StereoDepth)?;
+    left.as_node().link(None, None, &stereo, None, Some("left"))?;
+    right.as_node().link(None, None, &stereo, None, Some("right"))?;
+    println!("Linked cameras into StereoDepth");
     
-    // Start the pipeline
-    pipeline.start(&device)?;
+    // Start the pipeline using its default device (the one we provided)
+    pipeline.start_default()?;
     println!("Pipeline started successfully!");
     
     Ok(())
