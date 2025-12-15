@@ -1098,18 +1098,25 @@ fn emit_link_directives(path: &Path) {
         Some("a") => {
             // Prefer static linkage by default.
 
-            // If a system OpenCV is available, prefer it over the vcpkg-built OpenCV.
-            // This avoids OpenCV header/library ABI mismatches (e.g. cv::cvtColor signature changes)
-            // when depthai-core was built against system OpenCV.
-            let system_opencv_available = (cfg!(target_os = "linux") || cfg!(target_os = "macos"))
+            // When linking statically, we must also link depthai-core's transitive deps.
+            // Many of these are provided by the internal vcpkg build under builds/vcpkg_installed.
+            let vcpkg_lib = vcpkg_lib_dir();
+
+            // If depthai-core was built using its internal vcpkg OpenCV (common on Linux),
+            // linking against system OpenCV can fail due to ABI / symbol signature differences
+            // (e.g. cv::cvtColor gaining an AlgorithmHint parameter in newer OpenCV).
+            let vcpkg_opencv_available = vcpkg_lib.as_ref().is_some_and(|libdir| {
+                libdir.join("libopencv_core4.a").exists() && libdir.join("libopencv_imgproc4.a").exists()
+            });
+
+            // Only prefer system OpenCV if we *don't* have a vcpkg OpenCV build to match.
+            let system_opencv_available = !vcpkg_opencv_available
+                && (cfg!(target_os = "linux") || cfg!(target_os = "macos"))
                 && PkgConfig::new()
                     .cargo_metadata(false)
                     .probe("opencv4")
                     .is_ok();
 
-            // When linking statically, we must also link depthai-core's transitive deps.
-            // Many of these are provided by the internal vcpkg build under builds/vcpkg_installed.
-            let vcpkg_lib = vcpkg_lib_dir();
             if let Some(ref libdir) = vcpkg_lib {
                 println!("cargo:rustc-link-search=native={}", libdir.display());
 
@@ -1130,6 +1137,8 @@ fn emit_link_directives(path: &Path) {
                 println!("cargo:rustc-link-arg=-Wl,--start-group");
             }
 
+            // Link depthai-core itself.
+            // (Linking by name keeps behavior consistent with Cargo/rustc link handling.)
             println!("cargo:rustc-link-lib=static=depthai-core");
 
             // depthai-core commonly requires these when linked statically.
@@ -1154,6 +1163,8 @@ fn emit_link_directives(path: &Path) {
             if let Some(ref libdir) = vcpkg_lib {
                 let static_if_exists = |fname: &str, name: &str| {
                     if libdir.join(fname).exists() {
+                        // For non-OpenCV deps we can still use -l since they're typically also
+                        // available system-wide; absolute paths are used for OpenCV and core archives.
                         println!("cargo:rustc-link-lib=static={}", name);
                     }
                 };
@@ -1259,6 +1270,12 @@ fn emit_link_directives(path: &Path) {
 
             // Common system libs on Linux.
             if cfg!(target_os = "linux") {
+                // depthai-core uses backward-cpp with libdw/libelf on Linux.
+                // Link these explicitly to avoid undefined symbols like dwfl_end / dwarf_*.
+                if PkgConfig::new().cargo_metadata(false).probe("libdw").is_ok() {
+                    println!("cargo:rustc-link-lib=dw");
+                    println!("cargo:rustc-link-lib=elf");
+                }
                 println!("cargo:rustc-link-lib=pthread");
                 println!("cargo:rustc-link-lib=dl");
                 println!("cargo:rustc-link-lib=m");

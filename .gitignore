@@ -25,6 +25,8 @@ target/
 
 /target
 
+/build
+
 /daic-sys/builds
 
 /daic-sys/builds/depthai-core
