@@ -23,7 +23,7 @@ Our core goals with daic-rs are:
 ### Linux
 
 > [!WARNING]
-> For Linux system we only support debian based distributions for the moment and will investigate more as we go. Also the initial build can take a while as it will build DepthAI-Core from source and need to resolve every dependancy.
+> For Linux system we only support debian based distributions for the moment and will investigate more as we go. Also the initial build can take a while as it will build DepthAI-Core and opencv from source and need to resolve every dependancy.
 
 You will need to make sure that your system has the required dependancies.
 
@@ -31,7 +31,7 @@ You will need to make sure that your system has the required dependancies.
 ```sh
 # Install dependencies
 
-sudo apt -y install libclang-dev pkg-config cmake ninja-build python3 autoconf automake autoconf-archive libudev-dev libtool clang libssl-dev nasm libopencv-dev
+sudo apt -y install libclang-dev pkg-config cmake ninja-build python3 autoconf automake autoconf-archive libudev-dev libtool clang libssl-dev nasm
 ```
 
 ### Windows

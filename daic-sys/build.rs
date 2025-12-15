@@ -255,6 +255,14 @@ fn get_depthai_includes() -> Vec<PathBuf> {
         includes.push(build_include);
     }
 
+    // depthai-core's internal vcpkg installation contains headers required by depthai-core's
+    // public headers (e.g. <nlohmann/json.hpp>). After a `cargo clean`, the build directory can
+    // still contain `vcpkg_installed/.../include` even if CMake's FetchContent `_deps` checkouts
+    // are incomplete, so we include it explicitly.
+    if let Some(vcpkg_include) = vcpkg_include_dir() {
+        includes.push(vcpkg_include);
+    }
+
     let deps_path = BUILD_FOLDER_PATH.join("_deps");
 
     if deps_path.exists() {
@@ -1064,6 +1072,15 @@ fn vcpkg_lib_dir() -> Option<PathBuf> {
     let chosen = chosen.or_else(|| candidates.first().cloned())?;
     let lib = chosen.join("lib");
     lib.exists().then_some(lib)
+}
+
+fn vcpkg_include_dir() -> Option<PathBuf> {
+    // `vcpkg_lib_dir` returns: <builds>/vcpkg_installed/<triplet>/lib
+    // We want:              <builds>/vcpkg_installed/<triplet>/include
+    let lib = vcpkg_lib_dir()?;
+    let triplet = lib.parent()?;
+    let include = triplet.join("include");
+    include.exists().then_some(include)
 }
 
 fn link_all_static_libs_with_prefix(libdir: &Path, prefix: &str) {
