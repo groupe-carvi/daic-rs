@@ -25,6 +25,10 @@ name = "pipeline_creation"
 path = "examples/pipeline_creation.rs"
 
 [[example]]
+name = "rgbd_rerun"
+path = "examples/rgbd_rerun.rs"
+
+[[example]]
 name = "camera"
 path = "examples/camera.rs"
 

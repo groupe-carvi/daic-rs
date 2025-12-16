@@ -1,45 +1,35 @@
-use daic_rs::common::CameraBoardSocket;
+use std::time::Duration;
+
+use daic_rs::camera::{CameraNode, CameraOutputConfig};
+use daic_rs::common::{CameraBoardSocket, ImageFrameType, ResizeMode};
 use daic_rs::device::Device;
 use daic_rs::pipeline::Pipeline;
 use daic_rs::Result;
 
 fn main() -> Result<()> {
-    println!("=== Camera Startup with DepthAI ===");
-
-    // Create device using safe API
     let device = Device::new()?;
-    println!("Device created successfully");
-    println!("Device connected: {}", device.is_connected());
-
-    // Create pipeline bound to the same device (avoids opening a second connection)
     let pipeline = Pipeline::with_device(&device)?;
-    println!("Pipeline created successfully (bound to device)");
 
-    // Get connected cameras
-    let sockets = device.connected_cameras()?;
-    println!("Found {} connected cameras", sockets.len());
+    let cam = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;
+    let out = cam.request_output(CameraOutputConfig {
+        size: (640, 400),
+        frame_type: Some(ImageFrameType::RGB888i),
+        resize_mode: ResizeMode::Crop,
+        fps: Some(30.0),
+        enable_undistortion: None,
+    })?;
 
-    for &socket in &sockets {
-        println!("Configuring camera for socket: {:?}", socket);
+    let q = out.create_queue(4, false)?;
 
-        // Create camera node
-        let _camera = pipeline.create_camera(socket)?;
-        println!("Camera node created for socket: {}", socket);
-    }
-
-    // Always safe to create at least one node to keep pipeline non-empty.
-    // If no cameras were detected, create an Auto camera node for demonstration.
-    if sockets.is_empty() {
-        let _camera = pipeline.create_camera(CameraBoardSocket::Auto)?;
-        println!("No cameras detected; created Camera(Auto) node");
-    }
-
-    // Start the pipeline
     pipeline.start()?;
-    println!("Pipeline started successfully");
 
-    println!("Pipeline started; exiting.");
+    for _ in 0..10 {
+        if let Some(frame) = q.blocking_next(Some(Duration::from_millis(200)))? {
+            println!("Got frame: {} ({} bytes)", frame.describe(), frame.byte_len());
+        } else {
+            println!("No frame yet");
+        }
+    }
 
-    // The pipeline will automatically stop when dropped
     Ok(())
 }

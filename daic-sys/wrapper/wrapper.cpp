@@ -1,6 +1,9 @@
 #include "wrapper.h"
 #include "depthai/depthai.hpp"
 #include "depthai/build/version.hpp"
+#include "depthai/common/Point3fRGBA.hpp"
+#include "depthai/pipeline/datatype/PointCloudData.hpp"
+#include "depthai/pipeline/datatype/RGBDData.hpp"
 #include "XLink/XLink.h"
 #include "XLink/XLinkPublicDefines.h"
 #include <chrono>
@@ -252,6 +255,22 @@ DaiPipeline dai_pipeline_new_with_device(DaiDevice device) {
     }
 }
 
+DaiNode dai_rgbd_build(DaiNode rgbd) {
+    if(!rgbd) {
+        last_error = "dai_rgbd_build: null rgbd";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto node = static_cast<dai::node::RGBD*>(rgbd);
+        auto built = node->build();
+        return static_cast<DaiNode>(built.get());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_rgbd_build failed: ") + e.what();
+        return nullptr;
+    }
+}
+
 void dai_pipeline_delete(DaiPipeline pipeline) {
     if (pipeline) {
         auto pipe = static_cast<dai::Pipeline*>(pipeline);
@@ -340,6 +359,431 @@ DaiNode dai_pipeline_create_node(DaiPipeline pipeline, int kind) {
     } catch (const std::exception& e) {
         last_error = std::string("dai_pipeline_create_node failed: ") + e.what();
         return nullptr;
+    }
+}
+
+// Forward declarations for helpers defined later in this file.
+static inline bool _dai_cstr_empty(const char* s);
+static inline dai::Node::Input* _dai_pick_input_for_output(dai::Node* toNode, dai::Node::Output* output, const char* in_group);
+
+DaiOutput dai_node_get_output(DaiNode node, const char* group, const char* name) {
+    if(!node) {
+        last_error = "dai_node_get_output: null node";
+        return nullptr;
+    }
+    if(_dai_cstr_empty(name)) {
+        last_error = "dai_node_get_output: empty name";
+        return nullptr;
+    }
+    try {
+        auto n = static_cast<dai::Node*>(node);
+        dai::Node::Output* out = group ? n->getOutputRef(std::string(group), std::string(name)) : n->getOutputRef(std::string(name));
+        if(!out) {
+            last_error = "dai_node_get_output: output not found";
+            return nullptr;
+        }
+        return static_cast<DaiOutput>(out);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_node_get_output failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_output_link(DaiOutput from, DaiNode to, const char* in_group, const char* in_name) {
+    if(!from || !to) {
+        last_error = "dai_output_link: null from/to";
+        return false;
+    }
+    try {
+        auto out = static_cast<dai::Node::Output*>(from);
+        auto toNode = static_cast<dai::Node*>(to);
+
+        const bool inSpecified = !_dai_cstr_empty(in_name);
+        dai::Node::Input* input = nullptr;
+
+        if(inSpecified) {
+            const std::string inNameStr(in_name);
+            const std::optional<std::string> inGroupStr = in_group ? std::optional<std::string>(std::string(in_group)) : std::nullopt;
+
+            auto try_find_on_node = [&](dai::Node* n) -> dai::Node::Input* {
+                if(!n) return nullptr;
+
+                // Most nodes expose their inputs directly via getInputRef(name).
+                if(inGroupStr.has_value()) {
+                    if(auto* i = n->getInputRef(inGroupStr.value(), inNameStr)) return i;
+                }
+                if(auto* i = n->getInputRef(inNameStr)) return i;
+
+                // Some nodes (e.g. Sync-based host nodes) keep dynamic inputs under an InputMap named "inputs".
+                // When callers don't specify a group, try that common map name as a fallback.
+                if(!inGroupStr.has_value()) {
+                    if(auto* i = n->getInputRef(std::string("inputs"), inNameStr)) return i;
+                }
+
+                return nullptr;
+            };
+
+            // First try on the target node itself.
+            input = try_find_on_node(toNode);
+
+            // If not found, try any subnodes (e.g. RGBD -> Sync subnode).
+            if(!input) {
+                for(const auto& child : toNode->getNodeMap()) {
+                    input = try_find_on_node(child.get());
+                    if(input) break;
+                }
+            }
+
+            if(!input) {
+                last_error = "dai_output_link: input not found";
+                return false;
+            }
+        } else {
+            input = _dai_pick_input_for_output(toNode, out, in_group);
+        }
+
+        if(!input) {
+            last_error = "dai_output_link: no compatible input found";
+            return false;
+        }
+        out->link(*input);
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_output_link failed: ") + e.what();
+        return false;
+    }
+}
+
+int dai_device_get_platform(DaiDevice device) {
+    if(!device) {
+        last_error = "dai_device_get_platform: null device";
+        return -1;
+    }
+    try {
+        auto dev = static_cast<std::shared_ptr<dai::Device>*>(device);
+        if(!dev->get() || !(*dev)) {
+            last_error = "dai_device_get_platform: invalid device";
+            return -1;
+        }
+        return static_cast<int>((*dev)->getPlatform());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_device_get_platform failed: ") + e.what();
+        return -1;
+    }
+}
+
+void dai_device_set_ir_laser_dot_projector_intensity(DaiDevice device, float intensity) {
+    if(!device) {
+        last_error = "dai_device_set_ir_laser_dot_projector_intensity: null device";
+        return;
+    }
+    try {
+        auto dev = static_cast<std::shared_ptr<dai::Device>*>(device);
+        if(!dev->get() || !(*dev)) {
+            last_error = "dai_device_set_ir_laser_dot_projector_intensity: invalid device";
+            return;
+        }
+        (*dev)->setIrLaserDotProjectorIntensity(intensity);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_device_set_ir_laser_dot_projector_intensity failed: ") + e.what();
+    }
+}
+
+static inline dai::node::StereoDepth* _dai_as_stereo(DaiNode stereo) {
+    return static_cast<dai::node::StereoDepth*>(stereo);
+}
+
+void dai_stereo_set_subpixel(DaiNode stereo, bool enable) {
+    if(!stereo) {
+        last_error = "dai_stereo_set_subpixel: null stereo";
+        return;
+    }
+    try {
+        _dai_as_stereo(stereo)->setSubpixel(enable);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_set_subpixel failed: ") + e.what();
+    }
+}
+
+void dai_stereo_set_extended_disparity(DaiNode stereo, bool enable) {
+    if(!stereo) {
+        last_error = "dai_stereo_set_extended_disparity: null stereo";
+        return;
+    }
+    try {
+        _dai_as_stereo(stereo)->setExtendedDisparity(enable);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_set_extended_disparity failed: ") + e.what();
+    }
+}
+
+void dai_stereo_set_default_profile_preset(DaiNode stereo, int preset_mode) {
+    if(!stereo) {
+        last_error = "dai_stereo_set_default_profile_preset: null stereo";
+        return;
+    }
+    try {
+        _dai_as_stereo(stereo)->setDefaultProfilePreset(static_cast<dai::node::StereoDepth::PresetMode>(preset_mode));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_set_default_profile_preset failed: ") + e.what();
+    }
+}
+
+void dai_stereo_set_left_right_check(DaiNode stereo, bool enable) {
+    if(!stereo) {
+        last_error = "dai_stereo_set_left_right_check: null stereo";
+        return;
+    }
+    try {
+        _dai_as_stereo(stereo)->setLeftRightCheck(enable);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_set_left_right_check failed: ") + e.what();
+    }
+}
+
+void dai_stereo_set_rectify_edge_fill_color(DaiNode stereo, int color) {
+    if(!stereo) {
+        last_error = "dai_stereo_set_rectify_edge_fill_color: null stereo";
+        return;
+    }
+    try {
+        _dai_as_stereo(stereo)->setRectifyEdgeFillColor(color);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_set_rectify_edge_fill_color failed: ") + e.what();
+    }
+}
+
+void dai_stereo_enable_distortion_correction(DaiNode stereo, bool enable) {
+    if(!stereo) {
+        last_error = "dai_stereo_enable_distortion_correction: null stereo";
+        return;
+    }
+    try {
+        _dai_as_stereo(stereo)->enableDistortionCorrection(enable);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_enable_distortion_correction failed: ") + e.what();
+    }
+}
+
+void dai_stereo_initial_set_left_right_check_threshold(DaiNode stereo, int threshold) {
+    if(!stereo) {
+        last_error = "dai_stereo_initial_set_left_right_check_threshold: null stereo";
+        return;
+    }
+    try {
+        auto s = _dai_as_stereo(stereo);
+        if(!s->initialConfig) {
+            last_error = "dai_stereo_initial_set_left_right_check_threshold: initialConfig is null";
+            return;
+        }
+        s->initialConfig->setLeftRightCheckThreshold(threshold);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_initial_set_left_right_check_threshold failed: ") + e.what();
+    }
+}
+
+void dai_stereo_initial_set_threshold_filter_max_range(DaiNode stereo, int max_range) {
+    if(!stereo) {
+        last_error = "dai_stereo_initial_set_threshold_filter_max_range: null stereo";
+        return;
+    }
+    try {
+        auto s = _dai_as_stereo(stereo);
+        if(!s->initialConfig) {
+            last_error = "dai_stereo_initial_set_threshold_filter_max_range: initialConfig is null";
+            return;
+        }
+        s->initialConfig->postProcessing.thresholdFilter.maxRange = max_range;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_initial_set_threshold_filter_max_range failed: ") + e.what();
+    }
+}
+
+void dai_rgbd_set_depth_unit(DaiNode rgbd, int depth_unit) {
+    if(!rgbd) {
+        last_error = "dai_rgbd_set_depth_unit: null rgbd";
+        return;
+    }
+    try {
+        auto r = static_cast<dai::node::RGBD*>(rgbd);
+        r->setDepthUnit(static_cast<dai::StereoDepthConfig::AlgorithmControl::DepthUnit>(depth_unit));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_rgbd_set_depth_unit failed: ") + e.what();
+    }
+}
+
+// Wrapper-owned pointcloud view. PointCloudData::getPointsRGB() returns by value, so we
+// store the returned vector and expose a stable pointer + length to Rust.
+struct DaiPointCloudView {
+    std::shared_ptr<dai::PointCloudData> msg;
+    std::vector<dai::Point3fRGBA> points;
+};
+
+DaiPointCloud dai_queue_get_pointcloud(DaiDataQueue queue, int timeout_ms) {
+    if(!queue) {
+        last_error = "dai_queue_get_pointcloud: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        std::shared_ptr<dai::PointCloudData> pcl;
+        if(timeout_ms < 0) {
+            pcl = (*ptr)->get<dai::PointCloudData>();
+        } else {
+            bool timedOut = false;
+            pcl = (*ptr)->get<dai::PointCloudData>(std::chrono::milliseconds(timeout_ms), timedOut);
+            if(timedOut) return nullptr;
+        }
+        if(!pcl) return nullptr;
+
+        auto view = new DaiPointCloudView();
+        view->msg = pcl;
+        view->points = pcl->getPointsRGB();
+        return static_cast<DaiPointCloud>(view);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get_pointcloud failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiPointCloud dai_queue_try_get_pointcloud(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_try_get_pointcloud: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto pcl = (*ptr)->tryGet<dai::PointCloudData>();
+        if(!pcl) return nullptr;
+        auto view = new DaiPointCloudView();
+        view->msg = pcl;
+        view->points = pcl->getPointsRGB();
+        return static_cast<DaiPointCloud>(view);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_try_get_pointcloud failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+int dai_pointcloud_get_width(DaiPointCloud pcl) {
+    if(!pcl) {
+        last_error = "dai_pointcloud_get_width: null pointcloud";
+        return 0;
+    }
+    auto view = static_cast<DaiPointCloudView*>(pcl);
+    return static_cast<int>(view->msg ? view->msg->getWidth() : 0);
+}
+
+int dai_pointcloud_get_height(DaiPointCloud pcl) {
+    if(!pcl) {
+        last_error = "dai_pointcloud_get_height: null pointcloud";
+        return 0;
+    }
+    auto view = static_cast<DaiPointCloudView*>(pcl);
+    return static_cast<int>(view->msg ? view->msg->getHeight() : 0);
+}
+
+const DaiPoint3fRGBA* dai_pointcloud_get_points_rgba(DaiPointCloud pcl) {
+    if(!pcl) {
+        last_error = "dai_pointcloud_get_points_rgba: null pointcloud";
+        return nullptr;
+    }
+    auto view = static_cast<DaiPointCloudView*>(pcl);
+    if(view->points.empty()) return nullptr;
+    return reinterpret_cast<const DaiPoint3fRGBA*>(view->points.data());
+}
+
+size_t dai_pointcloud_get_points_rgba_len(DaiPointCloud pcl) {
+    if(!pcl) {
+        last_error = "dai_pointcloud_get_points_rgba_len: null pointcloud";
+        return 0;
+    }
+    auto view = static_cast<DaiPointCloudView*>(pcl);
+    return view->points.size();
+}
+
+void dai_pointcloud_release(DaiPointCloud pcl) {
+    if(pcl) {
+        auto view = static_cast<DaiPointCloudView*>(pcl);
+        delete view;
+    }
+}
+
+DaiRGBDData dai_queue_get_rgbd(DaiDataQueue queue, int timeout_ms) {
+    if(!queue) {
+        last_error = "dai_queue_get_rgbd: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        std::shared_ptr<dai::RGBDData> rgbd;
+        if(timeout_ms < 0) {
+            rgbd = (*ptr)->get<dai::RGBDData>();
+        } else {
+            bool timedOut = false;
+            rgbd = (*ptr)->get<dai::RGBDData>(std::chrono::milliseconds(timeout_ms), timedOut);
+            if(timedOut) return nullptr;
+        }
+        if(!rgbd) return nullptr;
+        return static_cast<DaiRGBDData>(new std::shared_ptr<dai::RGBDData>(rgbd));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get_rgbd failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiRGBDData dai_queue_try_get_rgbd(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_try_get_rgbd: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto rgbd = (*ptr)->tryGet<dai::RGBDData>();
+        if(!rgbd) return nullptr;
+        return static_cast<DaiRGBDData>(new std::shared_ptr<dai::RGBDData>(rgbd));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_try_get_rgbd failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiImgFrame dai_rgbd_get_rgb_frame(DaiRGBDData rgbd) {
+    if(!rgbd) {
+        last_error = "dai_rgbd_get_rgb_frame: null rgbd";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::RGBDData>*>(rgbd);
+        auto frame = (*ptr)->getRGBFrame();
+        if(!frame) return nullptr;
+        return new std::shared_ptr<dai::ImgFrame>(frame);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_rgbd_get_rgb_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiImgFrame dai_rgbd_get_depth_frame(DaiRGBDData rgbd) {
+    if(!rgbd) {
+        last_error = "dai_rgbd_get_depth_frame: null rgbd";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::RGBDData>*>(rgbd);
+        auto frame = (*ptr)->getDepthFrame();
+        if(!frame) return nullptr;
+        return new std::shared_ptr<dai::ImgFrame>(frame);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_rgbd_get_depth_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+void dai_rgbd_release(DaiRGBDData rgbd) {
+    if(rgbd) {
+        auto ptr = static_cast<std::shared_ptr<dai::RGBDData>*>(rgbd);
+        delete ptr;
     }
 }
 
@@ -847,6 +1291,9 @@ const char* dai_camera_socket_name(int socket) {
 
 // Error handling
 const char* dai_get_last_error() {
+    if(last_error.empty()) {
+        return nullptr;
+    }
     return last_error.c_str();
 }
 

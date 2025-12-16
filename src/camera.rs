@@ -114,6 +114,35 @@ impl CameraNode {
 }
 
 impl CameraOutput {
+    pub fn link_to(
+        &self,
+        to: &crate::pipeline::Node,
+        in_name: Option<&str>,
+    ) -> Result<()> {
+        clear_error_flag();
+        let in_name_c = in_name
+            .map(|s| std::ffi::CString::new(s).map_err(|_| last_error("invalid in_name")))
+            .transpose()?;
+
+        let ok = unsafe {
+            daic::dai_output_link(
+                self.handle,
+                to.handle(),
+                std::ptr::null(),
+                in_name_c
+                    .as_ref()
+                    .map(|s| s.as_ptr())
+                    .unwrap_or(std::ptr::null()),
+            )
+        };
+
+        if ok {
+            Ok(())
+        } else {
+            Err(last_error("failed to link output"))
+        }
+    }
+
     pub fn create_queue(&self, max_size: u32, blocking: bool) -> Result<OutputQueue> {
         clear_error_flag();
         let handle =
@@ -135,6 +164,14 @@ impl Drop for OutputQueue {
 }
 
 impl OutputQueue {
+    pub(crate) fn from_handle(handle: DaiDataQueue) -> Self {
+        Self { handle }
+    }
+
+    pub(crate) fn handle(&self) -> DaiDataQueue {
+        self.handle
+    }
+
     pub fn blocking_next(&self, timeout: Option<Duration>) -> Result<Option<ImageFrame>> {
         clear_error_flag();
         let timeout_ms = timeout.map(|d| d.as_millis() as i32).unwrap_or(-1);
@@ -174,6 +211,10 @@ impl Drop for ImageFrame {
 }
 
 impl ImageFrame {
+    pub(crate) fn from_handle(handle: DaiImgFrame) -> Self {
+        Self { handle }
+    }
+
     pub fn width(&self) -> u32 {
         let raw: ::std::os::raw::c_int = unsafe { daic::dai_frame_get_width(self.handle) }.into();
         raw as u32

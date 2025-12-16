@@ -11,6 +11,14 @@ pub struct Device {
     handle: DaiDevice,
 }
 
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DevicePlatform {
+    Rvc2 = 0,
+    Rvc3 = 1,
+    Rvc4 = 2,
+}
+
 impl Device {
     pub(crate) fn from_handle(handle: DaiDevice) -> Self {
         Self { handle }
@@ -79,6 +87,28 @@ impl Device {
             .into_iter()
             .map(|raw| CameraBoardSocket::from_raw(RawInt::from(raw)))
             .collect())
+    }
+
+    pub fn platform(&self) -> Result<DevicePlatform> {
+        clear_error_flag();
+        let raw: RawInt = unsafe { daic::dai_device_get_platform(self.handle) }.into();
+        match raw {
+            0 => Ok(DevicePlatform::Rvc2),
+            1 => Ok(DevicePlatform::Rvc3),
+            2 => Ok(DevicePlatform::Rvc4),
+            _ => Err(last_error("unknown device platform")),
+        }
+    }
+
+    /// Set IR laser dot projector intensity (0.0..1.0 on supported devices).
+    pub fn set_ir_laser_dot_projector_intensity(&self, intensity: f32) -> Result<()> {
+        clear_error_flag();
+        unsafe { daic::dai_device_set_ir_laser_dot_projector_intensity(self.handle, intensity) };
+        if let Some(err) = take_error_if_any("failed to set IR laser dot projector intensity") {
+            Err(err)
+        } else {
+            Ok(())
+        }
     }
 
     pub(crate) fn handle(&self) -> DaiDevice {

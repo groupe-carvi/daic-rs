@@ -46,6 +46,19 @@ typedef void* DaiCameraNode;  // currently: `dai::node::Camera*`
 typedef void* DaiOutput;      // currently: `dai::Node::Output*`
 typedef void* DaiDataQueue;   // currently: `std::shared_ptr<dai::MessageQueue>*`
 typedef void* DaiImgFrame;    // currently: `std::shared_ptr<dai::ImgFrame>*`
+typedef void* DaiPointCloud;  // currently: wrapper-owned view of `std::shared_ptr<dai::PointCloudData>`
+typedef void* DaiRGBDData;    // currently: `std::shared_ptr<dai::RGBDData>*`
+
+// POD view of `dai::Point3fRGBA`
+typedef struct DaiPoint3fRGBA {
+	float x;
+	float y;
+	float z;
+	unsigned char r;
+	unsigned char g;
+	unsigned char b;
+	unsigned char a;
+} DaiPoint3fRGBA;
 
 // Low-level device operations
 API DaiDevice dai_device_new();
@@ -59,6 +72,8 @@ API DaiPipeline dai_pipeline_new();
 API DaiPipeline dai_pipeline_new_with_device(DaiDevice device);
 API void dai_pipeline_delete(DaiPipeline pipeline);
 API bool dai_pipeline_start(DaiPipeline pipeline);
+// Builder helpers (mirror native API: `pipeline.create<node::RGBD>()->build()`).
+API DaiNode dai_rgbd_build(DaiNode rgbd);
 
 // Pipeline <-> device interop
 API DaiDevice dai_pipeline_get_default_device(DaiPipeline pipeline);
@@ -68,8 +83,28 @@ API DaiDevice dai_pipeline_get_default_device(DaiPipeline pipeline);
 // kind values are defined by the Rust-side `NodeKind` enum.
 API bool dai_pipeline_start_default(DaiPipeline pipeline);
 API DaiNode dai_pipeline_create_node(DaiPipeline pipeline, int kind);
+// Output helpers
+API DaiOutput dai_node_get_output(DaiNode node, const char* group, const char* name);
+API bool dai_output_link(DaiOutput from, DaiNode to, const char* in_group, const char* in_name);
 API bool dai_node_link(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name);
 API bool dai_node_unlink(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name);
+
+// Device helpers
+API int dai_device_get_platform(DaiDevice device);
+API void dai_device_set_ir_laser_dot_projector_intensity(DaiDevice device, float intensity);
+
+// StereoDepth configuration helpers
+API void dai_stereo_set_subpixel(DaiNode stereo, bool enable);
+API void dai_stereo_set_extended_disparity(DaiNode stereo, bool enable);
+API void dai_stereo_set_default_profile_preset(DaiNode stereo, int preset_mode);
+API void dai_stereo_set_left_right_check(DaiNode stereo, bool enable);
+API void dai_stereo_set_rectify_edge_fill_color(DaiNode stereo, int color);
+API void dai_stereo_enable_distortion_correction(DaiNode stereo, bool enable);
+API void dai_stereo_initial_set_left_right_check_threshold(DaiNode stereo, int threshold);
+API void dai_stereo_initial_set_threshold_filter_max_range(DaiNode stereo, int max_range);
+
+// RGBD configuration helpers
+API void dai_rgbd_set_depth_unit(DaiNode rgbd, int depth_unit);
 
 // Low-level camera node operations
 API DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline, int board_socket);
@@ -85,6 +120,24 @@ API DaiDataQueue dai_output_create_queue(DaiOutput output, unsigned int max_size
 API void dai_queue_delete(DaiDataQueue queue);
 API DaiImgFrame dai_queue_get_frame(DaiDataQueue queue, int timeout_ms);
 API DaiImgFrame dai_queue_try_get_frame(DaiDataQueue queue);
+
+// Message retrieval for non-ImgFrame outputs
+API DaiPointCloud dai_queue_get_pointcloud(DaiDataQueue queue, int timeout_ms);
+API DaiPointCloud dai_queue_try_get_pointcloud(DaiDataQueue queue);
+API DaiRGBDData dai_queue_get_rgbd(DaiDataQueue queue, int timeout_ms);
+API DaiRGBDData dai_queue_try_get_rgbd(DaiDataQueue queue);
+
+// PointCloud view accessors
+API int dai_pointcloud_get_width(DaiPointCloud pcl);
+API int dai_pointcloud_get_height(DaiPointCloud pcl);
+API const DaiPoint3fRGBA* dai_pointcloud_get_points_rgba(DaiPointCloud pcl);
+API size_t dai_pointcloud_get_points_rgba_len(DaiPointCloud pcl);
+API void dai_pointcloud_release(DaiPointCloud pcl);
+
+// RGBDData accessors
+API DaiImgFrame dai_rgbd_get_rgb_frame(DaiRGBDData rgbd);
+API DaiImgFrame dai_rgbd_get_depth_frame(DaiRGBDData rgbd);
+API void dai_rgbd_release(DaiRGBDData rgbd);
 
 // Low-level frame operations
 API void* dai_frame_get_data(DaiImgFrame frame);

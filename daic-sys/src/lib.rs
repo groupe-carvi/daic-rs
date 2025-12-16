@@ -34,12 +34,32 @@ include_cpp! {
     generate!("daic::dai_pipeline_new")
     generate!("daic::dai_pipeline_delete")
     generate!("daic::dai_pipeline_start")
+    generate!("daic::dai_rgbd_build")
     generate!("daic::dai_pipeline_create_camera")
 
     // Generic node creation / linking
     generate!("daic::dai_pipeline_create_node")
+    generate!("daic::dai_node_get_output")
+    generate!("daic::dai_output_link")
     generate!("daic::dai_node_link")
     generate!("daic::dai_node_unlink")
+
+    // Device helpers
+    generate!("daic::dai_device_get_platform")
+    generate!("daic::dai_device_set_ir_laser_dot_projector_intensity")
+
+    // StereoDepth configuration helpers
+    generate!("daic::dai_stereo_set_subpixel")
+    generate!("daic::dai_stereo_set_extended_disparity")
+    generate!("daic::dai_stereo_set_default_profile_preset")
+    generate!("daic::dai_stereo_set_left_right_check")
+    generate!("daic::dai_stereo_set_rectify_edge_fill_color")
+    generate!("daic::dai_stereo_enable_distortion_correction")
+    generate!("daic::dai_stereo_initial_set_left_right_check_threshold")
+    generate!("daic::dai_stereo_initial_set_threshold_filter_max_range")
+
+    // RGBD configuration helpers
+    generate!("daic::dai_rgbd_set_depth_unit")
 
     // Camera functions
     generate!("daic::dai_camera_request_output")
@@ -50,12 +70,28 @@ include_cpp! {
     generate!("daic::dai_queue_delete")
     generate!("daic::dai_queue_get_frame")
     generate!("daic::dai_queue_try_get_frame")
+    generate!("daic::dai_queue_get_pointcloud")
+    generate!("daic::dai_queue_try_get_pointcloud")
+    generate!("daic::dai_queue_get_rgbd")
+    generate!("daic::dai_queue_try_get_rgbd")
     generate!("daic::dai_frame_get_data")
     generate!("daic::dai_frame_get_width")
     generate!("daic::dai_frame_get_height")
     generate!("daic::dai_frame_get_type")
     generate!("daic::dai_frame_get_size")
     generate!("daic::dai_frame_release")
+
+    // PointCloudData accessors
+    generate!("daic::dai_pointcloud_get_width")
+    generate!("daic::dai_pointcloud_get_height")
+    generate!("daic::dai_pointcloud_get_points_rgba")
+    generate!("daic::dai_pointcloud_get_points_rgba_len")
+    generate!("daic::dai_pointcloud_release")
+
+    // RGBDData accessors
+    generate!("daic::dai_rgbd_get_rgb_frame")
+    generate!("daic::dai_rgbd_get_depth_frame")
+    generate!("daic::dai_rgbd_release")
 
     // Utilities
     generate!("daic::dai_camera_socket_name")
@@ -76,6 +112,8 @@ pub type DaiCameraNode = *mut autocxx::c_void;
 pub type DaiOutput = *mut autocxx::c_void;
 pub type DaiDataQueue = *mut autocxx::c_void;
 pub type DaiImgFrame = *mut autocxx::c_void;
+pub type DaiPointCloud = *mut autocxx::c_void;
+pub type DaiRGBDData = *mut autocxx::c_void;
 
 pub mod string_utils;
 

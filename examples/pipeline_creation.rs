@@ -10,7 +10,7 @@ use daic_rs::pipeline::{NodeKind, Pipeline};
 use daic_rs::Result;
 
 fn main() -> Result<()> {
-    println!("Creating pipeline with generic create() API...");
+    println!("Creating pipeline with generic create_with() API...");
     
     // Create device (single connection)
     let device = Device::new()?;
