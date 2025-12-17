@@ -76,6 +76,7 @@ fn main() {
     let examples_dir = target_dir.join("examples");
 
     if cfg!(target_os = "windows") {
+        ensure_libclang_path_for_windows();
         download_and_prepare_opencv();
     }
 
@@ -166,6 +167,172 @@ fn main() {
     }
 }
 
+fn ensure_libclang_path_for_windows() {
+    if !cfg!(target_os = "windows") {
+        return;
+    }
+
+    // autocxx-bindgen requires a dynamically-loadable libclang (libclang.dll / clang.dll)
+    // on Windows. Many users have LLVM installed but don't have LIBCLANG_PATH set.
+    let already_set = env::var_os("LIBCLANG_PATH").is_some();
+    if already_set {
+        return;
+    }
+
+    let mut candidates: Vec<PathBuf> = Vec::new();
+
+    // 0) Hard-coded defaults (works even if ProgramFiles env vars are missing/altered).
+    candidates.push(PathBuf::from(r"C:\\Program Files\\LLVM\\bin"));
+    candidates.push(PathBuf::from(r"C:\\Program Files\\LLVM\\lib"));
+    candidates.push(PathBuf::from(r"C:\\Program Files (x86)\\LLVM\\bin"));
+    candidates.push(PathBuf::from(r"C:\\Program Files (x86)\\LLVM\\lib"));
+
+    // 1) Try to locate the DLL via PATH using `where`.
+    for dll_name in ["libclang.dll", "clang.dll"] {
+        if let Ok(out) = Command::new("where").arg(dll_name).output() {
+            if out.status.success() {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                if let Some(first) = stdout.lines().map(str::trim).find(|l| !l.is_empty()) {
+                    let path = PathBuf::from(first);
+                    if let Some(parent) = path.parent() {
+                        candidates.push(parent.to_path_buf());
+                    }
+                }
+            }
+        }
+    }
+
+    // 1b) If clang is on PATH, libclang is often near it.
+    for exe_name in ["clang.exe", "clang-cl.exe"] {
+        if let Ok(out) = Command::new("where").arg(exe_name).output() {
+            if out.status.success() {
+                let stdout = String::from_utf8_lossy(&out.stdout);
+                if let Some(first) = stdout.lines().map(str::trim).find(|l| !l.is_empty()) {
+                    let path = PathBuf::from(first);
+                    if let Some(bin_dir) = path.parent() {
+                        candidates.push(bin_dir.to_path_buf());
+                        // Some distros keep libclang under ../lib.
+                        candidates.push(bin_dir.join("..").join("lib"));
+                        candidates.push(bin_dir.join("..").join("lib").join("bin"));
+                    }
+                }
+            }
+        }
+    }
+
+    // 2) Common LLVM installer locations.
+    if let Ok(pf) = env::var("ProgramFiles") {
+        candidates.push(PathBuf::from(&pf).join("LLVM").join("bin"));
+        candidates.push(PathBuf::from(&pf).join("LLVM").join("lib"));
+    } else {
+        println_build!(
+            "Warning: ProgramFiles env var is not set; relying on hard-coded LLVM paths."
+        );
+    }
+    if let Ok(pfx86) = env::var("ProgramFiles(x86)") {
+        candidates.push(PathBuf::from(&pfx86).join("LLVM").join("bin"));
+        candidates.push(PathBuf::from(&pfx86).join("LLVM").join("lib"));
+    }
+
+    // 2b) Chocolatey LLVM.
+    if let Ok(pd) = env::var("ProgramData") {
+        candidates.push(
+            PathBuf::from(&pd)
+                .join("chocolatey")
+                .join("lib")
+                .join("llvm")
+                .join("tools")
+                .join("bin"),
+        );
+        candidates.push(
+            PathBuf::from(&pd)
+                .join("chocolatey")
+                .join("lib")
+                .join("llvm")
+                .join("tools")
+                .join("lib"),
+        );
+    }
+
+    // 2c) Scoop LLVM.
+    if let Ok(home) = env::var("USERPROFILE") {
+        candidates.push(
+            PathBuf::from(&home)
+                .join("scoop")
+                .join("apps")
+                .join("llvm")
+                .join("current")
+                .join("bin"),
+        );
+        candidates.push(
+            PathBuf::from(&home)
+                .join("scoop")
+                .join("apps")
+                .join("llvm")
+                .join("current")
+                .join("lib"),
+        );
+    }
+
+    // 2d) MSYS2 / MinGW.
+    candidates.push(PathBuf::from(r"C:\\msys64\\mingw64\\bin"));
+    candidates.push(PathBuf::from(r"C:\\msys64\\ucrt64\\bin"));
+    candidates.push(PathBuf::from(r"C:\\msys64\\clang64\\bin"));
+
+    // 3) Visual Studio LLVM toolchain (best-effort, without expensive disk scans).
+    if let Ok(pf) = env::var("ProgramFiles") {
+        let vs_base = PathBuf::from(&pf).join("Microsoft Visual Studio");
+        for year in ["2022", "2019", "2017"] {
+            for edition in ["Community", "Professional", "Enterprise", "BuildTools"] {
+                candidates.push(
+                    vs_base
+                        .join(year)
+                        .join(edition)
+                        .join("VC")
+                        .join("Tools")
+                        .join("Llvm")
+                        .join("x64")
+                        .join("bin"),
+                );
+                candidates.push(
+                    vs_base
+                        .join(year)
+                        .join(edition)
+                        .join("VC")
+                        .join("Tools")
+                        .join("Llvm")
+                        .join("bin"),
+                );
+            }
+        }
+    }
+
+    // Pick the first directory that actually contains the DLL.
+    for dir in candidates {
+        let libclang = dir.join("libclang.dll");
+        let clang = dir.join("clang.dll");
+        if libclang.exists() || clang.exists() {
+            println_build!(
+                "Setting LIBCLANG_PATH automatically to: {}",
+                dir.display()
+            );
+            env::set_var("LIBCLANG_PATH", &dir);
+            return;
+        }
+    }
+
+    // Don't hard-fail here; autocxx-bindgen will produce a clear error, but we add a hint.
+    let default_probe = PathBuf::from(r"C:\\Program Files\\LLVM\\bin\\libclang.dll");
+    println_build!(
+        "libclang probe: {} exists={}",
+        default_probe.display(),
+        default_probe.exists()
+    );
+    println_build!(
+        "LIBCLANG_PATH is not set and libclang.dll was not auto-detected. If the build fails, install LLVM and set LIBCLANG_PATH to the folder containing libclang.dll (e.g. C:\\Program Files\\LLVM\\bin)."
+    );
+}
+
 fn build_with_autocxx() -> Vec<PathBuf> {
     println_build!("Building with autocxx...");
 
@@ -223,10 +390,30 @@ fn build_with_autocxx() -> Vec<PathBuf> {
 
 fn build_cpp_wrapper(include_paths: &[PathBuf], opencv_enabled: bool) {
     println_build!("Building custom C++ wrapper sources...");
+
+    // cc-rs respects CFLAGS/CXXFLAGS. On Windows/MSVC these are often set to GCC-style
+    // values (e.g. "-std=c++17"), which `cl.exe` does not understand and can break the build.
+    if cfg!(target_env = "msvc") {
+        if env::var("CXXFLAGS")
+            .ok()
+            .is_some_and(|v| v.contains("-std=") || v.contains("-stdlib=") || v.contains("-f"))
+        {
+            println_build!("Removing CXXFLAGS for MSVC wrapper compilation.");
+            env::remove_var("CXXFLAGS");
+        }
+        if env::var("CFLAGS")
+            .ok()
+            .is_some_and(|v| v.contains("-std=") || v.contains("-f"))
+        {
+            println_build!("Removing CFLAGS for MSVC wrapper compilation.");
+            env::remove_var("CFLAGS");
+        }
+    }
+
     let mut cc_build = cc::Build::new();
     cc_build
         .cpp(true)
-        .flag("-std=c++17")
+        .std("c++17")
         .file(PROJECT_ROOT.join("wrapper").join("wrapper.cpp"));
 
     if !opencv_enabled {
@@ -476,11 +663,39 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
     let deps_dir = Path::new(&target_dir).join("deps");
 
     if cfg!(target_os = "windows") {
-        let builds_lib = BUILD_FOLDER_PATH.join("depthai-core.dll");
-        if builds_lib.exists() {
-            println_build!("Found depthai-core.dll in builds directory.");
-            emit_link_directives(&builds_lib);
-            return Ok(builds_lib);
+        // On Windows (MSVC), linking must be done via the import library (.lib), not the DLL.
+        // Prefer the import library next to the configured DEPTHAI_CORE_ROOT first.
+        let import_lib = get_depthai_core_root().join("lib").join("depthai-core.lib");
+        if import_lib.exists() {
+            println_build!("Found Windows import library at: {}", import_lib.display());
+            println!(
+                "cargo:rustc-link-search=native={}",
+                import_lib.parent().unwrap().display()
+            );
+            println!("cargo:rustc-link-lib=depthai-core");
+            return Ok(import_lib);
+        }
+
+        // Some setups may place artifacts directly under builds/. If we see a DLL there,
+        // try to locate a matching import library in common locations.
+        let builds_dll = BUILD_FOLDER_PATH.join("depthai-core.dll");
+        if builds_dll.exists() {
+            let candidates = [
+                BUILD_FOLDER_PATH.join("depthai-core.lib"),
+                get_depthai_core_root().join("lib").join("depthai-core.lib"),
+            ];
+            if let Some(lib) = candidates.into_iter().find(|p| p.exists()) {
+                println_build!(
+                    "Found depthai-core.dll in builds; using import library: {}",
+                    lib.display()
+                );
+                println!(
+                    "cargo:rustc-link-search=native={}",
+                    lib.parent().unwrap().display()
+                );
+                println!("cargo:rustc-link-lib=depthai-core");
+                return Ok(lib);
+            }
         }
     } else if prefer_static {
         // Static is the default: don't silently pick a leftover .so.
@@ -512,13 +727,20 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
     );
     if cfg!(target_os = "windows")
         && target_dir.join("depthai-core.dll").exists()
-        && out_dir.join("depthai-core.lib").exists()
+        && (target_dir.join("depthai-core.lib").exists() || deps_dir.join("depthai-core.lib").exists())
     {
+        let lib = if target_dir.join("depthai-core.lib").exists() {
+            target_dir.join("depthai-core.lib")
+        } else {
+            deps_dir.join("depthai-core.lib")
+        };
         println_build!(
-            "Found depthai-core.dll in OUT_DIR: {}",
-            target_dir.display()
+            "Found depthai-core artifacts in target dir; using import library: {}",
+            lib.display()
         );
-        return Ok(target_dir.join("depthai-core.dll"));
+        println!("cargo:rustc-link-search=native={}", lib.parent().unwrap().display());
+        println!("cargo:rustc-link-lib=depthai-core");
+        return Ok(lib);
     } else if !prefer_static {
         // Shared path only when explicitly requested.
         let candidate = target_dir.join("libdepthai-core.so");
@@ -561,7 +783,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
                             .and_then(|p| p.parent()) // depthai-core
                             .map(|p| p.join("lib").join("depthai-core.lib"))
                             .ok_or("Could not construct path to depthai-core.lib")?
-                    } else if found_lib == out_dir.join("depthai-core.lib") {
+                    } else if found_lib == out_dir.join("depthai-core.dll") {
                         out_dir.join("depthai-core.lib")
                     } else {
                         get_depthai_core_root().join("lib").join("depthai-core.lib")
