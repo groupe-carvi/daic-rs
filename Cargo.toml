@@ -50,3 +50,5 @@ license = "MIT"
 [workspace.dependencies]
 autocxx = "0.30.0"
 cxx = "1.0.192"
+autocxx-build = "0.30.0"
+cxx-build = "1.0.192"

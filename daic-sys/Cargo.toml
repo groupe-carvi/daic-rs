@@ -15,8 +15,8 @@ force-binding-regeneration = []
 default = ["force-binding-regeneration"]
 
 [build-dependencies]
-autocxx-build = "0.30.0"
-cxx-build = "1.0.191"
+autocxx-build.workspace = true
+cxx-build.workspace = true
 cc = "1.2.49"
 cmake = "0.1.56"
 num_cpus = "1.17.0"
