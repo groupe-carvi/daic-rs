@@ -86,8 +86,6 @@ fn main() {
     build_cpp_wrapper(&include_paths, opencv_enabled);
 
     if cfg!(target_os = "windows") {
-        let dlls = ["depthai-core.dll", "libusb-1.0.dll", "opencv_world4110.dll"];
-
         if windows_static_lib.clone().is_some_and(|p| p.exists()) {
             let lib_path = windows_static_lib.clone().unwrap();
             let lib_name = lib_path.file_name().unwrap().to_str().unwrap();
@@ -98,37 +96,62 @@ fn main() {
                 .expect(&format!("Failed to copy {} to debug dir", lib_name));
         }
 
-        for dll in dlls {
-            let dll_path = get_depthai_core_root().join("bin").join(dll);
-
-            if dll_path.exists() {
-                println_build!("Copying {} to {:?}", dll, target_dir);
-                //fs::create_dir_all(&target_dir).expect("Failed to create debug dir");
-                fs::copy(&dll_path, target_dir.join(dll))
-                    .expect(&format!("Failed to copy {} to debug dir", dll));
-
-                println_build!("Copying {} to {:?}", dll, deps_dir);
-                //fs::create_dir_all(&deps_dir).expect("Failed to create deps dir");
-                fs::copy(&dll_path, deps_dir.join(dll))
-                    .expect(&format!("Failed to copy {} to deps dir", dll));
-
-                println_build!("Copying {} to {:?}", dll, examples_dir);
-                //fs::create_dir_all(&examples_dir).expect("Failed to create examples dir");
-                fs::copy(&dll_path, examples_dir.join(dll))
-                    .expect(&format!("Failed to copy {} to examples dir", dll));
-            } else {
-                println_build!("DLL not found: {:?}", dll_path);
-            }
-        }
-
+        // `cargo run` executes examples from target/<profile>/examples, and Windows DLL
+        // resolution is directory-based. To prevent STATUS_DLL_NOT_FOUND (0xc0000135),
+        // copy all runtime DLLs shipped with depthai-core into target/<profile>, deps and examples.
         let bin_path = get_depthai_core_root().join("bin");
+        if !bin_path.exists() {
+            println_build!(
+                "Warning: depthai-core bin directory not found: {}",
+                bin_path.display()
+            );
+        } else {
+            println_build!("Copying runtime DLLs from {}", bin_path.display());
 
-        println!(
-            "cargo:rustc-env=PATH={}{}{}",
-            bin_path.display(),
-            ";",
-            env::var("PATH").unwrap()
-        );
+            let entries = fs::read_dir(&bin_path).expect("Failed to read depthai-core/bin");
+            for entry in entries {
+                let entry = match entry {
+                    Ok(e) => e,
+                    Err(e) => {
+                        println_build!("Warning: failed to read a bin entry: {}", e);
+                        continue;
+                    }
+                };
+
+                let src = entry.path();
+                if !src.is_file() {
+                    continue;
+                }
+
+                let is_dll = src
+                    .extension()
+                    .and_then(|e| e.to_str())
+                    .is_some_and(|e| e.eq_ignore_ascii_case("dll"));
+                if !is_dll {
+                    continue;
+                }
+
+                let dll_name = match src.file_name().and_then(|n| n.to_str()) {
+                    Some(n) => n,
+                    None => continue,
+                };
+
+                for dest_dir in [target_dir, deps_dir.as_path(), examples_dir.as_path()] {
+                    let dest = dest_dir.join(dll_name);
+                    if let Err(e) = fs::copy(&src, &dest) {
+                        println_build!(
+                            "Warning: failed to copy {} to {}: {}",
+                            dll_name,
+                            dest.display(),
+                            e
+                        );
+                    }
+                }
+            }
+
+            // NOTE: `cargo:rustc-env=PATH=...` does not affect runtime PATH. We keep DLLs
+            // next to the produced executables instead.
+        }
     } else {
         match depthai_core_lib.extension().and_then(|e| e.to_str()) {
             Some("so") => {
@@ -604,7 +627,7 @@ fn download_and_prepare_opencv() {
             opencv_dll_file.clone(),
             expected_dll_path
         );
-        return;
+        // Do not return: we still must copy the DLL(s) into depthai-core/bin.
     }
 
     if !opencv_exe_path.exists() {
@@ -722,14 +745,45 @@ fn download_and_prepare_opencv() {
         found
     };
 
-    // Copy and rename to opencv_world4110.dll
-    println_build!("Copying and renaming OpenCV DLL...");
+    // Copy OpenCV runtime DLL(s) into depthai-core/bin. depthai-core.dll is linked against
+    // opencv_world, and OpenCV may also rely on companion DLLs (e.g. videoio backends).
+    println_build!("Copying OpenCV runtime DLLs into depthai-core/bin...");
 
-    let dest_path = get_depthai_core_root().join("bin").join(&opencv_dll_file);
+    let dest_bin_dir = get_depthai_core_root().join("bin");
+    let _ = fs::create_dir_all(&dest_bin_dir);
 
+    // Always copy the main opencv_world DLL.
+    let dest_path = dest_bin_dir.join(&opencv_dll_file);
     fs::copy(&dll_path, &dest_path).expect("Failed to copy OpenCV DLL");
-
     println_build!("OpenCV DLL copied to {:?}", dest_path);
+
+    // Best-effort: copy any other `opencv_*.dll` found next to it.
+    if let Some(src_bin_dir) = dll_path.parent() {
+        if let Ok(entries) = fs::read_dir(src_bin_dir) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if !p.is_file() {
+                    continue;
+                }
+
+                let fname = match p.file_name().and_then(|n| n.to_str()) {
+                    Some(n) => n,
+                    None => continue,
+                };
+
+                let lower = fname.to_ascii_lowercase();
+                if !lower.ends_with(".dll") {
+                    continue;
+                }
+                if !lower.starts_with("opencv_") {
+                    continue;
+                }
+
+                let dest = dest_bin_dir.join(fname);
+                let _ = fs::copy(&p, &dest);
+            }
+        }
+    }
 }
 
 fn resolve_deps_includes() -> PathBuf {
