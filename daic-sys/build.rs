@@ -482,24 +482,81 @@ fn get_depthai_includes() -> Vec<PathBuf> {
 }
 
 fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
-    println_build!("Stripping SFX header from OpenCV exe...");
-    let header_size = 6144;
+    println_build!("Stripping SFX header from OpenCV exe (locating embedded 7z payload)...");
+
+    // OpenCV's "windows.exe" is a self-extracting (SFX) archive. Using it directly can pop
+    // a GUI window. To ensure a fully silent build, we extract the embedded 7z payload ourselves.
+    //
+    // 7z file signature: 37 7A BC AF 27 1C
+    const SEVEN_Z_MAGIC: [u8; 6] = [0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C];
 
     let mut file = File::open(exe_path).expect("Failed to open OpenCV exe");
-
     let mut buf = Vec::new();
     file.read_to_end(&mut buf)
         .expect("Failed to read OpenCV exe");
 
-    if buf.len() <= header_size {
+    if buf.len() < SEVEN_Z_MAGIC.len() {
         panic!(
-            "Exe file too small ({} bytes), cannot strip header. Expected size > {} bytes.",
-            buf.len(),
-            header_size
+            "Exe file too small ({} bytes), cannot locate 7z payload.",
+            buf.len()
         );
     }
 
-    let seven_z_data = &buf[header_size..];
+    // There can (rarely) be false positives; pick an occurrence that looks like a valid 7z header.
+    // 7z header structure starts with:
+    //   magic(6) + version(2) + startHeaderCRC(4) + nextHeaderOffset(8) + nextHeaderSize(8) + nextHeaderCRC(4)
+    // version is typically 0.4 for modern 7z archives.
+    let mut candidates: Vec<usize> = buf
+        .windows(SEVEN_Z_MAGIC.len())
+        .enumerate()
+        .filter_map(|(i, w)| (w == SEVEN_Z_MAGIC).then_some(i))
+        .collect();
+
+    if candidates.is_empty() {
+        panic!(
+            "Failed to locate 7z payload signature inside OpenCV exe: {}",
+            exe_path.display()
+        );
+    }
+
+    // Prefer the *last* plausible header in the file. This avoids matching bytes inside the SFX stub.
+    candidates.sort_unstable();
+    let seven_z_start = candidates
+        .iter()
+        .rev()
+        .copied()
+        .find(|&pos| {
+            // Need at least 32 bytes for the fixed header.
+            if pos + 32 > buf.len() {
+                return false;
+            }
+            let major = buf[pos + 6];
+            let minor = buf[pos + 7];
+            major == 0 && (minor == 3 || minor == 4)
+        })
+        .unwrap_or_else(|| {
+            // Fallback to the last occurrence of the magic.
+            *candidates.last().unwrap()
+        });
+
+    println_build!(
+        "Embedded 7z payload found at offset {} (file size {} bytes)",
+        seven_z_start,
+        buf.len()
+    );
+
+    if seven_z_start == 0 {
+        println_build!(
+            "Warning: 7z signature found at start of file; exe might already be a raw archive: {}",
+            exe_path.display()
+        );
+    }
+
+    let seven_z_data = &buf[seven_z_start..];
+
+    if let Some(parent) = out_7z_path.parent() {
+        let _ = fs::create_dir_all(parent);
+    }
 
     let mut out_file = File::create(out_7z_path).expect("Failed to create .7z output file");
     out_file
@@ -531,19 +588,21 @@ fn download_and_prepare_opencv() {
 
     let extraction_dir = BUILD_FOLDER_PATH.join("opencv_download");
     let opencv_exe_path = extraction_dir.join(OPENCV_WIN_PREBUILT_URL.split('/').last().unwrap());
+    // The OpenCV SFX archive typically contains a top-level "opencv/" folder.
+    // We extract into `extraction_dir` and then locate the DLL under it.
     let extract_path = extraction_dir.join("opencv");
-    let dll_path = extract_path
+    let expected_dll_path = extract_path
         .join("build")
         .join("x64")
         .join("vc16")
         .join("bin")
         .join(opencv_dll_file);
 
-    if dll_path.exists() {
+    if expected_dll_path.exists() {
         println_build!(
             "{} already exists at {:?}",
             opencv_dll_file.clone(),
-            dll_path
+            expected_dll_path
         );
         return;
     }
@@ -569,51 +628,99 @@ fn download_and_prepare_opencv() {
         println_build!("OpenCV exe already downloaded at {:?}", opencv_exe_path);
     }
 
-    if !extract_path.exists() && opencv_exe_path.exists() {
-        println_build!("Attempting to extract OpenCV using silent installer...");
+    // Force a fully silent extraction path: do NOT execute the .exe (it can spawn a GUI).
+    // Instead, strip the embedded 7z payload and decompress it via sevenz-rust2.
+    if opencv_exe_path.exists() {
+        println_build!("Extracting OpenCV payload without launching the installer (no UI)...");
 
-        let status = Command::new(&opencv_exe_path)
-            .arg("-o")
-            .arg(&extract_path)
-            .arg("-y")
-            .status();
+        let opencv_7z_path = extraction_dir.join("opencv.7z");
 
-        match status {
-            Ok(exit_status) if exit_status.success() => {
-                println_build!("OpenCV extracted successfully using silent installer");
-            }
-            _ => {
-                println_build!("Silent installer failed, trying SFX header stripping...");
-                let opencv_7z_path = extraction_dir.join("opencv.7z");
+        let file_size = fs::metadata(&opencv_exe_path)
+            .expect("Failed to get file metadata")
+            .len();
 
-                let file_size = fs::metadata(&opencv_exe_path)
-                    .expect("Failed to get file metadata")
-                    .len();
+        if file_size <= 10000 {
+            panic!(
+                "OpenCV file is too small ({} bytes). Please check the download.",
+                file_size
+            );
+        }
 
-                if file_size > 10000 {
-                    strip_sfx_header(&opencv_exe_path, &opencv_7z_path);
+        // If an incomplete extraction folder exists (but the expected DLL doesn't), clean it up.
+        if extract_path.exists() && !expected_dll_path.exists() {
+            println_build!(
+                "Existing OpenCV extraction seems incomplete (missing DLL). Removing: {:?}",
+                extract_path
+            );
+            let _ = fs::remove_dir_all(&extract_path);
+        }
 
-                    println_build!("Extracting .7z payload to {:?}", extract_path);
-                    zip::zip_extract::zip_extract(&opencv_7z_path, &extract_path)
-                        .expect("Failed to extract OpenCV .7z payload");
-                    fs::remove_file(&opencv_7z_path).expect("Failed to remove .7z payload");
-                } else {
-                    panic!(
-                        "OpenCV file is too small and extraction methods failed. Please check the download."
-                    );
+        if !expected_dll_path.exists() {
+            // Best-effort cleanup in case of previous partial runs.
+            let _ = fs::remove_file(&opencv_7z_path);
+
+            // Try once; if checksum fails, re-download and retry.
+            for attempt in 1..=2 {
+                println_build!("OpenCV extract attempt {}/2", attempt);
+
+                strip_sfx_header(&opencv_exe_path, &opencv_7z_path);
+                println_build!("Decompressing OpenCV .7z payload to {:?}", extraction_dir);
+
+                match sevenz_rust2::decompress_file(&opencv_7z_path, &extraction_dir) {
+                    Ok(_) => {
+                        let _ = fs::remove_file(&opencv_7z_path);
+                        break;
+                    }
+                    Err(e) => {
+                        println_build!("OpenCV 7z decompress failed: {:?}", e);
+                        let _ = fs::remove_file(&opencv_7z_path);
+                        let _ = fs::remove_dir_all(&extract_path);
+
+                        if attempt == 1 {
+                            // The existing exe may be corrupted/truncated; re-download.
+                            println_build!(
+                                "Re-downloading OpenCV exe and retrying (to avoid checksum failures)..."
+                            );
+                            let _ = fs::remove_file(&opencv_exe_path);
+                            let downloaded = download_file(OPENCV_WIN_PREBUILT_URL, &extraction_dir)
+                                .expect("Failed to re-download OpenCV prebuilt binary");
+                            fs::rename(downloaded, &opencv_exe_path)
+                                .expect("Failed to rename downloaded OpenCV exe");
+                        } else {
+                            panic!("Failed to decompress OpenCV .7z payload: {:?}", e);
+                        }
+                    }
                 }
             }
         }
-    } else {
-        println_build!("OpenCV already extracted at {:?}", extract_path);
     }
 
-    if !dll_path.exists() {
-        panic!(
-            "{:?} not found in extracted files at {:?}",
-            &opencv_dll_file, dll_path
+    // Locate the DLL: prefer the canonical expected path, otherwise search under extraction_dir.
+    let dll_path = if expected_dll_path.exists() {
+        expected_dll_path
+    } else {
+        println_build!(
+            "Expected OpenCV DLL not found at canonical path; searching under {:?}...",
+            extraction_dir
         );
-    }
+        let found = WalkDir::new(&extraction_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .find(|e| {
+                e.file_type().is_file()
+                    && e.file_name().to_string_lossy().eq_ignore_ascii_case(opencv_dll_file)
+            })
+            .map(|e| e.into_path())
+            .unwrap_or_else(|| {
+                panic!(
+                    "{} not found in extracted files under {:?}",
+                    opencv_dll_file, extraction_dir
+                )
+            });
+
+        println_build!("Found OpenCV DLL at {:?}", found);
+        found
+    };
 
     // Copy and rename to opencv_world4110.dll
     println_build!("Copying and renaming OpenCV DLL...");
