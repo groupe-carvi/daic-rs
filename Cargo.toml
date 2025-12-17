@@ -1,7 +1,9 @@
 [package]
 name = "daic-rs"
-version = "0.1.0"
-edition = "2024"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
 
 [features]
 hit = [] # Hardware Integration Tests
@@ -39,6 +41,12 @@ members = [
     "./daic-sys",
 ]
 
+[workspace.package]
+edition = "2024"
+version = "3.2.1" # Should match depthai-core version
+authors = ["Groupe CARVI Inc."]
+license = "MIT"
+
 [workspace.dependencies]
 autocxx = "0.30.0"
-cxx = "1.0.191"
+cxx = "1.0.192"

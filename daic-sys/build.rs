@@ -339,7 +339,7 @@ fn ensure_libclang_path_for_windows() {
                 "Setting LIBCLANG_PATH automatically to: {}",
                 dir.display()
             );
-            env::set_var("LIBCLANG_PATH", &dir);
+            unsafe {env::set_var("LIBCLANG_PATH", &dir);}
             return;
         }
     }
@@ -422,14 +422,14 @@ fn build_cpp_wrapper(include_paths: &[PathBuf], opencv_enabled: bool) {
             .is_some_and(|v| v.contains("-std=") || v.contains("-stdlib=") || v.contains("-f"))
         {
             println_build!("Removing CXXFLAGS for MSVC wrapper compilation.");
-            env::remove_var("CXXFLAGS");
+            unsafe{env::remove_var("CXXFLAGS");}
         }
         if env::var("CFLAGS")
             .ok()
             .is_some_and(|v| v.contains("-std=") || v.contains("-f"))
         {
             println_build!("Removing CFLAGS for MSVC wrapper compilation.");
-            env::remove_var("CFLAGS");
+            unsafe{env::remove_var("CFLAGS");}
         }
     }
 
