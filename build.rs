@@ -2,9 +2,9 @@ use std::{env, path::PathBuf};
 
 fn main() {
     // Ensure changes to vcpkg-installed libs re-trigger linkage when present.
-    println!("cargo:rerun-if-env-changed=DAIC_RPATH_DISABLE");
+    println!("cargo:rerun-if-env-changed=DEPTHAI_RPATH_DISABLE");
 
-    if env::var("DAIC_RPATH_DISABLE").ok().as_deref() == Some("1") {
+    if env::var("DEPTHAI_RPATH_DISABLE").ok().as_deref() == Some("1") {
         return;
     }
 
@@ -12,7 +12,7 @@ fn main() {
     // without setting LD_LIBRARY_PATH (needed for FFmpeg/libusb when OpenCV videoio is enabled).
     let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
     let vcpkg_root = manifest_dir
-        .join("daic-sys")
+        .join("depthai-sys")
         .join("builds")
         .join("vcpkg_installed");
 

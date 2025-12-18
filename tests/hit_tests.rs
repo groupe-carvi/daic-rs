@@ -1,5 +1,5 @@
 #[cfg(feature = "hit")]
-/// This file contains hardware-dependent tests for the daic-rs library.
+/// This file contains hardware-dependent tests for the depthai-rs library.
 /// These tests are only compiled and run when the "hdep-tests" feature is enabled.
 ///
 /// These tests require actual DepthAI hardware to be connected and may take longer to run.
@@ -8,7 +8,7 @@
 /// Tests for the high-level Rust API that require hardware
 #[cfg(test)]
 mod hardware_integration_tests {
-    use daic_rs::{DaiError, Device, Pipeline, PipelineConfig};
+    use depthai::{DaiError, Device, Pipeline, PipelineConfig};
 
     #[test]
     fn test_device_creation_with_hardware() {

@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::sync::Arc;
 
 use autocxx::c_int;
-use daic_sys::{daic, DaiNode};
+use depthai_sys::{depthai, DaiNode};
 
 use crate::error::{clear_error_flag, last_error, Result};
 
@@ -57,7 +57,7 @@ impl Node {
             .transpose()?;
 
         let ok = unsafe {
-            daic::dai_node_link(
+            depthai::dai_node_link(
                 self.handle,
                 out_group_c
                     .as_ref()
@@ -90,7 +90,7 @@ impl Node {
 pub(crate) fn create_node(pipeline: Arc<PipelineInner>, kind: NodeKind) -> Result<Node> {
     clear_error_flag();
     let handle = unsafe {
-        daic::dai_pipeline_create_node(pipeline.handle, c_int(kind as i32))
+        depthai::dai_pipeline_create_node(pipeline.handle, c_int(kind as i32))
     };
     if handle.is_null() {
         Err(last_error("failed to create node"))

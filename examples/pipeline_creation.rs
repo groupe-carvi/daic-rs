@@ -3,11 +3,11 @@
 /// This example shows:
 /// - typed creation (`CameraNode`)
 /// - and how to build a small “composite” using generic nodes (`NodeKind` + `Node::link`)
-use daic_rs::camera::{CameraNode, CameraOutputConfig};
-use daic_rs::common::CameraBoardSocket;
-use daic_rs::device::Device;
-use daic_rs::pipeline::{NodeKind, Pipeline};
-use daic_rs::Result;
+use depthai::camera::{CameraNode, CameraOutputConfig};
+use depthai::common::CameraBoardSocket;
+use depthai::device::Device;
+use depthai::pipeline::{NodeKind, Pipeline};
+use depthai::Result;
 
 fn main() -> Result<()> {
     println!("Creating pipeline with generic create_with() API...");

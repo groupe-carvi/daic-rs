@@ -1,5 +1,5 @@
 use autocxx::c_int;
-use daic_sys::{daic, DaiDevice};
+use depthai_sys::{depthai, DaiDevice};
 use std::os::raw::c_int as RawInt;
 
 use crate::common::CameraBoardSocket;
@@ -26,7 +26,7 @@ impl Device {
 
     pub fn new() -> Result<Self> {
         clear_error_flag();
-        let handle = daic::dai_device_new();
+        let handle = depthai::dai_device_new();
         if handle.is_null() {
             Err(last_error("failed to create DepthAI device"))
         } else {
@@ -39,7 +39,7 @@ impl Device {
     /// This mirrors DepthAI's C++ usage where the device is commonly shared via `std::shared_ptr`.
     pub fn try_clone(&self) -> Result<Self> {
         clear_error_flag();
-        let handle = unsafe { daic::dai_device_clone(self.handle) };
+        let handle = unsafe { depthai::dai_device_clone(self.handle) };
         if handle.is_null() {
             Err(last_error("failed to clone DepthAI device"))
         } else {
@@ -48,7 +48,7 @@ impl Device {
     }
 
     pub fn is_connected(&self) -> bool {
-        unsafe { !daic::dai_device_is_closed(self.handle) }
+        unsafe { !depthai::dai_device_is_closed(self.handle) }
     }
 
     /// Explicitly close the device connection.
@@ -57,7 +57,7 @@ impl Device {
     /// closed state as well.
     pub fn close(&self) -> Result<()> {
         clear_error_flag();
-        unsafe { daic::dai_device_close(self.handle) };
+        unsafe { depthai::dai_device_close(self.handle) };
         if let Some(err) = take_error_if_any("failed to close DepthAI device") {
             Err(err)
         } else {
@@ -69,7 +69,7 @@ impl Device {
         clear_error_flag();
         let mut sockets = vec![c_int(0); MAX_SOCKETS];
         let count = unsafe {
-            daic::dai_device_get_connected_camera_sockets(
+            depthai::dai_device_get_connected_camera_sockets(
                 self.handle,
                 sockets.as_mut_ptr(),
                 c_int(MAX_SOCKETS as i32),
@@ -91,7 +91,7 @@ impl Device {
 
     pub fn platform(&self) -> Result<DevicePlatform> {
         clear_error_flag();
-        let raw: RawInt = unsafe { daic::dai_device_get_platform(self.handle) }.into();
+        let raw: RawInt = unsafe { depthai::dai_device_get_platform(self.handle) }.into();
         match raw {
             0 => Ok(DevicePlatform::Rvc2),
             1 => Ok(DevicePlatform::Rvc3),
@@ -103,7 +103,7 @@ impl Device {
     /// Set IR laser dot projector intensity (0.0..1.0 on supported devices).
     pub fn set_ir_laser_dot_projector_intensity(&self, intensity: f32) -> Result<()> {
         clear_error_flag();
-        unsafe { daic::dai_device_set_ir_laser_dot_projector_intensity(self.handle, intensity) };
+        unsafe { depthai::dai_device_set_ir_laser_dot_projector_intensity(self.handle, intensity) };
         if let Some(err) = take_error_if_any("failed to set IR laser dot projector intensity") {
             Err(err)
         } else {
@@ -127,7 +127,7 @@ impl Clone for Device {
 impl Drop for Device {
     fn drop(&mut self) {
         if !self.handle.is_null() {
-            unsafe { daic::dai_device_delete(self.handle) };
+            unsafe { depthai::dai_device_delete(self.handle) };
             self.handle = std::ptr::null_mut();
         }
     }

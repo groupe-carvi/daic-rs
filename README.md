@@ -1,9 +1,9 @@
-# daic-rs
+# depthai-rs
 
 Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
 
-- High-level crate: `daic-rs` (Rust API)
-- Low-level crate: `daic-sys` (builds DepthAI-Core and exposes an FFI surface via `autocxx`)
+- High-level crate: `depthai-rs` (Rust API)
+- Low-level crate: `depthai-sys` (builds DepthAI-Core and exposes an FFI surface via `autocxx`)
 
 > [!CAUTION]
 > This project is experimental and in active development. APIs and behavior can change.
@@ -15,16 +15,16 @@ Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
 
 ### Crates
 
-- `daic-sys`
-	- Builds DepthAI-Core and its dependencies (in `daic-sys/builds/`).
-	- Compiles a small C++ wrapper (`daic-sys/wrapper/wrapper.cpp`) and generates Rust bindings using `autocxx`.
-- `daic-rs`
+- `depthai-sys`
+	- Builds DepthAI-Core and its dependencies (in `depthai-sys/builds/`).
+	- Compiles a small C++ wrapper (`depthai-sys/wrapper/wrapper.cpp`) and generates Rust bindings using `autocxx`.
+- `depthai-rs`
 	- Safe(-er) Rust wrapper types like `Device`, `Pipeline`, typed camera helpers, and a generic node API.
 
 ### Repository layout (high-level)
 
 ```
-daic-sys/            # FFI crate (build script + wrapper)
+depthai-sys/            # FFI crate (build script + wrapper)
 	build.rs           # clones/builds DepthAI-Core (Linux) or downloads prebuilt (Windows)
 	wrapper/           # C ABI functions used by Rust
 src/                 # Rust API (`Device`, `Pipeline`, nodes, camera helpers)
@@ -92,7 +92,7 @@ cargo build
 Notes:
 
 - The first build can take a while because DepthAI-Core is fetched/built and dependencies are prepared.
-- Build artifacts for native code live under `daic-sys/builds/`.
+- Build artifacts for native code live under `depthai-sys/builds/`.
 
 ## Run examples
 
@@ -104,9 +104,9 @@ cargo run --example camera_output
 
 ## DepthAI feature support
 
-This section is generated from the native DepthAI-Core C++ examples vendored in this repo under `daic-sys/builds/depthai-core/examples/cpp`.
+This section is generated from the native DepthAI-Core C++ examples vendored in this repo under `depthai-sys/builds/depthai-core/examples/cpp`.
 
-- ✅ in the **Supported** column means `daic-rs` currently wraps enough of that feature/node to build and run *at least one* equivalent pipeline.
+- ✅ in the **Supported** column means `depthai-rs` currently wraps enough of that feature/node to build and run *at least one* equivalent pipeline.
 - A blank cell means it’s not yet wrapped/exposed in the Rust API (even if DepthAI-Core supports it).
 
 ### Feature support matrix
@@ -198,7 +198,7 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 
 ### Device ownership
 
-DepthAI device connections are typically exclusive. `daic-rs` mirrors the common C++ pattern of sharing one device connection:
+DepthAI device connections are typically exclusive. `depthai-rs` mirrors the common C++ pattern of sharing one device connection:
 
 - `Device::new()` opens/returns a device handle.
 - `Device::clone()` / `Device::try_clone()` creates another handle to the same underlying connection.
@@ -218,10 +218,10 @@ right_camera.as_node().link(None, None, &stereo, None, Some("right"))?;
 
 ## Environment variables (advanced)
 
-`daic-sys` exposes a few environment variables that affect native builds:
+`depthai-sys` exposes a few environment variables that affect native builds:
 
 - `DEPTHAI_CORE_ROOT`: override the DepthAI-Core checkout directory.
-- `DAIC_SYS_LINK_SHARED=1`: prefer linking against `libdepthai-core.so` (otherwise static is preferred).
+- `DEPTHAI_SYS_LINK_SHARED=1`: prefer linking against `libdepthai-core.so` (otherwise static is preferred).
 - `DEPTHAI_OPENCV_SUPPORT=1`: enable DepthAI-Core OpenCV support (if available).
 - `DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT=1`: toggle DepthAI-Core dynamic calibration support.
 - `DEPTHAI_ENABLE_EVENTS_MANAGER=1`: toggle DepthAI-Core events manager.
@@ -241,7 +241,7 @@ Make sure `clang` and `libclang-dev` are installed on Linux, and that LLVM is in
 
 ### Missing native libraries at runtime
 
-By default, the build prefers static linking where possible. If you opt into shared linking (`DAIC_SYS_LINK_SHARED=1`) you may need to ensure the runtime loader can find the shared libraries.
+By default, the build prefers static linking where possible. If you opt into shared linking (`DEPTHAI_SYS_LINK_SHARED=1`) you may need to ensure the runtime loader can find the shared libraries.
 
 ## Hardware integration tests
 

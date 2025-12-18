@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use autocxx::c_int;
-use daic_sys::{daic, DaiRGBDData};
+use depthai_sys::{depthai, DaiRGBDData};
 
 use crate::camera::{ImageFrame, OutputQueue};
 use crate::error::{clear_error_flag, last_error, take_error_if_any, Result};
@@ -29,7 +29,7 @@ impl RgbdNode {
 
     pub fn build(&self) -> Result<()> {
         clear_error_flag();
-        let out = unsafe { daic::dai_rgbd_build(self.node.handle()) };
+        let out = unsafe { depthai::dai_rgbd_build(self.node.handle()) };
         if out.is_null() {
             Err(last_error("failed to build RGBD node"))
         } else {
@@ -40,7 +40,7 @@ impl RgbdNode {
     pub fn set_depth_unit(&self, unit: DepthUnit) {
         // setter cannot fail at the C ABI level (will record last_error on exception)
         clear_error_flag();
-        unsafe { daic::dai_rgbd_set_depth_unit(self.node.handle(), c_int(unit as i32)) };
+        unsafe { depthai::dai_rgbd_set_depth_unit(self.node.handle(), c_int(unit as i32)) };
     }
 }
 
@@ -58,7 +58,7 @@ pub struct RgbdData {
 impl Drop for RgbdData {
     fn drop(&mut self) {
         if !self.handle.is_null() {
-            unsafe { daic::dai_rgbd_release(self.handle) };
+            unsafe { depthai::dai_rgbd_release(self.handle) };
             self.handle = std::ptr::null_mut();
         }
     }
@@ -71,7 +71,7 @@ impl RgbdData {
 
     pub fn rgb_frame(&self) -> Result<ImageFrame> {
         clear_error_flag();
-        let frame = unsafe { daic::dai_rgbd_get_rgb_frame(self.handle) };
+        let frame = unsafe { depthai::dai_rgbd_get_rgb_frame(self.handle) };
         if frame.is_null() {
             Err(last_error("failed to get RGB frame"))
         } else {
@@ -81,7 +81,7 @@ impl RgbdData {
 
     pub fn depth_frame(&self) -> Result<ImageFrame> {
         clear_error_flag();
-        let frame = unsafe { daic::dai_rgbd_get_depth_frame(self.handle) };
+        let frame = unsafe { depthai::dai_rgbd_get_depth_frame(self.handle) };
         if frame.is_null() {
             Err(last_error("failed to get depth frame"))
         } else {
@@ -94,7 +94,7 @@ impl OutputQueue {
     pub fn blocking_next_rgbd(&self, timeout: Option<Duration>) -> Result<Option<RgbdData>> {
         clear_error_flag();
         let timeout_ms = timeout.map(|d| d.as_millis() as i32).unwrap_or(-1);
-        let msg = unsafe { daic::dai_queue_get_rgbd(self.handle(), c_int(timeout_ms)) };
+        let msg = unsafe { depthai::dai_queue_get_rgbd(self.handle(), c_int(timeout_ms)) };
         if msg.is_null() {
             if let Some(err) = take_error_if_any("failed to pull rgbd") {
                 Err(err)
@@ -108,7 +108,7 @@ impl OutputQueue {
 
     pub fn try_next_rgbd(&self) -> Result<Option<RgbdData>> {
         clear_error_flag();
-        let msg = unsafe { daic::dai_queue_try_get_rgbd(self.handle()) };
+        let msg = unsafe { depthai::dai_queue_try_get_rgbd(self.handle()) };
         if msg.is_null() {
             if let Some(err) = take_error_if_any("failed to poll rgbd") {
                 Err(err)

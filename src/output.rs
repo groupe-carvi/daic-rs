@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::sync::Arc;
 
 use autocxx::c_uint;
-use daic_sys::{daic, DaiOutput};
+use depthai_sys::{depthai, DaiOutput};
 
 use crate::camera::OutputQueue;
 use crate::error::{clear_error_flag, last_error, Result};
@@ -26,7 +26,7 @@ impl Output {
             .transpose()?;
 
         let ok = unsafe {
-            daic::dai_output_link(
+            depthai::dai_output_link(
                 self.handle,
                 to.handle(),
                 std::ptr::null(),
@@ -46,7 +46,7 @@ impl Output {
 
     pub fn create_queue(&self, max_size: u32, blocking: bool) -> Result<OutputQueue> {
         clear_error_flag();
-        let handle = unsafe { daic::dai_output_create_queue(self.handle, c_uint(max_size), blocking) };
+        let handle = unsafe { depthai::dai_output_create_queue(self.handle, c_uint(max_size), blocking) };
         if handle.is_null() {
             Err(last_error("failed to create output queue"))
         } else {
@@ -59,7 +59,7 @@ impl Node {
     pub fn output(&self, name: &str) -> Result<Output> {
         clear_error_flag();
         let name_c = CString::new(name).map_err(|_| last_error("invalid output name"))?;
-        let handle = unsafe { daic::dai_node_get_output(self.handle(), std::ptr::null(), name_c.as_ptr()) };
+        let handle = unsafe { depthai::dai_node_get_output(self.handle(), std::ptr::null(), name_c.as_ptr()) };
         if handle.is_null() {
             Err(last_error("failed to get node output"))
         } else {

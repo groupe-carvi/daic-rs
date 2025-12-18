@@ -15,10 +15,10 @@
 #endif
 
 #ifdef __cplusplus
+namespace dai {
 extern "C" {
 #endif
 
-namespace daic {
 // Version informations getters
 API const char* dai_build_version();
 API int dai_build_version_major();
@@ -155,9 +155,7 @@ API const char* dai_camera_socket_name(int socket);
 API const char* dai_get_last_error();
 API void dai_clear_last_error();
 
-} // namespace daic
-
-
 #ifdef __cplusplus
-}
+} // extern "C"
+} // namespace dai
 #endif

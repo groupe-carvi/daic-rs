@@ -1,5 +1,5 @@
 use autocxx::c_int;
-use daic_sys::daic;
+use depthai_sys::depthai;
 
 use crate::error::{clear_error_flag, Result};
 use crate::pipeline::{DeviceNode, NodeKind, Pipeline};
@@ -26,27 +26,27 @@ impl StereoDepthNode {
 
     pub fn set_default_profile_preset(&self, mode: PresetMode) {
         clear_error_flag();
-        unsafe { daic::dai_stereo_set_default_profile_preset(self.node.handle(), c_int(mode as i32)) };
+        unsafe { depthai::dai_stereo_set_default_profile_preset(self.node.handle(), c_int(mode as i32)) };
     }
 
     pub fn set_left_right_check(&self, enable: bool) {
         clear_error_flag();
-        unsafe { daic::dai_stereo_set_left_right_check(self.node.handle(), enable) };
+        unsafe { depthai::dai_stereo_set_left_right_check(self.node.handle(), enable) };
     }
 
     pub fn set_subpixel(&self, enable: bool) {
         clear_error_flag();
-        unsafe { daic::dai_stereo_set_subpixel(self.node.handle(), enable) };
+        unsafe { depthai::dai_stereo_set_subpixel(self.node.handle(), enable) };
     }
 
     pub fn set_extended_disparity(&self, enable: bool) {
         clear_error_flag();
-        unsafe { daic::dai_stereo_set_extended_disparity(self.node.handle(), enable) };
+        unsafe { depthai::dai_stereo_set_extended_disparity(self.node.handle(), enable) };
     }
 
     pub fn enable_distortion_correction(&self, enable: bool) {
         clear_error_flag();
-        unsafe { daic::dai_stereo_enable_distortion_correction(self.node.handle(), enable) };
+        unsafe { depthai::dai_stereo_enable_distortion_correction(self.node.handle(), enable) };
     }
 }
 

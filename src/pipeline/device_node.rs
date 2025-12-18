@@ -34,9 +34,9 @@ pub trait CreateInPipelineWith<P>: Sized {
 /// # Example
 /// 
 /// ```ignore
-/// use daic_rs::pipeline::Pipeline;
-/// use daic_rs::camera::CameraNode;
-/// use daic_rs::pipeline::DeviceNode;
+/// use depthai::pipeline::Pipeline;
+/// use depthai::camera::CameraNode;
+/// use depthai::pipeline::DeviceNode;
 /// 
 /// let pipeline = Pipeline::new()?;
 /// 
@@ -100,10 +100,10 @@ where
 /// # Example
 /// 
 /// ```ignore
-/// use daic_rs::pipeline::Pipeline;
-/// use daic_rs::camera::CameraNode;
-/// use daic_rs::common::CameraBoardSocket;
-/// use daic_rs::pipeline::DeviceNodeWithParams;
+/// use depthai::pipeline::Pipeline;
+/// use depthai::camera::CameraNode;
+/// use depthai::common::CameraBoardSocket;
+/// use depthai::pipeline::DeviceNodeWithParams;
 /// 
 /// let pipeline = Pipeline::new()?;
 /// 

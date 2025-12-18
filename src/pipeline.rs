@@ -2,7 +2,7 @@ pub mod device_node;
 pub mod node;
 
 use autocxx::c_int;
-use daic_sys::{daic, DaiPipeline};
+use depthai_sys::{depthai, DaiPipeline};
 pub use device_node::{CreateInPipeline, CreateInPipelineWith, DeviceNode, DeviceNodeWithParams};
 pub use node::{Node, NodeKind};
 
@@ -21,7 +21,7 @@ pub(crate) struct PipelineInner {
 impl Drop for PipelineInner {
     fn drop(&mut self) {
         if !self.handle.is_null() {
-            unsafe { daic::dai_pipeline_delete(self.handle) };
+            unsafe { depthai::dai_pipeline_delete(self.handle) };
         }
     }
 }
@@ -34,7 +34,7 @@ pub struct Pipeline {
 impl Pipeline {
     pub fn new() -> Result<Self> {
         clear_error_flag();
-        let handle = daic::dai_pipeline_new();
+        let handle = depthai::dai_pipeline_new();
         if handle.is_null() {
             Err(last_error("failed to create pipeline"))
         } else {
@@ -50,7 +50,7 @@ impl Pipeline {
     /// `auto device = std::make_shared<dai::Device>(); dai::Pipeline pipeline(device);`
     pub fn with_device(device: &Device) -> Result<Self> {
         clear_error_flag();
-        let handle = unsafe { daic::dai_pipeline_new_with_device(device.handle()) };
+        let handle = unsafe { depthai::dai_pipeline_new_with_device(device.handle()) };
         if handle.is_null() {
             Err(last_error("failed to create pipeline with device"))
         } else {
@@ -66,7 +66,7 @@ impl Pipeline {
     /// was created with an implicit/default device.
     pub fn default_device(&self) -> Result<Device> {
         clear_error_flag();
-        let handle = unsafe { daic::dai_pipeline_get_default_device(self.inner.handle) };
+        let handle = unsafe { depthai::dai_pipeline_get_default_device(self.inner.handle) };
         if handle.is_null() {
             Err(last_error("failed to get pipeline default device"))
         } else {
@@ -100,7 +100,7 @@ impl Pipeline {
     pub fn create_camera(&self, socket: CameraBoardSocket) -> Result<CameraNode> {
         clear_error_flag();
         let handle =
-            unsafe { daic::dai_pipeline_create_camera(self.inner.handle, c_int(socket.as_raw())) };
+            unsafe { depthai::dai_pipeline_create_camera(self.inner.handle, c_int(socket.as_raw())) };
         if handle.is_null() {
             Err(last_error("failed to create camera node"))
         } else {
@@ -121,7 +121,7 @@ impl Pipeline {
     /// pipeline's internally-managed default device.
     pub fn start(&self) -> Result<()> {
         clear_error_flag();
-        let started = unsafe { daic::dai_pipeline_start(self.inner.handle) };
+        let started = unsafe { depthai::dai_pipeline_start(self.inner.handle) };
         if started {
             Ok(())
         } else {

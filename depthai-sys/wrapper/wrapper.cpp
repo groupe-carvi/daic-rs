@@ -60,7 +60,7 @@ static bool select_first_device_info(dai::DeviceInfo& out) {
     return false;
 }
 
-namespace daic {
+namespace dai {
 
 const char* dai_build_version() {
     return dai::build::VERSION;
@@ -1301,4 +1301,4 @@ void dai_clear_last_error() {
     last_error.clear();
 }
 
-} // namespace daic
+} // namespace dai

@@ -1,17 +1,17 @@
 use std::error::Error;
 use std::time::Duration;
 
-use daic_rs::camera::{CameraNode, CameraOutputConfig};
-use daic_rs::common::{CameraBoardSocket, ImageFrameType, ResizeMode};
-use daic_rs::pipeline::{NodeKind, Pipeline};
-use daic_rs::{DepthUnit, Device, DevicePlatform, Output, RgbdNode, StereoDepthNode, StereoPresetMode};
-use daic_rs::pointcloud::rgba32_from_rgba;
+use depthai::camera::{CameraNode, CameraOutputConfig};
+use depthai::common::{CameraBoardSocket, ImageFrameType, ResizeMode};
+use depthai::pipeline::{NodeKind, Pipeline};
+use depthai::{DepthUnit, Device, DevicePlatform, Output, RgbdNode, StereoDepthNode, StereoPresetMode};
+use depthai::pointcloud::rgba32_from_rgba;
 
 use rerun as rr;
 
 fn main() -> Result<(), Box<dyn Error>> {
     // Start a rerun recording.
-    let rec = rr::RecordingStreamBuilder::new("daic_rgbd").spawn()?;
+    let rec = rr::RecordingStreamBuilder::new("depthai_rgbd").spawn()?;
 
     // Create a single device connection and bind the pipeline to it.
     let device = Device::new()?;

@@ -1,5 +1,5 @@
 [package]
-name = "daic-rs"
+name = "depthai"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -13,7 +13,7 @@ hit = [] # Hardware Integration Tests
 image = "0.25.9"
 memmap2 = "0.9.9"
 ndarray = "0.17.1"
-daic-sys = { path = "daic-sys" }
+depthai-sys = { path = "depthai-sys" }
 imageproc = "0.25.0"
 serde = { version = "1.0.228", features = ["derive"] }
 autocxx.workspace = true
@@ -38,7 +38,7 @@ path = "examples/camera.rs"
 resolver = "3"
 members = [
     ".",
-    "./daic-sys",
+    "./depthai-sys",
 ]
 
 [workspace.package]

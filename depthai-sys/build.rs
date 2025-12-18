@@ -58,7 +58,7 @@ macro_rules! println_build {
 fn main() {
     println!("cargo:rerun-if-changed=wrapper/");
     println!("cargo:rerun-if-changed=builds/depthai-core/include/");
-    println!("cargo:rerun-if-env-changed=DAIC_SYS_LINK_SHARED");
+    println!("cargo:rerun-if-env-changed=DEPTHAI_SYS_LINK_SHARED");
     println!("cargo:rerun-if-env-changed=DEPTHAI_OPENCV_SUPPORT");
     println!("cargo:rerun-if-env-changed=DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT");
     println!("cargo:rerun-if-env-changed=DEPTHAI_ENABLE_EVENTS_MANAGER");
@@ -405,7 +405,7 @@ fn build_with_autocxx() -> Vec<PathBuf> {
         build.flag("-std=c++17");
     }
 
-    build.compile("autocxx-daic-sys");
+    build.compile("autocxx-depthai-sys");
 
     println_build!("autocxx build completed successfully");
     include_paths
@@ -447,7 +447,7 @@ fn build_cpp_wrapper(include_paths: &[PathBuf], opencv_enabled: bool) {
         cc_build.include(include);
     }
 
-    cc_build.compile("daic_wrapper");
+    cc_build.compile("depthai_wrapper");
     println_build!("C++ wrapper build completed.");
 }
 
@@ -818,7 +818,7 @@ fn resolve_deps_includes() -> PathBuf {
 
 fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
     println_build!("Resolving depthai-core library path...");
-    let prefer_static = !env_bool("DAIC_SYS_LINK_SHARED").unwrap_or(false);
+    let prefer_static = !env_bool("DEPTHAI_SYS_LINK_SHARED").unwrap_or(false);
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
     let target_dir = Path::new(&out_dir).ancestors().nth(3).unwrap();
     let deps_dir = Path::new(&target_dir).join("deps");
@@ -997,7 +997,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
         if !get_depthai_core_root().exists() {
             println_build!("DEPTHAI_CORE_ROOT not set, downloading prebuilt depthai-core...");
 
-            let depthai_core_install = get_daic_windows_prebuilt_binary()
+            let depthai_core_install = get_depthai_windows_prebuilt_binary()
                 .map_err(|_| "Failed to download prebuilt depthai-core.")?;
 
             // After extracting, check if the library exists
@@ -1150,7 +1150,7 @@ fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
         "Unix Makefiles"
     };
 
-    let prefer_static = !env_bool("DAIC_SYS_LINK_SHARED").unwrap_or(false);
+    let prefer_static = !env_bool("DEPTHAI_SYS_LINK_SHARED").unwrap_or(false);
     // depthai-core compiles some sources which unconditionally include OpenCV headers.
     // Disabling OpenCV support causes compilation failures (e.g. missing <opencv2/...> and
     // API methods guarded by DEPTHAI_HAVE_OPENCV_SUPPORT), so we always build depthai-core
@@ -1274,7 +1274,7 @@ fn bool_to_cmake(value: bool) -> &'static str {
     if value { "ON" } else { "OFF" }
 }
 
-fn get_daic_windows_prebuilt_binary() -> Result<PathBuf, String> {
+fn get_depthai_windows_prebuilt_binary() -> Result<PathBuf, String> {
     let mut zip_path = BUILD_FOLDER_PATH.join("depthai-core.zip");
 
     if !zip_path.exists() {

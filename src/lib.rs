@@ -1,4 +1,4 @@
-pub use daic_sys as bindings;
+pub use depthai_sys as bindings;
 
 pub mod camera;
 pub mod common;
@@ -10,7 +10,7 @@ pub mod pointcloud;
 pub mod rgbd;
 pub mod stereo_depth;
 
-pub use error::{DaicError, Result};
+pub use error::{DepthaiError, Result};
 pub use pipeline::{CreateInPipeline, CreateInPipelineWith, DeviceNode, DeviceNodeWithParams};
 
 pub use device::Device;
