@@ -56,6 +56,10 @@ macro_rules! println_build {
 }
 
 fn main() {
+    // autocxx_build::Builder lit `src/lib.rs` (include_cpp!) pour déterminer l'allowlist.
+    // Sans ce rerun-if-changed, Cargo ne relance pas toujours le build script lors
+    // d'une modification de la liste `generate!(...)`, ce qui laisse des bindings obsolètes.
+    println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=wrapper/");
     println!("cargo:rerun-if-changed=builds/depthai-core/include/");
     println!("cargo:rerun-if-env-changed=DEPTHAI_SYS_LINK_SHARED");

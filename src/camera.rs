@@ -1,26 +1,28 @@
-use std::time::Duration;
 use std::sync::Arc;
+use std::time::Duration;
 
-use autocxx::{c_int, c_uint};
-use depthai_sys::{depthai, DepthaiameraNode, DaiDataQueue, DaiImgFrame, DaiNode, DaiOutput};
+use autocxx::c_int;
+use depthai_sys::{depthai, DepthaiameraNode, DaiDataQueue, DaiImgFrame, DaiNode};
 
-pub use crate::common::{CameraBoardSocket, ImageFrameType, ResizeMode};
+pub use crate::common::{CameraBoardSocket, CameraSensorType, ImageFrameType, ResizeMode};
 use crate::error::{Result, clear_error_flag, last_error, take_error_if_any};
 use crate::pipeline::device_node::CreateInPipelineWith;
 use crate::pipeline::{Pipeline, PipelineInner};
+use crate::output::Output as NodeOutput;
 
 #[crate::native_node_wrapper(
     native = "dai::node::Camera",
-    outputs(video, preview, still, isp, raw)
+    inputs(inputControl, mockIsp),
+    outputs(raw)
 )]
 pub struct CameraNode {
     node: crate::pipeline::Node,
 }
 
-pub struct CameraOutput {
-    pipeline: Arc<PipelineInner>,
-    handle: DaiOutput,
-}
+/// Alias for camera output.
+///
+/// We reuse the common type `crate::output::Output` for consistency (link/queue).
+pub type CameraOutput = NodeOutput;
 
 pub struct OutputQueue {
     handle: DaiDataQueue,
@@ -28,6 +30,30 @@ pub struct OutputQueue {
 
 pub struct ImageFrame {
     handle: DaiImgFrame,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct CameraBuildConfig {
+    pub board_socket: CameraBoardSocket,
+    pub sensor_resolution: Option<(u32, u32)>,
+    pub sensor_fps: Option<f32>,
+}
+
+#[derive(Debug, Clone)]
+pub struct CameraFullResolutionConfig {
+    pub frame_type: Option<ImageFrameType>,
+    pub fps: Option<f32>,
+    pub use_highest_resolution: bool,
+}
+
+impl Default for CameraFullResolutionConfig {
+    fn default() -> Self {
+        Self {
+            frame_type: None,
+            fps: None,
+            use_highest_resolution: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -90,66 +116,260 @@ impl CameraNode {
         if handle.is_null() {
             Err(last_error("failed to request camera output"))
         } else {
-            Ok(CameraOutput {
-                pipeline: Arc::clone(&self.node.pipeline),
-                handle,
-            })
+            Ok(NodeOutput::from_handle(std::sync::Arc::clone(&self.node.pipeline), handle))
         }
     }
 
     pub fn request_full_resolution_output(&self) -> Result<CameraOutput> {
+        self.request_full_resolution_output_with(CameraFullResolutionConfig::default())
+    }
+
+    pub fn request_full_resolution_output_with(&self, config: CameraFullResolutionConfig) -> Result<CameraOutput> {
         clear_error_flag();
-        let handle = unsafe { depthai::dai_camera_request_full_resolution_output(self.node.handle() as DepthaiameraNode) };
+        let fmt = config.frame_type.map(|t| t as i32).unwrap_or(-1);
+        let fps = config.fps.unwrap_or(-1.0);
+        let handle = unsafe {
+            depthai::dai_camera_request_full_resolution_output_ex(
+                self.node.handle() as DepthaiameraNode,
+                c_int(fmt),
+                fps,
+                config.use_highest_resolution,
+            )
+        };
         if handle.is_null() {
             Err(last_error("failed to request full resolution output"))
         } else {
-            Ok(CameraOutput {
-                pipeline: Arc::clone(&self.node.pipeline),
-                handle,
-            })
+            Ok(NodeOutput::from_handle(std::sync::Arc::clone(&self.node.pipeline), handle))
         }
     }
-}
 
-impl CameraOutput {
-    pub fn link_to(
-        &self,
-        to: &crate::pipeline::Node,
-        in_name: Option<&str>,
-    ) -> Result<()> {
+    /// Configure (build) the camera node.
+    ///
+    /// Useful when the node was created via `Pipeline::create::<CameraNode>()` (string-based)
+    /// as opposed to `Pipeline::create_camera(...)` which calls `build()` immediately.
+    pub fn build(&self, config: CameraBuildConfig) -> Result<()> {
         clear_error_flag();
-        let in_name_c = in_name
-            .map(|s| std::ffi::CString::new(s).map_err(|_| last_error("invalid in_name")))
-            .transpose()?;
-
+        let (w, h) = config
+            .sensor_resolution
+            .map(|(w, h)| (w as i32, h as i32))
+            .unwrap_or((-1, -1));
+        let fps = config.sensor_fps.unwrap_or(-1.0);
         let ok = unsafe {
-            depthai::dai_output_link(
-                self.handle,
-                to.handle(),
-                std::ptr::null(),
-                in_name_c
-                    .as_ref()
-                    .map(|s| s.as_ptr())
-                    .unwrap_or(std::ptr::null()),
+            depthai::dai_camera_build(
+                self.node.handle() as DepthaiameraNode,
+                c_int(config.board_socket.as_raw()),
+                c_int(w),
+                c_int(h),
+                fps,
             )
         };
-
         if ok {
             Ok(())
         } else {
-            Err(last_error("failed to link output"))
+            Err(last_error("failed to build camera"))
         }
     }
 
-    pub fn create_queue(&self, max_size: u32, blocking: bool) -> Result<OutputQueue> {
+    pub fn board_socket(&self) -> Result<CameraBoardSocket> {
         clear_error_flag();
-        let handle =
-            unsafe { depthai::dai_output_create_queue(self.handle, c_uint(max_size), blocking) };
-        if handle.is_null() {
-            Err(last_error("failed to create output queue"))
-        } else {
-            Ok(OutputQueue { handle })
+        let raw = unsafe { depthai::dai_camera_get_board_socket(self.node.handle() as DepthaiameraNode) };
+        if let Some(err) = take_error_if_any("failed to get camera board socket") {
+            return Err(err);
         }
+        Ok(CameraBoardSocket::from_raw(raw.into()))
+    }
+
+    pub fn max_width(&self) -> Result<u32> {
+        clear_error_flag();
+        let w = unsafe { depthai::dai_camera_get_max_width(self.node.handle() as DepthaiameraNode) };
+        if let Some(err) = take_error_if_any("failed to get camera max width") {
+            return Err(err);
+        }
+        Ok(w as u32)
+    }
+
+    pub fn max_height(&self) -> Result<u32> {
+        clear_error_flag();
+        let h = unsafe { depthai::dai_camera_get_max_height(self.node.handle() as DepthaiameraNode) };
+        if let Some(err) = take_error_if_any("failed to get camera max height") {
+            return Err(err);
+        }
+        Ok(h as u32)
+    }
+
+    pub fn set_sensor_type(&self, sensor_type: CameraSensorType) -> Result<()> {
+        clear_error_flag();
+        unsafe {
+            depthai::dai_camera_set_sensor_type(
+                self.node.handle() as DepthaiameraNode,
+                c_int(sensor_type.as_raw()),
+            )
+        };
+        if let Some(err) = take_error_if_any("failed to set camera sensor type") {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    pub fn sensor_type(&self) -> Result<CameraSensorType> {
+        clear_error_flag();
+        let raw = unsafe { depthai::dai_camera_get_sensor_type(self.node.handle() as DepthaiameraNode) };
+        if let Some(err) = take_error_if_any("failed to get camera sensor type") {
+            return Err(err);
+        }
+        Ok(CameraSensorType::from_raw(raw.into()))
+    }
+
+    pub fn set_raw_num_frames_pool(&self, num: i32) -> Result<()> {
+        clear_error_flag();
+        unsafe { depthai::dai_camera_set_raw_num_frames_pool(self.node.handle() as DepthaiameraNode, c_int(num)) };
+        if let Some(err) = take_error_if_any("failed to set raw num frames pool") {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    pub fn set_max_size_pool_raw(&self, size: i32) -> Result<()> {
+        clear_error_flag();
+        unsafe { depthai::dai_camera_set_max_size_pool_raw(self.node.handle() as DepthaiameraNode, c_int(size)) };
+        if let Some(err) = take_error_if_any("failed to set raw max size pool") {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    pub fn set_isp_num_frames_pool(&self, num: i32) -> Result<()> {
+        clear_error_flag();
+        unsafe { depthai::dai_camera_set_isp_num_frames_pool(self.node.handle() as DepthaiameraNode, c_int(num)) };
+        if let Some(err) = take_error_if_any("failed to set isp num frames pool") {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    pub fn set_max_size_pool_isp(&self, size: i32) -> Result<()> {
+        clear_error_flag();
+        unsafe { depthai::dai_camera_set_max_size_pool_isp(self.node.handle() as DepthaiameraNode, c_int(size)) };
+        if let Some(err) = take_error_if_any("failed to set isp max size pool") {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    pub fn set_num_frames_pools(&self, raw: i32, isp: i32, outputs: i32) -> Result<()> {
+        clear_error_flag();
+        unsafe {
+            depthai::dai_camera_set_num_frames_pools(
+                self.node.handle() as DepthaiameraNode,
+                c_int(raw),
+                c_int(isp),
+                c_int(outputs),
+            )
+        };
+        if let Some(err) = take_error_if_any("failed to set num frames pools") {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    pub fn set_max_size_pools(&self, raw: i32, isp: i32, outputs: i32) -> Result<()> {
+        clear_error_flag();
+        unsafe {
+            depthai::dai_camera_set_max_size_pools(
+                self.node.handle() as DepthaiameraNode,
+                c_int(raw),
+                c_int(isp),
+                c_int(outputs),
+            )
+        };
+        if let Some(err) = take_error_if_any("failed to set max size pools") {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    pub fn set_outputs_num_frames_pool(&self, num: i32) -> Result<()> {
+        clear_error_flag();
+        unsafe { depthai::dai_camera_set_outputs_num_frames_pool(self.node.handle() as DepthaiameraNode, c_int(num)) };
+        if let Some(err) = take_error_if_any("failed to set outputs num frames pool") {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    pub fn set_outputs_max_size_pool(&self, size: i32) -> Result<()> {
+        clear_error_flag();
+        unsafe { depthai::dai_camera_set_outputs_max_size_pool(self.node.handle() as DepthaiameraNode, c_int(size)) };
+        if let Some(err) = take_error_if_any("failed to set outputs max size pool") {
+            return Err(err);
+        }
+        Ok(())
+    }
+
+    pub fn raw_num_frames_pool(&self) -> Result<i32> {
+        clear_error_flag();
+        let v = unsafe { depthai::dai_camera_get_raw_num_frames_pool(self.node.handle() as DepthaiameraNode) };
+        if let Some(err) = take_error_if_any("failed to get raw num frames pool") {
+            return Err(err);
+        }
+        Ok(v.into())
+    }
+
+    pub fn max_size_pool_raw(&self) -> Result<i32> {
+        clear_error_flag();
+        let v = unsafe { depthai::dai_camera_get_max_size_pool_raw(self.node.handle() as DepthaiameraNode) };
+        if let Some(err) = take_error_if_any("failed to get raw max size pool") {
+            return Err(err);
+        }
+        Ok(v.into())
+    }
+
+    pub fn isp_num_frames_pool(&self) -> Result<i32> {
+        clear_error_flag();
+        let v = unsafe { depthai::dai_camera_get_isp_num_frames_pool(self.node.handle() as DepthaiameraNode) };
+        if let Some(err) = take_error_if_any("failed to get isp num frames pool") {
+            return Err(err);
+        }
+        Ok(v.into())
+    }
+
+    pub fn max_size_pool_isp(&self) -> Result<i32> {
+        clear_error_flag();
+        let v = unsafe { depthai::dai_camera_get_max_size_pool_isp(self.node.handle() as DepthaiameraNode) };
+        if let Some(err) = take_error_if_any("failed to get isp max size pool") {
+            return Err(err);
+        }
+        Ok(v.into())
+    }
+
+    pub fn outputs_num_frames_pool(&self) -> Result<Option<i32>> {
+        clear_error_flag();
+        let mut out: c_int = c_int(0);
+        let ok = unsafe {
+            depthai::dai_camera_get_outputs_num_frames_pool(
+                self.node.handle() as DepthaiameraNode,
+                &mut out as *mut c_int,
+            )
+        };
+        if let Some(err) = take_error_if_any("failed to get outputs num frames pool") {
+            return Err(err);
+        }
+        Ok(if ok { Some(out.into()) } else { None })
+    }
+
+    pub fn outputs_max_size_pool(&self) -> Result<Option<usize>> {
+        clear_error_flag();
+        let mut out: usize = 0;
+        let ok = unsafe {
+            depthai::dai_camera_get_outputs_max_size_pool(
+                self.node.handle() as DepthaiameraNode,
+                &mut out as *mut usize,
+            )
+        };
+        if let Some(err) = take_error_if_any("failed to get outputs max size pool") {
+            return Err(err);
+        }
+        Ok(if ok { Some(out) } else { None })
     }
 }
 

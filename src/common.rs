@@ -112,6 +112,39 @@ pub enum CameraBoardSocket {
     CamJ = 9,
 }
 
+#[repr(i32)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CameraSensorType {
+    Auto = -1,
+    Color = 0,
+    Mono = 1,
+    ToF = 2,
+    Thermal = 3,
+}
+
+impl Default for CameraSensorType {
+    fn default() -> Self {
+        CameraSensorType::Auto
+    }
+}
+
+impl CameraSensorType {
+    pub fn as_raw(self) -> i32 {
+        self as i32
+    }
+
+    pub fn from_raw(value: i32) -> Self {
+        match value {
+            -1 => CameraSensorType::Auto,
+            0 => CameraSensorType::Color,
+            1 => CameraSensorType::Mono,
+            2 => CameraSensorType::ToF,
+            3 => CameraSensorType::Thermal,
+            _ => CameraSensorType::Auto,
+        }
+    }
+}
+
 impl Default for CameraBoardSocket {
     fn default() -> Self {
         CameraBoardSocket::Auto

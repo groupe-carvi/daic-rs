@@ -20,8 +20,10 @@ impl CameraStereoBundle {
         let stereo = pipeline.create::<StereoDepthNode>()?;
 
         // Link them
-        left.isp()?.link(&stereo.left()?)?;
-        right.isp()?.link(&stereo.right()?)?;
+        // NOTE: `dai::node::Camera` exposes a `raw` output (and dynamic outputs requested via
+        // `request_output(...)`). Older examples used `isp`, which is a `ColorCamera` port.
+        left.raw()?.link(&stereo.left()?)?;
+        right.raw()?.link(&stereo.right()?)?;
 
         Ok(Self { left, right, stereo })
     }

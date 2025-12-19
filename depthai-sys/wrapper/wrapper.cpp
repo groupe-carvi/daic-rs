@@ -1129,6 +1129,314 @@ DaiOutput dai_camera_request_full_resolution_output(DaiCameraNode camera) {
         return nullptr;
     }
 }
+
+DaiOutput dai_camera_request_full_resolution_output_ex(DaiCameraNode camera, int type, float fps, bool use_highest_resolution) {
+    if (!camera) {
+        last_error = "dai_camera_request_full_resolution_output_ex: null camera";
+        return nullptr;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        std::optional<dai::ImgFrame::Type> opt_type = (type >= 0) ? std::optional<dai::ImgFrame::Type>(static_cast<dai::ImgFrame::Type>(type))
+                                                                  : std::nullopt;
+        std::optional<float> opt_fps = (fps > 0.0f) ? std::optional<float>(fps) : std::nullopt;
+        dai::Node::Output* output = cam->requestFullResolutionOutput(opt_type, opt_fps, use_highest_resolution);
+        return static_cast<DaiOutput>(output);
+    } catch (const std::exception& e) {
+        last_error = std::string("dai_camera_request_full_resolution_output_ex failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_camera_build(DaiCameraNode camera, int board_socket, int sensor_width, int sensor_height, float sensor_fps) {
+    if(!camera) {
+        last_error = "dai_camera_build: null camera";
+        return false;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        auto socket = static_cast<dai::CameraBoardSocket>(board_socket);
+
+        std::optional<std::pair<uint32_t, uint32_t>> opt_res = std::nullopt;
+        if(sensor_width > 0 && sensor_height > 0) {
+            opt_res = std::make_pair(static_cast<uint32_t>(sensor_width), static_cast<uint32_t>(sensor_height));
+        }
+        std::optional<float> opt_fps = (sensor_fps > 0.0f) ? std::optional<float>(sensor_fps) : std::nullopt;
+
+        cam->build(socket, opt_res, opt_fps);
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_build failed: ") + e.what();
+        return false;
+    }
+}
+
+int dai_camera_get_board_socket(DaiCameraNode camera) {
+    if(!camera) {
+        last_error = "dai_camera_get_board_socket: null camera";
+        return -1;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        return static_cast<int>(cam->getBoardSocket());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_board_socket failed: ") + e.what();
+        return -1;
+    }
+}
+
+uint32_t dai_camera_get_max_width(DaiCameraNode camera) {
+    if(!camera) {
+        last_error = "dai_camera_get_max_width: null camera";
+        return 0;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        return cam->getMaxWidth();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_max_width failed: ") + e.what();
+        return 0;
+    }
+}
+
+uint32_t dai_camera_get_max_height(DaiCameraNode camera) {
+    if(!camera) {
+        last_error = "dai_camera_get_max_height: null camera";
+        return 0;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        return cam->getMaxHeight();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_max_height failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_camera_set_sensor_type(DaiCameraNode camera, int sensor_type) {
+    if(!camera) {
+        last_error = "dai_camera_set_sensor_type: null camera";
+        return;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        cam->setSensorType(static_cast<dai::CameraSensorType>(sensor_type));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_set_sensor_type failed: ") + e.what();
+    }
+}
+
+int dai_camera_get_sensor_type(DaiCameraNode camera) {
+    if(!camera) {
+        last_error = "dai_camera_get_sensor_type: null camera";
+        return -1;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        return static_cast<int>(cam->getSensorType());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_sensor_type failed: ") + e.what();
+        return -1;
+    }
+}
+
+void dai_camera_set_raw_num_frames_pool(DaiCameraNode camera, int num) {
+    if(!camera) {
+        last_error = "dai_camera_set_raw_num_frames_pool: null camera";
+        return;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        cam->setRawNumFramesPool(num);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_set_raw_num_frames_pool failed: ") + e.what();
+    }
+}
+
+void dai_camera_set_max_size_pool_raw(DaiCameraNode camera, int size) {
+    if(!camera) {
+        last_error = "dai_camera_set_max_size_pool_raw: null camera";
+        return;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        cam->setMaxSizePoolRaw(size);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_set_max_size_pool_raw failed: ") + e.what();
+    }
+}
+
+void dai_camera_set_isp_num_frames_pool(DaiCameraNode camera, int num) {
+    if(!camera) {
+        last_error = "dai_camera_set_isp_num_frames_pool: null camera";
+        return;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        cam->setIspNumFramesPool(num);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_set_isp_num_frames_pool failed: ") + e.what();
+    }
+}
+
+void dai_camera_set_max_size_pool_isp(DaiCameraNode camera, int size) {
+    if(!camera) {
+        last_error = "dai_camera_set_max_size_pool_isp: null camera";
+        return;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        cam->setMaxSizePoolIsp(size);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_set_max_size_pool_isp failed: ") + e.what();
+    }
+}
+
+void dai_camera_set_num_frames_pools(DaiCameraNode camera, int raw, int isp, int outputs) {
+    if(!camera) {
+        last_error = "dai_camera_set_num_frames_pools: null camera";
+        return;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        cam->setNumFramesPools(raw, isp, outputs);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_set_num_frames_pools failed: ") + e.what();
+    }
+}
+
+void dai_camera_set_max_size_pools(DaiCameraNode camera, int raw, int isp, int outputs) {
+    if(!camera) {
+        last_error = "dai_camera_set_max_size_pools: null camera";
+        return;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        cam->setMaxSizePools(raw, isp, outputs);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_set_max_size_pools failed: ") + e.what();
+    }
+}
+
+void dai_camera_set_outputs_num_frames_pool(DaiCameraNode camera, int num) {
+    if(!camera) {
+        last_error = "dai_camera_set_outputs_num_frames_pool: null camera";
+        return;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        cam->setOutputsNumFramesPool(num);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_set_outputs_num_frames_pool failed: ") + e.what();
+    }
+}
+
+void dai_camera_set_outputs_max_size_pool(DaiCameraNode camera, int size) {
+    if(!camera) {
+        last_error = "dai_camera_set_outputs_max_size_pool: null camera";
+        return;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        cam->setOutputsMaxSizePool(size);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_set_outputs_max_size_pool failed: ") + e.what();
+    }
+}
+
+int dai_camera_get_raw_num_frames_pool(DaiCameraNode camera) {
+    if(!camera) {
+        last_error = "dai_camera_get_raw_num_frames_pool: null camera";
+        return 0;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        return cam->getRawNumFramesPool();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_raw_num_frames_pool failed: ") + e.what();
+        return 0;
+    }
+}
+
+int dai_camera_get_max_size_pool_raw(DaiCameraNode camera) {
+    if(!camera) {
+        last_error = "dai_camera_get_max_size_pool_raw: null camera";
+        return 0;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        return cam->getMaxSizePoolRaw();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_max_size_pool_raw failed: ") + e.what();
+        return 0;
+    }
+}
+
+int dai_camera_get_isp_num_frames_pool(DaiCameraNode camera) {
+    if(!camera) {
+        last_error = "dai_camera_get_isp_num_frames_pool: null camera";
+        return 0;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        return cam->getIspNumFramesPool();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_isp_num_frames_pool failed: ") + e.what();
+        return 0;
+    }
+}
+
+int dai_camera_get_max_size_pool_isp(DaiCameraNode camera) {
+    if(!camera) {
+        last_error = "dai_camera_get_max_size_pool_isp: null camera";
+        return 0;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        return cam->getMaxSizePoolIsp();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_max_size_pool_isp failed: ") + e.what();
+        return 0;
+    }
+}
+
+bool dai_camera_get_outputs_num_frames_pool(DaiCameraNode camera, int* out_num) {
+    if(!camera || !out_num) {
+        last_error = "dai_camera_get_outputs_num_frames_pool: null camera or out_num";
+        return false;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        auto opt = cam->getOutputsNumFramesPool();
+        if(opt.has_value()) {
+            *out_num = opt.value();
+            return true;
+        }
+        return false;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_outputs_num_frames_pool failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_camera_get_outputs_max_size_pool(DaiCameraNode camera, size_t* out_size) {
+    if(!camera || !out_size) {
+        last_error = "dai_camera_get_outputs_max_size_pool: null camera or out_size";
+        return false;
+    }
+    try {
+        auto cam = static_cast<dai::node::Camera*>(camera);
+        auto opt = cam->getOutputsMaxSizePool();
+        if(opt.has_value()) {
+            *out_size = opt.value();
+            return true;
+        }
+        return false;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_camera_get_outputs_max_size_pool failed: ") + e.what();
+        return false;
+    }
+}
 DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline, int board_socket) {
     if (!pipeline) {
         last_error = "dai_pipeline_create_camera: null pipeline";

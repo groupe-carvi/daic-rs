@@ -7,6 +7,7 @@
 // - Included by the binding generator (autocxx) via `autocxx_wrapper.h`.
 
 #include <cstddef>  // size_t
+#include <cstdint>  // uint32_t
 
 #ifdef _WIN32
 #define API __declspec(dllexport)
@@ -114,6 +115,33 @@ API DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline, int board_soc
 // Camera output wrappers
 API DaiOutput dai_camera_request_output(DaiCameraNode camera, int width, int height, int type, int resize_mode, float fps, int enable_undistortion);
 API DaiOutput dai_camera_request_full_resolution_output(DaiCameraNode camera);
+API DaiOutput dai_camera_request_full_resolution_output_ex(DaiCameraNode camera, int type, float fps, bool use_highest_resolution);
+
+// Camera configuration / introspection
+API bool dai_camera_build(DaiCameraNode camera, int board_socket, int sensor_width, int sensor_height, float sensor_fps);
+API int dai_camera_get_board_socket(DaiCameraNode camera);
+API uint32_t dai_camera_get_max_width(DaiCameraNode camera);
+API uint32_t dai_camera_get_max_height(DaiCameraNode camera);
+
+API void dai_camera_set_sensor_type(DaiCameraNode camera, int sensor_type);
+API int dai_camera_get_sensor_type(DaiCameraNode camera);
+
+// Camera pools configuration
+API void dai_camera_set_raw_num_frames_pool(DaiCameraNode camera, int num);
+API void dai_camera_set_max_size_pool_raw(DaiCameraNode camera, int size);
+API void dai_camera_set_isp_num_frames_pool(DaiCameraNode camera, int num);
+API void dai_camera_set_max_size_pool_isp(DaiCameraNode camera, int size);
+API void dai_camera_set_num_frames_pools(DaiCameraNode camera, int raw, int isp, int outputs);
+API void dai_camera_set_max_size_pools(DaiCameraNode camera, int raw, int isp, int outputs);
+API void dai_camera_set_outputs_num_frames_pool(DaiCameraNode camera, int num);
+API void dai_camera_set_outputs_max_size_pool(DaiCameraNode camera, int size);
+
+API int dai_camera_get_raw_num_frames_pool(DaiCameraNode camera);
+API int dai_camera_get_max_size_pool_raw(DaiCameraNode camera);
+API int dai_camera_get_isp_num_frames_pool(DaiCameraNode camera);
+API int dai_camera_get_max_size_pool_isp(DaiCameraNode camera);
+API bool dai_camera_get_outputs_num_frames_pool(DaiCameraNode camera, int* out_num);
+API bool dai_camera_get_outputs_max_size_pool(DaiCameraNode camera, size_t* out_size);
 
 // Low-level output operations
 API DaiDataQueue dai_output_create_queue(DaiOutput output, unsigned int max_size, bool blocking);
