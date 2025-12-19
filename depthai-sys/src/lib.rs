@@ -38,9 +38,11 @@ include_cpp! {
     generate!("dai::dai_pipeline_create_camera")
 
     // Generic node creation / linking
-    generate!("dai::dai_pipeline_create_node")
+    generate!("dai::dai_pipeline_create_node_by_name")
     generate!("dai::dai_node_get_output")
+    generate!("dai::dai_node_get_input")
     generate!("dai::dai_output_link")
+    generate!("dai::dai_output_link_input")
     generate!("dai::dai_node_link")
     generate!("dai::dai_node_unlink")
 
@@ -110,6 +112,7 @@ pub type DaiPipeline = *mut autocxx::c_void;
 pub type DaiNode = *mut autocxx::c_void;
 pub type DepthaiameraNode = *mut autocxx::c_void;
 pub type DaiOutput = *mut autocxx::c_void;
+pub type DaiInput = *mut autocxx::c_void;
 pub type DaiDataQueue = *mut autocxx::c_void;
 pub type DaiImgFrame = *mut autocxx::c_void;
 pub type DaiPointCloud = *mut autocxx::c_void;

@@ -2,11 +2,11 @@
 ///
 /// This example shows:
 /// - typed creation (`CameraNode`)
-/// - and how to build a small “composite” using generic nodes (`NodeKind` + `Node::link`)
+/// - and how to build a small “composite” using generic nodes (string name + `Node::link`)
 use depthai::camera::{CameraNode, CameraOutputConfig};
 use depthai::common::CameraBoardSocket;
 use depthai::device::Device;
-use depthai::pipeline::{NodeKind, Pipeline};
+use depthai::pipeline::Pipeline;
 use depthai::Result;
 
 fn main() -> Result<()> {
@@ -36,7 +36,7 @@ fn main() -> Result<()> {
 
     // Demonstrate the generic node API: create a StereoDepth node and link the cameras into it.
     // (StereoDepth expects inputs named "left" and "right".)
-    let stereo = pipeline.create_node(NodeKind::StereoDepth)?;
+    let stereo = pipeline.create_node("dai::node::StereoDepth")?;
     left.as_node().link(None, None, &stereo, None, Some("left"))?;
     right.as_node().link(None, None, &stereo, None, Some("right"))?;
     println!("Linked cameras into StereoDepth");

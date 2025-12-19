@@ -1,5 +1,11 @@
 pub use depthai_sys as bindings;
 
+// Re-export proc-macros for ergonomic use: `use depthai::native_node_wrapper;`.
+extern crate self as depthai;
+
+pub use depthai_macros::native_node_wrapper;
+pub use depthai_macros::depthai_composite;
+
 pub mod camera;
 pub mod common;
 pub mod device;
@@ -17,7 +23,7 @@ pub use device::Device;
 pub use device::DevicePlatform;
 pub use pipeline::Pipeline;
 
-pub use output::Output;
+pub use output::{Output, Input};
 pub use pointcloud::{Point3fRGBA, PointCloudData};
 pub use rgbd::{DepthUnit, RgbdData, RgbdNode};
 pub use stereo_depth::{PresetMode as StereoPresetMode, StereoDepthNode};

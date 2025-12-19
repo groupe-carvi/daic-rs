@@ -44,6 +44,7 @@ typedef void* DaiPipeline;    // currently: `dai::Pipeline*`
 typedef void* DaiNode;        // currently: `dai::Node*` (derived node instance)
 typedef void* DaiCameraNode;  // currently: `dai::node::Camera*`
 typedef void* DaiOutput;      // currently: `dai::Node::Output*`
+typedef void* DaiInput;       // currently: `dai::Node::Input*`
 typedef void* DaiDataQueue;   // currently: `std::shared_ptr<dai::MessageQueue>*`
 typedef void* DaiImgFrame;    // currently: `std::shared_ptr<dai::ImgFrame>*`
 typedef void* DaiPointCloud;  // currently: wrapper-owned view of `std::shared_ptr<dai::PointCloudData>`
@@ -80,12 +81,13 @@ API DaiDevice dai_pipeline_get_default_device(DaiPipeline pipeline);
 
 // Generic node creation / linking
 // Note: `DaiNode` is an erased node pointer; it must originate from the same pipeline.
-// kind values are defined by the Rust-side `NodeKind` enum.
 API bool dai_pipeline_start_default(DaiPipeline pipeline);
-API DaiNode dai_pipeline_create_node(DaiPipeline pipeline, int kind);
-// Output helpers
+API DaiNode dai_pipeline_create_node_by_name(DaiPipeline pipeline, const char* name);
+// Output/Input helpers
 API DaiOutput dai_node_get_output(DaiNode node, const char* group, const char* name);
+API DaiInput dai_node_get_input(DaiNode node, const char* group, const char* name);
 API bool dai_output_link(DaiOutput from, DaiNode to, const char* in_group, const char* in_name);
+API bool dai_output_link_input(DaiOutput from, DaiInput to);
 API bool dai_node_link(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name);
 API bool dai_node_unlink(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name);
 

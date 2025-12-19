@@ -4,7 +4,7 @@ pub mod node;
 use autocxx::c_int;
 use depthai_sys::{depthai, DaiPipeline};
 pub use device_node::{CreateInPipeline, CreateInPipelineWith, DeviceNode, DeviceNodeWithParams};
-pub use node::{Node, NodeKind};
+pub use node::Node;
 
 use std::sync::Arc;
 
@@ -97,6 +97,11 @@ impl Pipeline {
         T::create_with(self, params)
     }
 
+    /// Create a native node by its C++ class name.
+    pub fn create_node(&self, name: &str) -> Result<Node> {
+        node::create_node_by_name(self.inner_arc(), name)
+    }
+
     pub fn create_camera(&self, socket: CameraBoardSocket) -> Result<CameraNode> {
         clear_error_flag();
         let handle =
@@ -106,10 +111,6 @@ impl Pipeline {
         } else {
             Ok(CameraNode::from_handle(self.inner_arc(), handle))
         }
-    }
-
-    pub fn create_node(&self, kind: NodeKind) -> Result<Node> {
-        node::create_node(self.inner_arc(), kind)
     }
 
     /// Start the pipeline.

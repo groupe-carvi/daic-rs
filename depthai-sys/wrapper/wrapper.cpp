@@ -13,6 +13,8 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <unordered_map>
+#include <functional>
 
 // Global error storage
 static std::string last_error = "";
@@ -227,9 +229,14 @@ void dai_device_close(DaiDevice device) {
 DaiPipeline dai_pipeline_new() {
     try {
         dai_clear_last_error();
+        // Use the constructor that doesn't require a device.
+        // dai::Pipeline() in C++ is just a graph container.
+        // printf("DEBUG: Creating dai::Pipeline...\n");
         auto pipeline = new dai::Pipeline();
+        // printf("DEBUG: dai::Pipeline created at %p\n", pipeline);
         return static_cast<DaiPipeline>(pipeline);
     } catch (const std::exception& e) {
+        // printf("DEBUG: dai::Pipeline creation failed: %s\n", e.what());
         last_error = std::string("dai_pipeline_new failed: ") + e.what();
         return nullptr;
     }
@@ -319,45 +326,51 @@ DaiDevice dai_pipeline_get_default_device(DaiPipeline pipeline) {
 }
 
 // Generic node creation / linking
-// Keep in sync with Rust-side NodeKind discriminants.
-enum class DaiNodeKind : int {
-    Camera = 1,
-    StereoDepth = 2,
-    ImageAlign = 3,
-    RGBD = 4,
-};
+using NodeCreator = std::function<dai::Node*(dai::Pipeline*)>;
 
-DaiNode dai_pipeline_create_node(DaiPipeline pipeline, int kind) {
-    if (!pipeline) {
-        last_error = "dai_pipeline_create_node: null pipeline";
+#define REGISTER_NODE(name) registry[#name] = [](dai::Pipeline* p) { return p->create<name>().get(); }
+
+static std::unordered_map<std::string, NodeCreator>& get_node_registry() {
+    static std::unordered_map<std::string, NodeCreator> registry;
+    if (registry.empty()) {
+        REGISTER_NODE(dai::node::Camera);
+        REGISTER_NODE(dai::node::ColorCamera);
+        REGISTER_NODE(dai::node::MonoCamera);
+        REGISTER_NODE(dai::node::StereoDepth);
+        REGISTER_NODE(dai::node::ImageAlign);
+        REGISTER_NODE(dai::node::RGBD);
+        REGISTER_NODE(dai::node::VideoEncoder);
+        REGISTER_NODE(dai::node::NeuralNetwork);
+        REGISTER_NODE(dai::node::ImageManip);
+        REGISTER_NODE(dai::node::Script);
+        REGISTER_NODE(dai::node::SystemLogger);
+        REGISTER_NODE(dai::node::SpatialLocationCalculator);
+        REGISTER_NODE(dai::node::FeatureTracker);
+        REGISTER_NODE(dai::node::ObjectTracker);
+        REGISTER_NODE(dai::node::IMU);
+        REGISTER_NODE(dai::node::EdgeDetector);
+        REGISTER_NODE(dai::node::Warp);
+    }
+    return registry;
+}
+
+DaiNode dai_pipeline_create_node_by_name(DaiPipeline pipeline, const char* name) {
+    if (!pipeline || !name) {
+        last_error = "dai_pipeline_create_node_by_name: null pipeline or name";
         return nullptr;
     }
     try {
         auto pipe = static_cast<dai::Pipeline*>(pipeline);
-        const auto k = static_cast<DaiNodeKind>(kind);
-        switch (k) {
-            case DaiNodeKind::Camera: {
-                auto node = pipe->create<dai::node::Camera>();
-                return static_cast<DaiNode>(node.get());
-            }
-            case DaiNodeKind::StereoDepth: {
-                auto node = pipe->create<dai::node::StereoDepth>();
-                return static_cast<DaiNode>(node.get());
-            }
-            case DaiNodeKind::ImageAlign: {
-                auto node = pipe->create<dai::node::ImageAlign>();
-                return static_cast<DaiNode>(node.get());
-            }
-            case DaiNodeKind::RGBD: {
-                auto node = pipe->create<dai::node::RGBD>();
-                return static_cast<DaiNode>(node.get());
-            }
-            default:
-                last_error = "dai_pipeline_create_node: unknown kind";
-                return nullptr;
+        auto& registry = get_node_registry();
+        auto it = registry.find(name);
+        if (it != registry.end()) {
+            return static_cast<DaiNode>(it->second(pipe));
         }
+        
+        last_error = std::string("dai_pipeline_create_node_by_name: unknown node name: ") + name;
+        return nullptr;
     } catch (const std::exception& e) {
-        last_error = std::string("dai_pipeline_create_node failed: ") + e.what();
+        last_error = std::string("dai_pipeline_create_node_by_name failed: ") + e.what();
         return nullptr;
     }
 }
@@ -385,6 +398,29 @@ DaiOutput dai_node_get_output(DaiNode node, const char* group, const char* name)
         return static_cast<DaiOutput>(out);
     } catch(const std::exception& e) {
         last_error = std::string("dai_node_get_output failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiInput dai_node_get_input(DaiNode node, const char* group, const char* name) {
+    if(!node) {
+        last_error = "dai_node_get_input: null node";
+        return nullptr;
+    }
+    if(_dai_cstr_empty(name)) {
+        last_error = "dai_node_get_input: empty name";
+        return nullptr;
+    }
+    try {
+        auto n = static_cast<dai::Node*>(node);
+        dai::Node::Input* in = group ? n->getInputRef(std::string(group), std::string(name)) : n->getInputRef(std::string(name));
+        if(!in) {
+            last_error = "dai_node_get_input: input not found";
+            return nullptr;
+        }
+        return static_cast<DaiInput>(in);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_node_get_input failed: ") + e.what();
         return nullptr;
     }
 }
@@ -450,6 +486,22 @@ bool dai_output_link(DaiOutput from, DaiNode to, const char* in_group, const cha
         return true;
     } catch(const std::exception& e) {
         last_error = std::string("dai_output_link failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_output_link_input(DaiOutput from, DaiInput to) {
+    if(!from || !to) {
+        last_error = "dai_output_link_input: null from/to";
+        return false;
+    }
+    try {
+        auto out = static_cast<dai::Node::Output*>(from);
+        auto in = static_cast<dai::Node::Input*>(to);
+        out->link(*in);
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_output_link_input failed: ") + e.what();
         return false;
     }
 }

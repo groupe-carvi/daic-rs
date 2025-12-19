@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use depthai::camera::{CameraNode, CameraOutputConfig};
 use depthai::common::{CameraBoardSocket, ImageFrameType, ResizeMode};
-use depthai::pipeline::{NodeKind, Pipeline};
+use depthai::pipeline::Pipeline;
 use depthai::{DepthUnit, Device, DevicePlatform, Output, RgbdNode, StereoDepthNode, StereoPresetMode};
 use depthai::pointcloud::rgba32_from_rgba;
 
@@ -64,7 +64,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let aligned_depth_out: Output = match platform {
         DevicePlatform::Rvc4 => {
             // On some platforms the dedicated ImageAlign node is preferred.
-            let align = pipeline.create_node(NodeKind::ImageAlign)?;
+            let align = pipeline.create_node("dai::node::ImageAlign")?;
             let depth_out = stereo.as_node().output("depth")?;
             depth_out.link_to(&align, Some("input"))?;
             out_color.link_to(&align, Some("inputAlignTo"))?;

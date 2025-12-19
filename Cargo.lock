@@ -2884,6 +2884,7 @@ name = "depthai"
 version = "3.2.1"
 dependencies = [
  "autocxx",
+ "depthai-macros",
  "depthai-sys",
  "image",
  "imageproc",
@@ -2892,6 +2893,15 @@ dependencies = [
  "ndarray 0.17.1",
  "rerun",
  "serde",
+]
+
+[[package]]
+name = "depthai-macros"
+version = "3.2.1"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.111",
 ]
 
 [[package]]

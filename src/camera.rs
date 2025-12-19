@@ -9,9 +9,12 @@ use crate::error::{Result, clear_error_flag, last_error, take_error_if_any};
 use crate::pipeline::device_node::CreateInPipelineWith;
 use crate::pipeline::{Pipeline, PipelineInner};
 
+#[crate::native_node_wrapper(
+    native = "dai::node::Camera",
+    outputs(video, preview, still, isp, raw)
+)]
 pub struct CameraNode {
-    pipeline: Arc<PipelineInner>,
-    handle: DepthaiameraNode,
+    node: crate::pipeline::Node,
 }
 
 pub struct CameraOutput {
@@ -59,14 +62,9 @@ impl CameraOutputConfig {
 
 impl CameraNode {
     pub(crate) fn from_handle(pipeline: Arc<PipelineInner>, handle: DepthaiameraNode) -> Self {
-        Self { pipeline, handle }
-    }
-
-    /// View this camera node as a generic pipeline node.
-    ///
-    /// This is useful for calling generic node APIs like `Node::link`.
-    pub fn as_node(&self) -> crate::pipeline::Node {
-        crate::pipeline::node::Node::from_handle(Arc::clone(&self.pipeline), self.handle as DaiNode)
+        Self { 
+            node: crate::pipeline::Node::from_handle(pipeline, handle as DaiNode)
+        }
     }
 
     pub fn request_output(&self, config: CameraOutputConfig) -> Result<CameraOutput> {
@@ -80,7 +78,7 @@ impl CameraNode {
             .unwrap_or(-1);
         let handle = unsafe {
             depthai::dai_camera_request_output(
-                self.handle,
+                self.node.handle() as DepthaiameraNode,
                 c_int(config.size.0 as i32),
                 c_int(config.size.1 as i32),
                 c_int(fmt),
@@ -93,7 +91,7 @@ impl CameraNode {
             Err(last_error("failed to request camera output"))
         } else {
             Ok(CameraOutput {
-                pipeline: Arc::clone(&self.pipeline),
+                pipeline: Arc::clone(&self.node.pipeline),
                 handle,
             })
         }
@@ -101,12 +99,12 @@ impl CameraNode {
 
     pub fn request_full_resolution_output(&self) -> Result<CameraOutput> {
         clear_error_flag();
-        let handle = unsafe { depthai::dai_camera_request_full_resolution_output(self.handle) };
+        let handle = unsafe { depthai::dai_camera_request_full_resolution_output(self.node.handle() as DepthaiameraNode) };
         if handle.is_null() {
             Err(last_error("failed to request full resolution output"))
         } else {
             Ok(CameraOutput {
-                pipeline: Arc::clone(&self.pipeline),
+                pipeline: Arc::clone(&self.node.pipeline),
                 handle,
             })
         }

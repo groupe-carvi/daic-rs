@@ -14,6 +14,7 @@ image = "0.25.9"
 memmap2 = "0.9.9"
 ndarray = "0.17.1"
 depthai-sys = { path = "depthai-sys" }
+depthai-macros = { path = "depthai-macros" }
 imageproc = "0.25.0"
 serde = { version = "1.0.228", features = ["derive"] }
 autocxx.workspace = true
@@ -39,6 +40,7 @@ resolver = "3"
 members = [
     ".",
     "./depthai-sys",
+    "./depthai-macros",
 ]
 
 [workspace.package]

@@ -211,7 +211,7 @@ The generic node API supports linking by explicit port names *or* by choosing a 
 For example, `StereoDepth` expects inputs named `"left"` and `"right"`:
 
 ```rust
-let stereo = pipeline.create_node(NodeKind::StereoDepth)?;
+let stereo = pipeline.create_node("dai::node::StereoDepth")?;
 left_camera.as_node().link(None, None, &stereo, None, Some("left"))?;
 right_camera.as_node().link(None, None, &stereo, None, Some("right"))?;
 ```

@@ -5,7 +5,6 @@ use depthai_sys::{depthai, DaiRGBDData};
 
 use crate::camera::{ImageFrame, OutputQueue};
 use crate::error::{clear_error_flag, last_error, take_error_if_any, Result};
-use crate::pipeline::{DeviceNode, NodeKind, Pipeline};
 
 #[repr(i32)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -18,15 +17,13 @@ pub enum DepthUnit {
     Custom = 5,
 }
 
+#[allow(non_snake_case)]
+#[crate::native_node_wrapper(native = "dai::node::RGBD", inputs(inColor, inDepth), outputs(out))]
 pub struct RgbdNode {
     node: crate::pipeline::Node,
 }
 
 impl RgbdNode {
-    pub fn as_node(&self) -> &crate::pipeline::Node {
-        &self.node
-    }
-
     pub fn build(&self) -> Result<()> {
         clear_error_flag();
         let out = unsafe { depthai::dai_rgbd_build(self.node.handle()) };
@@ -41,13 +38,6 @@ impl RgbdNode {
         // setter cannot fail at the C ABI level (will record last_error on exception)
         clear_error_flag();
         unsafe { depthai::dai_rgbd_set_depth_unit(self.node.handle(), c_int(unit as i32)) };
-    }
-}
-
-unsafe impl DeviceNode for RgbdNode {
-    fn create_in_pipeline(pipeline: &Pipeline) -> Result<Self> {
-        let node = pipeline.create_node(NodeKind::Rgbd)?;
-        Ok(Self { node })
     }
 }
 

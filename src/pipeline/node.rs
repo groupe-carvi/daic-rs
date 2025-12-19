@@ -1,21 +1,11 @@
 use std::ffi::CString;
 use std::sync::Arc;
 
-use autocxx::c_int;
 use depthai_sys::{depthai, DaiNode};
 
 use crate::error::{clear_error_flag, last_error, Result};
 
 use super::PipelineInner;
-
-#[repr(i32)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum NodeKind {
-    Camera = 1,
-    StereoDepth = 2,
-    ImageAlign = 3,
-    Rgbd = 4,
-}
 
 #[derive(Clone)]
 pub struct Node {
@@ -87,13 +77,14 @@ impl Node {
     }
 }
 
-pub(crate) fn create_node(pipeline: Arc<PipelineInner>, kind: NodeKind) -> Result<Node> {
+pub(crate) fn create_node_by_name(pipeline: Arc<PipelineInner>, name: &str) -> Result<Node> {
     clear_error_flag();
+    let name_c = CString::new(name).map_err(|_| last_error("invalid node name"))?;
     let handle = unsafe {
-        depthai::dai_pipeline_create_node(pipeline.handle, c_int(kind as i32))
+        depthai::dai_pipeline_create_node_by_name(pipeline.handle, name_c.as_ptr())
     };
     if handle.is_null() {
-        Err(last_error("failed to create node"))
+        Err(last_error("failed to create node by name"))
     } else {
         Ok(Node::from_handle(pipeline, handle))
     }

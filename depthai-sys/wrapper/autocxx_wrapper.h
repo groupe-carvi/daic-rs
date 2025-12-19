@@ -10,3 +10,7 @@
 // so we can include it directly and avoid duplication.
 
 #include "wrapper.h"
+
+#ifdef __cplusplus
+#include "depthai/depthai.hpp"
+#endif
