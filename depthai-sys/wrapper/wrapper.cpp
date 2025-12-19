@@ -1,5 +1,7 @@
 #include "wrapper.h"
 #include "depthai/depthai.hpp"
+#include "depthai/pipeline/node/internal/XLinkIn.hpp"
+#include "depthai/pipeline/node/internal/XLinkOut.hpp"
 #include "depthai/build/version.hpp"
 #include "depthai/common/Point3fRGBA.hpp"
 #include "depthai/pipeline/datatype/PointCloudData.hpp"
@@ -350,6 +352,26 @@ static std::unordered_map<std::string, NodeCreator>& get_node_registry() {
         REGISTER_NODE(dai::node::IMU);
         REGISTER_NODE(dai::node::EdgeDetector);
         REGISTER_NODE(dai::node::Warp);
+        REGISTER_NODE(dai::node::AprilTag);
+        REGISTER_NODE(dai::node::DetectionParser);
+        REGISTER_NODE(dai::node::PointCloud);
+        REGISTER_NODE(dai::node::Sync);
+        REGISTER_NODE(dai::node::ToF);
+        REGISTER_NODE(dai::node::UVC);
+        REGISTER_NODE(dai::node::DetectionNetwork);
+        REGISTER_NODE(dai::node::SpatialDetectionNetwork);
+        REGISTER_NODE(dai::node::BenchmarkIn);
+        REGISTER_NODE(dai::node::BenchmarkOut);
+        REGISTER_NODE(dai::node::Rectification);
+        REGISTER_NODE(dai::node::MessageDemux);
+        REGISTER_NODE(dai::node::NeuralDepth);
+        REGISTER_NODE(dai::node::SPIIn);
+        REGISTER_NODE(dai::node::SPIOut);
+        REGISTER_NODE(dai::node::Thermal);
+
+        // XLink nodes are in internal namespace but we expose them as dai::node::XLinkIn/Out
+        registry["dai::node::XLinkIn"] = [](dai::Pipeline* p) { return p->create<dai::node::internal::XLinkIn>().get(); };
+        registry["dai::node::XLinkOut"] = [](dai::Pipeline* p) { return p->create<dai::node::internal::XLinkOut>().get(); };
     }
     return registry;
 }
