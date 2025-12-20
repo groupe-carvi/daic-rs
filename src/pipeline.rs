@@ -12,11 +12,16 @@ use crate::{
     camera::{CameraBoardSocket, CameraNode},
     device::Device,
     error::{clear_error_flag, last_error, Result},
+    host_node::{create_host_node, HostNode, HostNodeImpl},
+    threaded_host_node::{create_threaded_host_node, ThreadedHostNode, ThreadedHostNodeImpl},
 };
 
 pub(crate) struct PipelineInner {
     handle: DaiPipeline,
 }
+
+unsafe impl Send for PipelineInner {}
+unsafe impl Sync for PipelineInner {}
 
 impl Drop for PipelineInner {
     fn drop(&mut self) {
@@ -100,6 +105,19 @@ impl Pipeline {
     /// Create a native node by its C++ class name.
     pub fn create_node(&self, name: &str) -> Result<Node> {
         node::create_node_by_name(self.inner_arc(), name)
+    }
+
+    /// Create a custom host node implemented in Rust.
+    pub fn create_host_node<T: HostNodeImpl>(&self, node: T) -> Result<HostNode> {
+        create_host_node(self, node)
+    }
+
+    /// Create a custom threaded host node implemented in Rust.
+    pub fn create_threaded_host_node<T: ThreadedHostNodeImpl, F>(&self, init: F) -> Result<ThreadedHostNode>
+    where
+        F: FnOnce(&ThreadedHostNode) -> Result<T>,
+    {
+        create_threaded_host_node(self, init)
     }
 
     pub fn create_camera(&self, socket: CameraBoardSocket) -> Result<CameraNode> {

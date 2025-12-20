@@ -50,6 +50,13 @@ typedef void* DaiDataQueue;   // currently: `std::shared_ptr<dai::MessageQueue>*
 typedef void* DaiImgFrame;    // currently: `std::shared_ptr<dai::ImgFrame>*`
 typedef void* DaiPointCloud;  // currently: wrapper-owned view of `std::shared_ptr<dai::PointCloudData>`
 typedef void* DaiRGBDData;    // currently: `std::shared_ptr<dai::RGBDData>*`
+typedef void* DaiMessageGroup; // currently: `std::shared_ptr<dai::MessageGroup>*`
+typedef void* DaiBuffer;       // currently: `std::shared_ptr<dai::Buffer>*`
+
+// Host node callback types
+typedef DaiBuffer (*DaiHostNodeProcessGroup)(void* ctx, DaiMessageGroup group);
+typedef void (*DaiHostNodeCallback)(void* ctx);
+typedef void (*DaiThreadedHostNodeRun)(void* ctx);
 
 // POD view of `dai::Point3fRGBA`
 typedef struct DaiPoint3fRGBA {
@@ -74,6 +81,18 @@ API DaiPipeline dai_pipeline_new();
 API DaiPipeline dai_pipeline_new_with_device(DaiDevice device);
 API void dai_pipeline_delete(DaiPipeline pipeline);
 API bool dai_pipeline_start(DaiPipeline pipeline);
+API DaiNode dai_pipeline_create_host_node(DaiPipeline pipeline,
+                                          void* ctx,
+                                          DaiHostNodeProcessGroup process_cb,
+                                          DaiHostNodeCallback on_start_cb,
+                                          DaiHostNodeCallback on_stop_cb,
+                                          DaiHostNodeCallback drop_cb);
+API DaiNode dai_pipeline_create_threaded_host_node(DaiPipeline pipeline,
+                                                   void* ctx,
+                                                   DaiThreadedHostNodeRun run_cb,
+                                                   DaiHostNodeCallback on_start_cb,
+                                                   DaiHostNodeCallback on_stop_cb,
+                                                   DaiHostNodeCallback drop_cb);
 // Builder helpers (mirror native API: `pipeline.create<node::RGBD>()->build()`).
 API DaiNode dai_rgbd_build(DaiNode rgbd);
 
@@ -91,6 +110,24 @@ API bool dai_output_link(DaiOutput from, DaiNode to, const char* in_group, const
 API bool dai_output_link_input(DaiOutput from, DaiInput to);
 API bool dai_node_link(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name);
 API bool dai_node_unlink(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name);
+
+// Host node helpers
+API DaiInput dai_hostnode_get_input(DaiNode node, const char* name);
+API void dai_hostnode_run_sync_on_host(DaiNode node);
+API void dai_hostnode_run_sync_on_device(DaiNode node);
+API void dai_hostnode_send_processing_to_pipeline(DaiNode node, bool send);
+
+// Threaded host node helpers
+API DaiInput dai_threaded_hostnode_create_input(DaiNode node,
+                                                const char* name,
+                                                const char* group,
+                                                bool blocking,
+                                                int queue_size,
+                                                bool wait_for_message);
+API DaiOutput dai_threaded_hostnode_create_output(DaiNode node,
+                                                  const char* name,
+                                                  const char* group);
+API bool dai_threaded_node_is_running(DaiNode node);
 
 // Device helpers
 API int dai_device_get_platform(DaiDevice device);
@@ -168,6 +205,27 @@ API void dai_pointcloud_release(DaiPointCloud pcl);
 API DaiImgFrame dai_rgbd_get_rgb_frame(DaiRGBDData rgbd);
 API DaiImgFrame dai_rgbd_get_depth_frame(DaiRGBDData rgbd);
 API void dai_rgbd_release(DaiRGBDData rgbd);
+
+// Input queue helpers (host node)
+API DaiBuffer dai_input_get_buffer(DaiInput input);
+API DaiBuffer dai_input_try_get_buffer(DaiInput input);
+API DaiImgFrame dai_input_get_img_frame(DaiInput input);
+API DaiImgFrame dai_input_try_get_img_frame(DaiInput input);
+
+// Output send helpers (host node)
+API void dai_output_send_buffer(DaiOutput output, DaiBuffer buffer);
+API void dai_output_send_img_frame(DaiOutput output, DaiImgFrame frame);
+
+// MessageGroup helpers
+API DaiMessageGroup dai_message_group_clone(DaiMessageGroup group);
+API void dai_message_group_release(DaiMessageGroup group);
+API DaiBuffer dai_message_group_get_buffer(DaiMessageGroup group, const char* name);
+API DaiImgFrame dai_message_group_get_img_frame(DaiMessageGroup group, const char* name);
+
+// Buffer helpers
+API DaiBuffer dai_buffer_new(size_t size);
+API void dai_buffer_release(DaiBuffer buffer);
+API void dai_buffer_set_data(DaiBuffer buffer, const void* data, size_t len);
 
 // Low-level frame operations
 API void* dai_frame_get_data(DaiImgFrame frame);

@@ -149,6 +149,7 @@ fn expand_native_node(args: NativeNodeArgs, item_struct: ItemStruct) -> Result<T
     let input_methods = inputs.iter().map(|id| {
         let name = id.to_string();
         quote! {
+            #[allow(non_snake_case)]
             pub fn #id(&self) -> ::depthai::Result<::depthai::output::Input> {
                 self.as_node().input(#name)
             }
@@ -158,6 +159,7 @@ fn expand_native_node(args: NativeNodeArgs, item_struct: ItemStruct) -> Result<T
     let output_methods = outputs.iter().map(|id| {
         let name = id.to_string();
         quote! {
+            #[allow(non_snake_case)]
             pub fn #id(&self) -> ::depthai::Result<::depthai::output::Output> {
                 self.as_node().output(#name)
             }
@@ -204,6 +206,48 @@ pub fn depthai_composite(_args: TokenStream, item: TokenStream) -> TokenStream {
         impl ::depthai::pipeline::device_node::CreateInPipeline for #ty_ident {
             fn create(pipeline: &::depthai::pipeline::Pipeline) -> ::depthai::Result<Self> {
                 Self::new(pipeline)
+            }
+        }
+    };
+
+    expanded.into()
+}
+
+/// Attribute macro for defining Rust host nodes.
+///
+/// The annotated struct must implement a `process(&mut self, &MessageGroup) -> Option<Buffer>` method.
+#[proc_macro_attribute]
+pub fn depthai_host_node(_args: TokenStream, item: TokenStream) -> TokenStream {
+    let item_struct = parse_macro_input!(item as ItemStruct);
+    let ty_ident = item_struct.ident.clone();
+
+    let expanded = quote! {
+        #item_struct
+
+        impl ::depthai::host_node::HostNodeImpl for #ty_ident {
+            fn process_group(&mut self, group: &::depthai::host_node::MessageGroup) -> Option<::depthai::host_node::Buffer> {
+                self.process(group)
+            }
+        }
+    };
+
+    expanded.into()
+}
+
+/// Attribute macro for defining threaded host nodes in Rust.
+///
+/// The annotated struct must implement a `run(&mut self, ctx: &ThreadedHostNodeContext)` method.
+#[proc_macro_attribute]
+pub fn depthai_threaded_host_node(_args: TokenStream, item: TokenStream) -> TokenStream {
+    let item_struct = parse_macro_input!(item as ItemStruct);
+    let ty_ident = item_struct.ident.clone();
+
+    let expanded = quote! {
+        #item_struct
+
+        impl ::depthai::threaded_host_node::ThreadedHostNodeImpl for #ty_ident {
+            fn run(&mut self, ctx: &::depthai::threaded_host_node::ThreadedHostNodeContext) {
+                self.run(ctx)
             }
         }
     };

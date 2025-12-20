@@ -34,6 +34,8 @@ include_cpp! {
     generate!("dai::dai_pipeline_new")
     generate!("dai::dai_pipeline_delete")
     generate!("dai::dai_pipeline_start")
+    generate!("dai::dai_pipeline_create_host_node")
+    generate!("dai::dai_pipeline_create_threaded_host_node")
     generate!("dai::dai_rgbd_build")
     generate!("dai::dai_pipeline_create_camera")
 
@@ -45,6 +47,15 @@ include_cpp! {
     generate!("dai::dai_output_link_input")
     generate!("dai::dai_node_link")
     generate!("dai::dai_node_unlink")
+
+    // Host node helpers
+    generate!("dai::dai_hostnode_get_input")
+    generate!("dai::dai_hostnode_run_sync_on_host")
+    generate!("dai::dai_hostnode_run_sync_on_device")
+    generate!("dai::dai_hostnode_send_processing_to_pipeline")
+    generate!("dai::dai_threaded_hostnode_create_input")
+    generate!("dai::dai_threaded_hostnode_create_output")
+    generate!("dai::dai_threaded_node_is_running")
 
     // Device helpers
     generate!("dai::dai_device_get_platform")
@@ -116,6 +127,27 @@ include_cpp! {
     generate!("dai::dai_rgbd_get_depth_frame")
     generate!("dai::dai_rgbd_release")
 
+    // Input queue helpers
+    generate!("dai::dai_input_get_buffer")
+    generate!("dai::dai_input_try_get_buffer")
+    generate!("dai::dai_input_get_img_frame")
+    generate!("dai::dai_input_try_get_img_frame")
+
+    // Output send helpers
+    generate!("dai::dai_output_send_buffer")
+    generate!("dai::dai_output_send_img_frame")
+
+    // MessageGroup helpers
+    generate!("dai::dai_message_group_clone")
+    generate!("dai::dai_message_group_release")
+    generate!("dai::dai_message_group_get_buffer")
+    generate!("dai::dai_message_group_get_img_frame")
+
+    // Buffer helpers
+    generate!("dai::dai_buffer_new")
+    generate!("dai::dai_buffer_release")
+    generate!("dai::dai_buffer_set_data")
+
     // Utilities
     generate!("dai::dai_camera_socket_name")
     generate!("dai::dai_string_to_cstring")
@@ -131,16 +163,46 @@ include_cpp! {
 pub type DaiDevice = *mut autocxx::c_void;
 pub type DaiPipeline = *mut autocxx::c_void;
 pub type DaiNode = *mut autocxx::c_void;
-pub type DepthaiameraNode = *mut autocxx::c_void;
+pub type DaiCameraNode = *mut autocxx::c_void;
 pub type DaiOutput = *mut autocxx::c_void;
 pub type DaiInput = *mut autocxx::c_void;
 pub type DaiDataQueue = *mut autocxx::c_void;
 pub type DaiImgFrame = *mut autocxx::c_void;
 pub type DaiPointCloud = *mut autocxx::c_void;
 pub type DaiRGBDData = *mut autocxx::c_void;
+pub type DaiMessageGroup = *mut autocxx::c_void;
+pub type DaiBuffer = *mut autocxx::c_void;
 
 pub mod string_utils;
 
 // Re-export for convenience
 pub use ffi::*;
-pub use ffi::dai as depthai;
+
+pub mod depthai {
+    pub use crate::ffi::dai::*;
+
+    unsafe extern "C" {
+        pub fn dai_pipeline_create_host_node(
+            pipeline: super::DaiPipeline,
+            ctx: *mut std::ffi::c_void,
+            process_cb: Option<
+                unsafe extern "C" fn(
+                    ctx: *mut std::ffi::c_void,
+                    group: super::DaiMessageGroup,
+                ) -> super::DaiBuffer,
+            >,
+            on_start_cb: Option<unsafe extern "C" fn(ctx: *mut std::ffi::c_void)>,
+            on_stop_cb: Option<unsafe extern "C" fn(ctx: *mut std::ffi::c_void)>,
+            drop_cb: Option<unsafe extern "C" fn(ctx: *mut std::ffi::c_void)>,
+        ) -> super::DaiNode;
+
+        pub fn dai_pipeline_create_threaded_host_node(
+            pipeline: super::DaiPipeline,
+            ctx: *mut std::ffi::c_void,
+            run_cb: Option<unsafe extern "C" fn(ctx: *mut std::ffi::c_void)>,
+            on_start_cb: Option<unsafe extern "C" fn(ctx: *mut std::ffi::c_void)>,
+            on_stop_cb: Option<unsafe extern "C" fn(ctx: *mut std::ffi::c_void)>,
+            drop_cb: Option<unsafe extern "C" fn(ctx: *mut std::ffi::c_void)>,
+        ) -> super::DaiNode;
+    }
+}

@@ -13,6 +13,9 @@ pub struct Node {
     pub(crate) handle: DaiNode,
 }
 
+unsafe impl Send for Node {}
+unsafe impl Sync for Node {}
+
 impl Node {
     pub(crate) fn from_handle(pipeline: Arc<PipelineInner>, handle: DaiNode) -> Self {
         Self { pipeline, handle }

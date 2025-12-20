@@ -35,6 +35,14 @@ path = "examples/rgbd_rerun.rs"
 name = "camera"
 path = "examples/camera.rs"
 
+[[example]]
+name = "threaded_host_node"
+path = "examples/threaded_host_node.rs"
+
+[[example]]
+name = "host_node"
+path = "examples/host_node.rs"
+
 [workspace]
 resolver = "3"
 members = [

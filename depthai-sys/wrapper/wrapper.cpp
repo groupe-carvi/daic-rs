@@ -21,6 +21,95 @@
 // Global error storage
 static std::string last_error = "";
 
+namespace {
+struct HostNodeCallbacks {
+    dai::DaiHostNodeProcessGroup process = nullptr;
+    dai::DaiHostNodeCallback on_start = nullptr;
+    dai::DaiHostNodeCallback on_stop = nullptr;
+    dai::DaiHostNodeCallback drop = nullptr;
+};
+
+struct ThreadedHostNodeCallbacks {
+    dai::DaiThreadedHostNodeRun run = nullptr;
+    dai::DaiHostNodeCallback on_start = nullptr;
+    dai::DaiHostNodeCallback on_stop = nullptr;
+    dai::DaiHostNodeCallback drop = nullptr;
+};
+
+class RustHostNode : public dai::NodeCRTP<dai::node::HostNode, RustHostNode> {
+   public:
+    RustHostNode(HostNodeCallbacks callbacks, void* ctx) : callbacks(std::move(callbacks)), ctx(ctx) {}
+    ~RustHostNode() override {
+        if(callbacks.drop) {
+            callbacks.drop(ctx);
+        }
+    }
+
+    std::shared_ptr<dai::Buffer> processGroup(std::shared_ptr<dai::MessageGroup> in) override {
+        if(!callbacks.process) {
+            return nullptr;
+        }
+        auto group_handle = new std::shared_ptr<dai::MessageGroup>(in);
+        auto out_handle = callbacks.process(ctx, static_cast<dai::DaiMessageGroup>(group_handle));
+        if(!out_handle) {
+            return nullptr;
+        }
+        auto out_ptr = static_cast<std::shared_ptr<dai::Buffer>*>(out_handle);
+        std::shared_ptr<dai::Buffer> out = *out_ptr;
+        delete out_ptr;
+        return out;
+    }
+
+    void onStart() override {
+        if(callbacks.on_start) {
+            callbacks.on_start(ctx);
+        }
+    }
+
+    void onStop() override {
+        if(callbacks.on_stop) {
+            callbacks.on_stop(ctx);
+        }
+    }
+
+   private:
+    HostNodeCallbacks callbacks;
+    void* ctx = nullptr;
+};
+
+class RustThreadedHostNode : public dai::NodeCRTP<dai::node::ThreadedHostNode, RustThreadedHostNode> {
+   public:
+    RustThreadedHostNode(ThreadedHostNodeCallbacks callbacks, void* ctx) : callbacks(std::move(callbacks)), ctx(ctx) {}
+    ~RustThreadedHostNode() override {
+        if(callbacks.drop) {
+            callbacks.drop(ctx);
+        }
+    }
+
+    void run() override {
+        if(callbacks.run) {
+            callbacks.run(ctx);
+        }
+    }
+
+    void onStart() override {
+        if(callbacks.on_start) {
+            callbacks.on_start(ctx);
+        }
+    }
+
+    void onStop() override {
+        if(callbacks.on_stop) {
+            callbacks.on_stop(ctx);
+        }
+    }
+
+   private:
+    ThreadedHostNodeCallbacks callbacks;
+    void* ctx = nullptr;
+};
+}  // namespace
+
 // Device lifetime management
 //
 // DepthAI devices generally represent an exclusive connection. Creating multiple `dai::Device()`
@@ -299,6 +388,50 @@ bool dai_pipeline_start(DaiPipeline pipeline) {
     } catch (const std::exception& e) {
         last_error = std::string("dai_pipeline_start failed: ") + e.what();
         return false;
+    }
+}
+
+DaiNode dai_pipeline_create_host_node(DaiPipeline pipeline,
+                                      void* ctx,
+                                      DaiHostNodeProcessGroup process_cb,
+                                      DaiHostNodeCallback on_start_cb,
+                                      DaiHostNodeCallback on_stop_cb,
+                                      DaiHostNodeCallback drop_cb) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_create_host_node: null pipeline";
+        return nullptr;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        HostNodeCallbacks callbacks{process_cb, on_start_cb, on_stop_cb, drop_cb};
+        auto node = std::make_shared<RustHostNode>(std::move(callbacks), ctx);
+        pipe->add(node);
+        return static_cast<DaiNode>(node.get());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_create_host_node failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiNode dai_pipeline_create_threaded_host_node(DaiPipeline pipeline,
+                                               void* ctx,
+                                               DaiThreadedHostNodeRun run_cb,
+                                               DaiHostNodeCallback on_start_cb,
+                                               DaiHostNodeCallback on_stop_cb,
+                                               DaiHostNodeCallback drop_cb) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_create_threaded_host_node: null pipeline";
+        return nullptr;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        ThreadedHostNodeCallbacks callbacks{run_cb, on_start_cb, on_stop_cb, drop_cb};
+        auto node = std::make_shared<RustThreadedHostNode>(std::move(callbacks), ctx);
+        pipe->add(node);
+        return static_cast<DaiNode>(node.get());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_create_threaded_host_node failed: ") + e.what();
+        return nullptr;
     }
 }
 
@@ -861,6 +994,202 @@ void dai_rgbd_release(DaiRGBDData rgbd) {
     }
 }
 
+DaiMessageGroup dai_message_group_clone(DaiMessageGroup group) {
+    if(!group) {
+        last_error = "dai_message_group_clone: null group";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageGroup>*>(group);
+        return new std::shared_ptr<dai::MessageGroup>(*ptr);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_message_group_clone failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+void dai_message_group_release(DaiMessageGroup group) {
+    if(group) {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageGroup>*>(group);
+        delete ptr;
+    }
+}
+
+DaiBuffer dai_message_group_get_buffer(DaiMessageGroup group, const char* name) {
+    if(!group) {
+        last_error = "dai_message_group_get_buffer: null group";
+        return nullptr;
+    }
+    if(_dai_cstr_empty(name)) {
+        last_error = "dai_message_group_get_buffer: empty name";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageGroup>*>(group);
+        auto msg = (*ptr)->get(std::string(name));
+        if(!msg) return nullptr;
+        auto buf = std::dynamic_pointer_cast<dai::Buffer>(msg);
+        if(!buf) return nullptr;
+        return new std::shared_ptr<dai::Buffer>(buf);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_message_group_get_buffer failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiImgFrame dai_message_group_get_img_frame(DaiMessageGroup group, const char* name) {
+    if(!group) {
+        last_error = "dai_message_group_get_img_frame: null group";
+        return nullptr;
+    }
+    if(_dai_cstr_empty(name)) {
+        last_error = "dai_message_group_get_img_frame: empty name";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageGroup>*>(group);
+        auto msg = (*ptr)->get(std::string(name));
+        if(!msg) return nullptr;
+        auto frame = std::dynamic_pointer_cast<dai::ImgFrame>(msg);
+        if(!frame) return nullptr;
+        return new std::shared_ptr<dai::ImgFrame>(frame);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_message_group_get_img_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiBuffer dai_buffer_new(size_t size) {
+    try {
+        auto buf = std::make_shared<dai::Buffer>(size);
+        return new std::shared_ptr<dai::Buffer>(std::move(buf));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_buffer_new failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+void dai_buffer_release(DaiBuffer buffer) {
+    if(buffer) {
+        auto ptr = static_cast<std::shared_ptr<dai::Buffer>*>(buffer);
+        delete ptr;
+    }
+}
+
+void dai_buffer_set_data(DaiBuffer buffer, const void* data, size_t len) {
+    if(!buffer) {
+        last_error = "dai_buffer_set_data: null buffer";
+        return;
+    }
+    if(!data && len > 0) {
+        last_error = "dai_buffer_set_data: null data";
+        return;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::Buffer>*>(buffer);
+        std::vector<std::uint8_t> bytes;
+        bytes.resize(len);
+        if(len > 0) {
+            std::memcpy(bytes.data(), data, len);
+        }
+        (*ptr)->setData(std::move(bytes));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_buffer_set_data failed: ") + e.what();
+    }
+}
+
+DaiBuffer dai_input_get_buffer(DaiInput input) {
+    if(!input) {
+        last_error = "dai_input_get_buffer: null input";
+        return nullptr;
+    }
+    try {
+        auto in = static_cast<dai::Node::Input*>(input);
+        auto msg = in->get<dai::Buffer>();
+        if(!msg) return nullptr;
+        return new std::shared_ptr<dai::Buffer>(msg);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_input_get_buffer failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiBuffer dai_input_try_get_buffer(DaiInput input) {
+    if(!input) {
+        last_error = "dai_input_try_get_buffer: null input";
+        return nullptr;
+    }
+    try {
+        auto in = static_cast<dai::Node::Input*>(input);
+        auto msg = in->tryGet<dai::Buffer>();
+        if(!msg) return nullptr;
+        return new std::shared_ptr<dai::Buffer>(msg);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_input_try_get_buffer failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiImgFrame dai_input_get_img_frame(DaiInput input) {
+    if(!input) {
+        last_error = "dai_input_get_img_frame: null input";
+        return nullptr;
+    }
+    try {
+        auto in = static_cast<dai::Node::Input*>(input);
+        auto msg = in->get<dai::ImgFrame>();
+        if(!msg) return nullptr;
+        return new std::shared_ptr<dai::ImgFrame>(msg);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_input_get_img_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiImgFrame dai_input_try_get_img_frame(DaiInput input) {
+    if(!input) {
+        last_error = "dai_input_try_get_img_frame: null input";
+        return nullptr;
+    }
+    try {
+        auto in = static_cast<dai::Node::Input*>(input);
+        auto msg = in->tryGet<dai::ImgFrame>();
+        if(!msg) return nullptr;
+        return new std::shared_ptr<dai::ImgFrame>(msg);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_input_try_get_img_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+void dai_output_send_buffer(DaiOutput output, DaiBuffer buffer) {
+    if(!output || !buffer) {
+        last_error = "dai_output_send_buffer: null output/buffer";
+        return;
+    }
+    try {
+        auto out = static_cast<dai::Node::Output*>(output);
+        auto buf = static_cast<std::shared_ptr<dai::Buffer>*>(buffer);
+        out->send(*buf);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_output_send_buffer failed: ") + e.what();
+    }
+}
+
+void dai_output_send_img_frame(DaiOutput output, DaiImgFrame frame) {
+    if(!output || !frame) {
+        last_error = "dai_output_send_img_frame: null output/frame";
+        return;
+    }
+    try {
+        auto out = static_cast<dai::Node::Output*>(output);
+        auto img = static_cast<std::shared_ptr<dai::ImgFrame>*>(frame);
+        out->send(*img);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_output_send_img_frame failed: ") + e.what();
+    }
+}
+
 static inline std::string _dai_opt_cstr(const char* s) {
     return s ? std::string(s) : std::string();
 }
@@ -1110,6 +1439,169 @@ bool dai_node_unlink(DaiNode from, const char* out_group, const char* out_name, 
         return true;
     } catch (const std::exception& e) {
         last_error = std::string("dai_node_unlink failed: ") + e.what();
+        return false;
+    }
+}
+
+DaiInput dai_hostnode_get_input(DaiNode node, const char* name) {
+    if(!node) {
+        last_error = "dai_hostnode_get_input: null node";
+        return nullptr;
+    }
+    if(_dai_cstr_empty(name)) {
+        last_error = "dai_hostnode_get_input: empty name";
+        return nullptr;
+    }
+    try {
+        auto host = dynamic_cast<dai::node::HostNode*>(static_cast<dai::Node*>(node));
+        if(!host) {
+            last_error = "dai_hostnode_get_input: node is not a HostNode";
+            return nullptr;
+        }
+        auto& input = host->inputs[std::string(name)];
+        return static_cast<DaiInput>(&input);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_hostnode_get_input failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+void dai_hostnode_run_sync_on_host(DaiNode node) {
+    if(!node) {
+        last_error = "dai_hostnode_run_sync_on_host: null node";
+        return;
+    }
+    try {
+        auto host = dynamic_cast<dai::node::HostNode*>(static_cast<dai::Node*>(node));
+        if(!host) {
+            last_error = "dai_hostnode_run_sync_on_host: node is not a HostNode";
+            return;
+        }
+        host->runSyncingOnHost();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_hostnode_run_sync_on_host failed: ") + e.what();
+    }
+}
+
+void dai_hostnode_run_sync_on_device(DaiNode node) {
+    if(!node) {
+        last_error = "dai_hostnode_run_sync_on_device: null node";
+        return;
+    }
+    try {
+        auto host = dynamic_cast<dai::node::HostNode*>(static_cast<dai::Node*>(node));
+        if(!host) {
+            last_error = "dai_hostnode_run_sync_on_device: node is not a HostNode";
+            return;
+        }
+        host->runSyncingOnDevice();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_hostnode_run_sync_on_device failed: ") + e.what();
+    }
+}
+
+void dai_hostnode_send_processing_to_pipeline(DaiNode node, bool send) {
+    if(!node) {
+        last_error = "dai_hostnode_send_processing_to_pipeline: null node";
+        return;
+    }
+    try {
+        auto host = dynamic_cast<dai::node::HostNode*>(static_cast<dai::Node*>(node));
+        if(!host) {
+            last_error = "dai_hostnode_send_processing_to_pipeline: node is not a HostNode";
+            return;
+        }
+        host->sendProcessingToPipeline(send);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_hostnode_send_processing_to_pipeline failed: ") + e.what();
+    }
+}
+
+static inline bool _dai_assign_input_desc(dai::Node::InputDescription& desc,
+                                          const char* name,
+                                          const char* group) {
+    if(name && *name) {
+        desc.name = std::string(name);
+    }
+    if(group && *group) {
+        desc.group = std::string(group);
+    }
+    return true;
+}
+
+DaiInput dai_threaded_hostnode_create_input(DaiNode node,
+                                            const char* name,
+                                            const char* group,
+                                            bool blocking,
+                                            int queue_size,
+                                            bool wait_for_message) {
+    if(!node) {
+        last_error = "dai_threaded_hostnode_create_input: null node";
+        return nullptr;
+    }
+    try {
+        auto host = dynamic_cast<dai::node::ThreadedHostNode*>(static_cast<dai::Node*>(node));
+        if(!host) {
+            last_error = "dai_threaded_hostnode_create_input: node is not a ThreadedHostNode";
+            return nullptr;
+        }
+        dai::Node::InputDescription desc;
+        _dai_assign_input_desc(desc, name, group);
+        desc.blocking = blocking;
+        if(queue_size > 0) {
+            desc.queueSize = queue_size;
+        }
+        desc.waitForMessage = wait_for_message;
+        auto* input = new dai::Node::Input(*host, desc, true);
+        return static_cast<DaiInput>(input);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_threaded_hostnode_create_input failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiOutput dai_threaded_hostnode_create_output(DaiNode node,
+                                              const char* name,
+                                              const char* group) {
+    if(!node) {
+        last_error = "dai_threaded_hostnode_create_output: null node";
+        return nullptr;
+    }
+    try {
+        auto host = dynamic_cast<dai::node::ThreadedHostNode*>(static_cast<dai::Node*>(node));
+        if(!host) {
+            last_error = "dai_threaded_hostnode_create_output: node is not a ThreadedHostNode";
+            return nullptr;
+        }
+        dai::Node::OutputDescription desc;
+        if(name && *name) {
+            desc.name = std::string(name);
+        }
+        if(group && *group) {
+            desc.group = std::string(group);
+        }
+        auto* output = new dai::Node::Output(*host, desc, true);
+        return static_cast<DaiOutput>(output);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_threaded_hostnode_create_output failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_threaded_node_is_running(DaiNode node) {
+    if(!node) {
+        last_error = "dai_threaded_node_is_running: null node";
+        return false;
+    }
+    try {
+        auto threaded = dynamic_cast<dai::ThreadedNode*>(static_cast<dai::Node*>(node));
+        if(!threaded) {
+            last_error = "dai_threaded_node_is_running: node is not a ThreadedNode";
+            return false;
+        }
+        return threaded->isRunning();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_threaded_node_is_running failed: ") + e.what();
         return false;
     }
 }

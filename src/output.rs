@@ -4,8 +4,9 @@ use std::sync::Arc;
 use autocxx::c_uint;
 use depthai_sys::{depthai, DaiOutput, DaiInput};
 
-use crate::camera::OutputQueue;
+use crate::camera::{ImageFrame, OutputQueue};
 use crate::error::{clear_error_flag, last_error, Result};
+use crate::host_node::Buffer;
 use crate::pipeline::{Node, PipelineInner};
 
 #[derive(Clone)]
@@ -14,11 +15,17 @@ pub struct Output {
     pub(crate) handle: DaiOutput,
 }
 
+unsafe impl Send for Output {}
+unsafe impl Sync for Output {}
+
 #[derive(Clone)]
 pub struct Input {
     pub(crate) pipeline: Arc<PipelineInner>,
     pub(crate) handle: DaiInput,
 }
+
+unsafe impl Send for Input {}
+unsafe impl Sync for Input {}
 
 impl Output {
     pub(crate) fn from_handle(pipeline: Arc<PipelineInner>, handle: DaiOutput) -> Self {
@@ -69,11 +76,79 @@ impl Output {
             Ok(OutputQueue::from_handle(handle))
         }
     }
+
+    pub fn send_buffer(&self, buffer: &Buffer) -> Result<()> {
+        clear_error_flag();
+        unsafe { depthai::dai_output_send_buffer(self.handle, buffer.handle()) };
+        if let Some(err) = crate::error::take_error_if_any("failed to send buffer") {
+            Err(err)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn send_frame(&self, frame: &ImageFrame) -> Result<()> {
+        clear_error_flag();
+        unsafe { depthai::dai_output_send_img_frame(self.handle, frame.handle()) };
+        if let Some(err) = crate::error::take_error_if_any("failed to send frame") {
+            Err(err)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl Input {
     pub(crate) fn from_handle(pipeline: Arc<PipelineInner>, handle: DaiInput) -> Self {
         Self { pipeline, handle }
+    }
+
+    pub fn get_buffer(&self) -> Result<Buffer> {
+        clear_error_flag();
+        let handle = unsafe { depthai::dai_input_get_buffer(self.handle) };
+        if handle.is_null() {
+            Err(last_error("failed to get buffer from input"))
+        } else {
+            Ok(Buffer::from_handle(handle))
+        }
+    }
+
+    pub fn try_get_buffer(&self) -> Result<Option<Buffer>> {
+        clear_error_flag();
+        let handle = unsafe { depthai::dai_input_try_get_buffer(self.handle) };
+        if handle.is_null() {
+            if let Some(err) = crate::error::take_error_if_any("failed to poll buffer from input") {
+                Err(err)
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(Some(Buffer::from_handle(handle)))
+        }
+    }
+
+    pub fn get_frame(&self) -> Result<ImageFrame> {
+        clear_error_flag();
+        let handle = unsafe { depthai::dai_input_get_img_frame(self.handle) };
+        if handle.is_null() {
+            Err(last_error("failed to get frame from input"))
+        } else {
+            Ok(ImageFrame::from_handle(handle))
+        }
+    }
+
+    pub fn try_get_frame(&self) -> Result<Option<ImageFrame>> {
+        clear_error_flag();
+        let handle = unsafe { depthai::dai_input_try_get_img_frame(self.handle) };
+        if handle.is_null() {
+            if let Some(err) = crate::error::take_error_if_any("failed to poll frame from input") {
+                Err(err)
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(Some(ImageFrame::from_handle(handle)))
+        }
     }
 }
 
