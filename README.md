@@ -85,11 +85,11 @@ winget install -e --id LLVM.LLVM
 
 ### Default features
 
-- `rerun`: Enables Rerun visualization support with `RerunHostNode`. Adds Tokio runtime and web viewer dependencies
+- `rerun`: Enables Rerun visualization support with `RerunHostNode`. Adds Tokio runtime and web viewer dependencies.
 
 ### Optional features
 
-- `hit`: Hardware Integration Tests - enable with `cargo test --features hit` when you have a physical device connected
+- `hit`: Hardware Integration Tests - enable with `cargo test --features hit` when you have a physical device connected.
 
 To build without the rerun feature:
 
@@ -245,9 +245,10 @@ let cameras = device.connected_cameras()?;
 // Control IR laser dot projector (on supported devices)
 device.set_ir_laser_dot_projector_intensity(0.3)?;
 
-// Check if device is still connected before sending commands
+// Check if device is still connected
 if device.is_connected() {
-    // Safe to use device
+    // Device is still connected, but note that it could disconnect between
+    // this check and any subsequent operations, so always handle errors.
 }
 ```
 
