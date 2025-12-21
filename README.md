@@ -81,6 +81,22 @@ Example (PowerShell):
 winget install -e --id LLVM.LLVM
 ```
 
+## Features
+
+### Default features
+
+- `rerun`: Enables Rerun visualization support with `RerunHostNode`. Adds Tokio runtime and web viewer dependencies.
+
+### Optional features
+
+- `hit`: Hardware Integration Tests - enable with `cargo test --features hit` when you have a physical device connected.
+
+To build without the rerun feature:
+
+```bash
+cargo build --no-default-features
+```
+
 ## Build
 
 From the repo root:
@@ -97,9 +113,18 @@ Notes:
 ## Run examples
 
 ```bash
+# Basic examples
 cargo run --example pipeline_creation
 cargo run --example camera
-cargo run --example camera_output
+cargo run --example composite_node
+
+# Host node examples
+cargo run --example host_node
+cargo run --example threaded_host_node
+
+# Rerun visualization examples (requires rerun feature)
+cargo run --example rerun_host_node --features rerun
+cargo run --example rgbd_rerun --features rerun
 ```
 
 ## DepthAI feature support
@@ -115,12 +140,12 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 |---|---|:---:|---|
 | `AprilTags` | `AprilTag`, `Camera`, `ImageManip`, `ThreadedHostNode` |  |  |
 | `Benchmark` | `BenchmarkIn`, `BenchmarkOut`, `Camera`, `NeuralNetwork` |  |  |
-| `Camera` |  `Camera`, `ImageManip`, `Script` | ✅ | `examples/camera.rs`, `examples/camera_output.rs` |
+| `Camera` |  `Camera`, `ImageManip`, `Script` | ✅ | `examples/camera.rs`, `examples/host_node.rs`, `examples/threaded_host_node.rs`, `examples/rerun_host_node.rs`, `examples/rgbd_rerun.rs`, `examples/composite_node.rs` |
 | `DetectionNetwork` | `Camera`, `DetectionNetwork`, `ReplayVideo`, `StereoDepth` |  |  |
 | `DynamicCalibration` | `Camera`, `DynamicCalibration`, `StereoDepth` |  |  |
 | `Events` | `Camera`, `DetectionNetwork` |  |  |
 | `FeatureTracker` | `Camera`, `FeatureTracker`, `ImageManip` |  |  |
-| `HostNodes` | `Camera`, `CustomNode`, `CustomThreadedNode`, `Display`, `HostCamera`, `HostNode`, `ImageManip`, `ReplayVideo` |  |  |
+| `HostNodes` | `Camera`, `CustomNode`, `CustomThreadedNode`, `Display`, `HostCamera`, `HostNode`, `ImageManip`, `ReplayVideo` | ✅ | `examples/host_node.rs`, `examples/threaded_host_node.rs`, `examples/rerun_host_node.rs` |
 | `IMU` | `IMU` |  |  |
 | `ImageAlign` | `Camera`, `ImageAlign`, `StereoDepth`, `Sync` | ✅ | `examples/rgbd_rerun.rs` |
 | `ImageManip` | `Camera`, `Display`, `ImageManip` |  |  |
@@ -159,15 +184,15 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 | `BenchmarkIn` | `Benchmark` |  |
 | `BenchmarkOut` | `Benchmark` |  |
 | `Camera` | `AprilTags`, `Benchmark`, `Camera`, `DetectionNetwork`, `DynamicCalibration`, `Events`, … (+25) | ✅ |
-| `CustomNode` | `HostNodes`, `VideoEncoder` |  |
-| `CustomThreadedNode` | `HostNodes` |  |
+| `CustomNode` | `HostNodes`, `VideoEncoder` | ✅ |
+| `CustomThreadedNode` | `HostNodes` | ✅ |
 | `DetectionNetwork` | `DetectionNetwork`, `Events`, `ObjectTracker`, `RVC2/NNArchive`, `RVC2/Thermal`, `Visualizer` |  |
 | `Display` | `HostNodes`, `ImageManip`, `RecordReplay` |  |
 | `DynamicCalibration` | `DynamicCalibration` |  |
 | `EdgeDetector` | `RVC2/EdgeDetector` |  |
 | `FeatureTracker` | `FeatureTracker`, `RVC2/VSLAM` |  |
 | `HostCamera` | `HostNodes` |  |
-| `HostNode` | `HostNodes`, `SpatialDetectionNetwork`, `Visualizer` |  |
+| `HostNode` | `HostNodes`, `SpatialDetectionNetwork`, `Visualizer` | ✅ |
 | `IMU` | `IMU`, `RVC2/VSLAM`, `RecordReplay` |  |
 | `ImageAlign` | `ImageAlign`, `NeuralDepth`, `RGBD`, `RVC2/ImageAlign`, `RVC2/Thermal`, `RVC2/ToF` | ✅ |
 | `ImageManip` | `AprilTags`, `Camera`, `FeatureTracker`, `HostNodes`, `ImageManip` |  |
@@ -188,33 +213,11 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 | `Sync` | `ImageAlign`, `NeuralDepth`, `RVC2/ImageAlign`, `RVC2/Thermal`, `RVC2/ToF`, `Sync` |  |
 | `SystemLogger` | `RVC2/SystemLogger` |  |
 | `Thermal` | `RVC2/Thermal` |  |
-| `ThreadedHostNode` | `AprilTags`, `RGBD` |  |
+| `ThreadedHostNode` | `AprilTags`, `RGBD` | ✅ |
 | `ToF` | `RVC2/ToF` |  |
 | `VideoEncoder` | `RecordReplay`, `VideoEncoder`, `Visualizer` |  |
 | `Warp` | `Warp` |  |
 <!-- END depthai-node-matrix -->
-
-## API overview
-
-### Device ownership
-
-DepthAI device connections are typically exclusive. `depthai-rs` mirrors the common C++ pattern of sharing one device connection:
-
-- `Device::new()` opens/returns a device handle.
-- `Device::clone()` / `Device::try_clone()` creates another handle to the same underlying connection.
-- `Pipeline::with_device(&device)` binds a pipeline to an existing device connection (recommended).
-- `Pipeline::start_default()` starts the pipeline using its internally-held device.
-
-### Generic node linking
-
-The generic node API supports linking by explicit port names *or* by choosing a compatible default when you omit port names.
-For example, `StereoDepth` expects inputs named `"left"` and `"right"`:
-
-```rust
-let stereo = pipeline.create_node("dai::node::StereoDepth")?;
-left_camera.as_node().link(None, None, &stereo, None, Some("left"))?;
-right_camera.as_node().link(None, None, &stereo, None, Some("right"))?;
-```
 
 ## Environment variables (advanced)
 
