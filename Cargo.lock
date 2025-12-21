@@ -1419,6 +1419,7 @@ dependencies = [
  "re_web_viewer_server",
  "rerun",
  "serde",
+ "serde_json",
  "tokio",
 ]
 

@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use depthai_sys::{depthai, DaiNode};
 
-use crate::error::{clear_error_flag, last_error, Result};
+use crate::error::{clear_error_flag, last_error, take_error_if_any, Result};
 
 use super::PipelineInner;
 
@@ -23,6 +23,52 @@ impl Node {
 
     pub fn handle(&self) -> DaiNode {
         self.handle
+    }
+
+    fn take_owned_string(ptr: *mut std::ffi::c_char, context: &str) -> Result<String> {
+        if ptr.is_null() {
+            return Err(last_error(context));
+        }
+        let s = unsafe { std::ffi::CStr::from_ptr(ptr).to_string_lossy().into_owned() };
+        unsafe { depthai::dai_free_cstring(ptr) };
+        Ok(s)
+    }
+
+    /// Returns the node id assigned by the pipeline.
+    pub fn id(&self) -> Result<i32> {
+        clear_error_flag();
+        let id = unsafe { depthai::dai_node_get_id(self.handle) };
+        if let Some(e) = take_error_if_any("failed to get node id") {
+            Err(e)
+        } else {
+            Ok(i32::from(id))
+        }
+    }
+
+    /// Returns the node alias (user-defined label).
+    pub fn alias(&self) -> Result<String> {
+        clear_error_flag();
+        let ptr = unsafe { depthai::dai_node_get_alias(self.handle) };
+        Self::take_owned_string(ptr, "failed to get node alias")
+    }
+
+    /// Sets the node alias (user-defined label).
+    pub fn set_alias(&self, alias: &str) -> Result<()> {
+        clear_error_flag();
+        let c = CString::new(alias).map_err(|_| last_error("invalid alias"))?;
+        let ok = unsafe { depthai::dai_node_set_alias(self.handle, c.as_ptr()) };
+        if ok {
+            Ok(())
+        } else {
+            Err(last_error("failed to set node alias"))
+        }
+    }
+
+    /// Returns the node type name (C++ node class name constant in DepthAI).
+    pub fn name(&self) -> Result<String> {
+        clear_error_flag();
+        let ptr = unsafe { depthai::dai_node_get_name(self.handle) };
+        Self::take_owned_string(ptr, "failed to get node name")
     }
 
     pub fn link(

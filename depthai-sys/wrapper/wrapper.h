@@ -78,9 +78,64 @@ API void dai_device_close(DaiDevice device);
 
 // Low-level pipeline operations  
 API DaiPipeline dai_pipeline_new();
+API DaiPipeline dai_pipeline_new_ex(bool create_implicit_device);
 API DaiPipeline dai_pipeline_new_with_device(DaiDevice device);
 API void dai_pipeline_delete(DaiPipeline pipeline);
 API bool dai_pipeline_start(DaiPipeline pipeline);
+
+// Pipeline lifecycle / status
+API bool dai_pipeline_is_running(DaiPipeline pipeline);
+API bool dai_pipeline_is_built(DaiPipeline pipeline);
+API bool dai_pipeline_build(DaiPipeline pipeline);
+API bool dai_pipeline_wait(DaiPipeline pipeline);
+API bool dai_pipeline_stop(DaiPipeline pipeline);
+API bool dai_pipeline_run(DaiPipeline pipeline);
+API bool dai_pipeline_process_tasks(DaiPipeline pipeline, bool wait_for_tasks, double timeout_seconds);
+
+// Pipeline configuration
+API bool dai_pipeline_set_xlink_chunk_size(DaiPipeline pipeline, int size_bytes);
+API bool dai_pipeline_set_sipp_buffer_size(DaiPipeline pipeline, int size_bytes);
+API bool dai_pipeline_set_sipp_dma_buffer_size(DaiPipeline pipeline, int size_bytes);
+API bool dai_pipeline_set_camera_tuning_blob_path(DaiPipeline pipeline, const char* path);
+API bool dai_pipeline_set_openvino_version(DaiPipeline pipeline, int version);
+
+// Pipeline serialization / introspection
+// Returned strings must be freed with dai_free_cstring.
+API char* dai_pipeline_serialize_to_json(DaiPipeline pipeline, bool include_assets);
+API char* dai_pipeline_get_schema_json(DaiPipeline pipeline, int serialization_type);
+
+// Node/connection graph introspection helpers (JSON)
+// Returned strings must be freed with dai_free_cstring.
+API char* dai_pipeline_get_all_nodes_json(DaiPipeline pipeline);
+API char* dai_pipeline_get_source_nodes_json(DaiPipeline pipeline);
+API DaiNode dai_pipeline_get_node_by_id(DaiPipeline pipeline, int id);
+API bool dai_pipeline_remove_node(DaiPipeline pipeline, DaiNode node);
+API char* dai_pipeline_get_connections_json(DaiPipeline pipeline);
+API char* dai_pipeline_get_connection_map_json(DaiPipeline pipeline);
+
+// Calibration data helpers (JSON)
+// Returned strings must be freed with dai_free_cstring.
+API bool dai_pipeline_is_calibration_data_available(DaiPipeline pipeline);
+API char* dai_pipeline_get_calibration_data_json(DaiPipeline pipeline);
+API bool dai_pipeline_set_calibration_data_json(DaiPipeline pipeline, const char* eeprom_data_json);
+
+// Pipeline configuration via JSON (portable ABI, avoids binding large struct graphs).
+// Returned strings must be freed with dai_free_cstring.
+API char* dai_pipeline_get_global_properties_json(DaiPipeline pipeline);
+API bool dai_pipeline_set_global_properties_json(DaiPipeline pipeline, const char* json);
+
+API char* dai_pipeline_get_board_config_json(DaiPipeline pipeline);
+API bool dai_pipeline_set_board_config_json(DaiPipeline pipeline, const char* json);
+
+API char* dai_pipeline_get_device_config_json(DaiPipeline pipeline);
+
+API char* dai_pipeline_get_eeprom_data_json(DaiPipeline pipeline);
+API bool dai_pipeline_set_eeprom_data_json(DaiPipeline pipeline, const char* json);
+API uint32_t dai_pipeline_get_eeprom_id(DaiPipeline pipeline);
+
+// Record / Replay
+API bool dai_pipeline_enable_holistic_record_json(DaiPipeline pipeline, const char* record_config_json);
+API bool dai_pipeline_enable_holistic_replay(DaiPipeline pipeline, const char* path_to_recording);
 API DaiNode dai_pipeline_create_host_node(DaiPipeline pipeline,
                                           void* ctx,
                                           DaiHostNodeProcessGroup process_cb,
@@ -106,6 +161,12 @@ API DaiNode dai_pipeline_create_node_by_name(DaiPipeline pipeline, const char* n
 // Output/Input helpers
 API DaiOutput dai_node_get_output(DaiNode node, const char* group, const char* name);
 API DaiInput dai_node_get_input(DaiNode node, const char* group, const char* name);
+// Node introspection
+// Returned strings must be freed with dai_free_cstring.
+API int dai_node_get_id(DaiNode node);
+API char* dai_node_get_alias(DaiNode node);
+API bool dai_node_set_alias(DaiNode node, const char* alias);
+API char* dai_node_get_name(DaiNode node);
 API bool dai_output_link(DaiOutput from, DaiNode to, const char* in_group, const char* in_name);
 API bool dai_output_link_input(DaiOutput from, DaiInput to);
 API bool dai_node_link(DaiNode from, const char* out_group, const char* out_name, DaiNode to, const char* in_group, const char* in_name);

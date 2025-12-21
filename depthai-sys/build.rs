@@ -72,6 +72,7 @@ fn main() {
     println!("cargo:rerun-if-env-changed=DEPTHAI_OPENCV_SUPPORT");
     println!("cargo:rerun-if-env-changed=DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT");
     println!("cargo:rerun-if-env-changed=DEPTHAI_ENABLE_EVENTS_MANAGER");
+    println!("cargo:rerun-if-env-changed=DEPTHAI_RPATH_DISABLE");
     println_build!("Checking for depthai-core...");
 
     let depthai_core_lib = resolve_depthai_core_lib().expect("Failed to resolve depthai-core path");
@@ -163,6 +164,14 @@ fn main() {
             // next to the produced executables instead.
         }
     } else {
+        // Ensure downstream binaries can resolve staged .so files when this crate is used as a
+        // dependency. Linux does NOT search the executable directory by default.
+        if env::var("DEPTHAI_RPATH_DISABLE").ok().as_deref() != Some("1") {
+            // Use $ORIGIN so binaries in target/<profile>/{deps,examples} can find the .so files
+            // we copy next to them.
+            println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
+        }
+
         match depthai_core_lib.extension().and_then(|e| e.to_str()) {
             Some("so") => {
                 let lib_name = "libdepthai-core.so";
@@ -181,6 +190,17 @@ fn main() {
                     fs::copy(&depthai_core_lib, &dest_examples)
                         .expect("Failed to copy depthai-core to examples dir");
                 }
+
+                // depthai-core may depend on libdynamic_calibration.so (when enabled in the core build).
+                // If present, stage it next to produced executables so runtime loading works out of the box.
+                if let Some(dcl) = find_dynamic_calibration_so() {
+                    copy_so_to_run_dirs(&dcl, target_dir, &deps_dir, &examples_dir);
+                } else {
+                    println_build!(
+                        "Note: libdynamic_calibration.so not found in build tree; if your depthai-core build requires it, runtime loading may fail"
+                    );
+                }
+
                 println_build!(
                     "Depthai-core library copied to: {} and {} and {}",
                     target_dir.to_string_lossy(),
@@ -198,6 +218,72 @@ fn main() {
 
         println_build!("Linux build configuration complete.");
     }
+}
+
+fn copy_so_to_run_dirs(src: &Path, target_dir: &Path, deps_dir: &Path, examples_dir: &Path) {
+    let so_name = match src.file_name().and_then(|n| n.to_str()) {
+        Some(n) => n,
+        None => return,
+    };
+
+    for dest_dir in [target_dir, deps_dir, examples_dir] {
+        let dest = dest_dir.join(so_name);
+        if let Err(e) = fs::copy(src, &dest) {
+            println_build!(
+                "Warning: failed to copy {} to {}: {}",
+                so_name,
+                dest.display(),
+                e
+            );
+        }
+    }
+}
+
+fn find_dynamic_calibration_so() -> Option<PathBuf> {
+    let needle = "libdynamic_calibration.so";
+
+    let candidates = [
+        BUILD_FOLDER_PATH
+            .join("_deps")
+            .join("dynamic_calibration-src")
+            .join("lib")
+            .join(needle),
+        BUILD_FOLDER_PATH
+            .join("_deps")
+            .join("dynamic_calibration-build")
+            .join(needle),
+        get_depthai_core_root().join("lib").join(needle),
+        get_depthai_core_root().join("bin").join(needle),
+    ];
+
+    for c in candidates {
+        if c.exists() {
+            println_build!("Found dynamic calibration runtime at: {}", c.display());
+            return Some(c);
+        }
+    }
+
+    // Fallback: search in the depthai build tree.
+    let search_root = BUILD_FOLDER_PATH.join("_deps");
+    if search_root.exists() {
+        for entry in WalkDir::new(&search_root)
+            .follow_links(false)
+            .max_depth(8)
+            .into_iter()
+            .filter_map(Result::ok)
+        {
+            if !entry.file_type().is_file() {
+                continue;
+            }
+            if entry.file_name() == needle {
+                let p = entry.into_path();
+                println_build!("Found dynamic calibration runtime at: {}", p.display());
+                return Some(p);
+            }
+        }
+    }
+
+    None
 }
 
 fn ensure_libclang_path_for_windows() {

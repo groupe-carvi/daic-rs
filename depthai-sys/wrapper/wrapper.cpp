@@ -320,15 +320,22 @@ void dai_device_close(DaiDevice device) {
 DaiPipeline dai_pipeline_new() {
     try {
         dai_clear_last_error();
-        // Use the constructor that doesn't require a device.
-        // dai::Pipeline() in C++ is just a graph container.
-        // printf("DEBUG: Creating dai::Pipeline...\n");
         auto pipeline = new dai::Pipeline();
-        // printf("DEBUG: dai::Pipeline created at %p\n", pipeline);
         return static_cast<DaiPipeline>(pipeline);
     } catch (const std::exception& e) {
         // printf("DEBUG: dai::Pipeline creation failed: %s\n", e.what());
         last_error = std::string("dai_pipeline_new failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiPipeline dai_pipeline_new_ex(bool create_implicit_device) {
+    try {
+        dai_clear_last_error();
+        auto pipeline = new dai::Pipeline(create_implicit_device);
+        return static_cast<DaiPipeline>(pipeline);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_new_ex failed: ") + e.what();
         return nullptr;
     }
 }
@@ -387,6 +394,677 @@ bool dai_pipeline_start(DaiPipeline pipeline) {
         return true;
     } catch (const std::exception& e) {
         last_error = std::string("dai_pipeline_start failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_is_running(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_is_running: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        return pipe->isRunning();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_is_running failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_is_built(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_is_built: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        return pipe->isBuilt();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_is_built failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_build(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_build: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->build();
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_build failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_wait(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_wait: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->wait();
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_wait failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_stop(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_stop: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->stop();
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_stop failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_run(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_run: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->run();
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_run failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_process_tasks(DaiPipeline pipeline, bool wait_for_tasks, double timeout_seconds) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_process_tasks: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->processTasks(wait_for_tasks, timeout_seconds);
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_process_tasks failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_set_xlink_chunk_size(DaiPipeline pipeline, int size_bytes) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_set_xlink_chunk_size: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->setXLinkChunkSize(size_bytes);
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_set_xlink_chunk_size failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_set_sipp_buffer_size(DaiPipeline pipeline, int size_bytes) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_set_sipp_buffer_size: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->setSippBufferSize(size_bytes);
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_set_sipp_buffer_size failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_set_sipp_dma_buffer_size(DaiPipeline pipeline, int size_bytes) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_set_sipp_dma_buffer_size: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->setSippDmaBufferSize(size_bytes);
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_set_sipp_dma_buffer_size failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_set_camera_tuning_blob_path(DaiPipeline pipeline, const char* path) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_set_camera_tuning_blob_path: null pipeline";
+        return false;
+    }
+    if(!path) {
+        last_error = "dai_pipeline_set_camera_tuning_blob_path: null path";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        // Interpret input as UTF-8.
+        pipe->setCameraTuningBlobPath(std::filesystem::u8path(path));
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_set_camera_tuning_blob_path failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_set_openvino_version(DaiPipeline pipeline, int version) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_set_openvino_version: null pipeline";
+        return false;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->setOpenVINOVersion(static_cast<dai::OpenVINO::Version>(version));
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_set_openvino_version failed: ") + e.what();
+        return false;
+    }
+}
+
+char* dai_pipeline_serialize_to_json(DaiPipeline pipeline, bool include_assets) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_serialize_to_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto j = pipe->serializeToJson(include_assets);
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_serialize_to_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+char* dai_pipeline_get_schema_json(DaiPipeline pipeline, int serialization_type) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_schema_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        // We expose schema as JSON regardless of requested serialization type.
+        auto schema = pipe->getPipelineSchema(static_cast<dai::SerializationType>(serialization_type));
+        nlohmann::json j = schema;
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_schema_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+char* dai_pipeline_get_all_nodes_json(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_all_nodes_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto nodes = pipe->getAllNodes();
+        nlohmann::json j = nlohmann::json::array();
+        for(const auto& n : nodes) {
+            if(!n) continue;
+            nlohmann::json item;
+            item["id"] = n->id;
+            item["alias"] = n->getAlias();
+            item["name"] = std::string(n->getName());
+            j.push_back(std::move(item));
+        }
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_all_nodes_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+char* dai_pipeline_get_source_nodes_json(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_source_nodes_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto nodes = pipe->getSourceNodes();
+        nlohmann::json j = nlohmann::json::array();
+        for(const auto& n : nodes) {
+            if(!n) continue;
+            nlohmann::json item;
+            item["id"] = n->id;
+            item["alias"] = n->getAlias();
+            item["name"] = std::string(n->getName());
+            j.push_back(std::move(item));
+        }
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_source_nodes_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiNode dai_pipeline_get_node_by_id(DaiPipeline pipeline, int id) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_node_by_id: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto n = pipe->getNode(static_cast<dai::Node::Id>(id));
+        if(!n) {
+            return nullptr;
+        }
+        return static_cast<DaiNode>(n.get());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_node_by_id failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_pipeline_remove_node(DaiPipeline pipeline, DaiNode node) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_remove_node: null pipeline";
+        return false;
+    }
+    if(!node) {
+        last_error = "dai_pipeline_remove_node: null node";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto target = static_cast<dai::Node*>(node);
+        auto nodes = pipe->getAllNodes();
+        for(const auto& n : nodes) {
+            if(n && n.get() == target) {
+                pipe->remove(n);
+                return true;
+            }
+        }
+        last_error = "dai_pipeline_remove_node: node not found in pipeline";
+        return false;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_remove_node failed: ") + e.what();
+        return false;
+    }
+}
+
+char* dai_pipeline_get_connections_json(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_connections_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto conns = pipe->getConnections();
+        nlohmann::json j = nlohmann::json::array();
+        for(const auto& c : conns) {
+            nlohmann::json item;
+            item["outputId"] = c.outputId;
+            item["outputGroup"] = c.outputGroup;
+            item["outputName"] = c.outputName;
+            item["inputId"] = c.inputId;
+            item["inputGroup"] = c.inputGroup;
+            item["inputName"] = c.inputName;
+            j.push_back(std::move(item));
+        }
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_connections_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+char* dai_pipeline_get_connection_map_json(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_connection_map_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto cmap = pipe->getConnectionMap();
+
+        // JSON object keyed by input node id (as string), value is list of connections.
+        nlohmann::json j = nlohmann::json::object();
+        for(const auto& kv : cmap) {
+            const auto inputId = kv.first;
+            const auto& set = kv.second;
+
+            nlohmann::json arr = nlohmann::json::array();
+            for(const auto& c : set) {
+                nlohmann::json item;
+                auto outNode = c.outputNode.lock();
+                auto inNode = c.inputNode.lock();
+                item["outputId"] = outNode ? outNode->id : -1;
+                item["outputGroup"] = c.outputGroup;
+                item["outputName"] = c.outputName;
+                item["inputId"] = inNode ? inNode->id : inputId;
+                item["inputGroup"] = c.inputGroup;
+                item["inputName"] = c.inputName;
+                arr.push_back(std::move(item));
+            }
+
+            j[std::to_string(inputId)] = std::move(arr);
+        }
+
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_connection_map_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_pipeline_is_calibration_data_available(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_is_calibration_data_available: null pipeline";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        return pipe->isCalibrationDataAvailable();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_is_calibration_data_available failed: ") + e.what();
+        return false;
+    }
+}
+
+char* dai_pipeline_get_calibration_data_json(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_calibration_data_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        nlohmann::json j;
+        if(pipe->isCalibrationDataAvailable()) {
+            auto calib = pipe->getCalibrationData();
+            j = calib.eepromToJson();
+        } else {
+            j = nullptr;
+        }
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_calibration_data_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_pipeline_set_calibration_data_json(DaiPipeline pipeline, const char* eeprom_data_json) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_set_calibration_data_json: null pipeline";
+        return false;
+    }
+    if(!eeprom_data_json) {
+        last_error = "dai_pipeline_set_calibration_data_json: null eeprom_data_json";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto j = nlohmann::json::parse(eeprom_data_json);
+        if(j.is_null()) {
+            last_error = "dai_pipeline_set_calibration_data_json: null is not supported";
+            return false;
+        }
+        auto calib = dai::CalibrationHandler::fromJson(j);
+        pipe->setCalibrationData(std::move(calib));
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_set_calibration_data_json failed: ") + e.what();
+        return false;
+    }
+}
+
+char* dai_pipeline_get_global_properties_json(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_global_properties_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto props = pipe->getGlobalProperties();
+        nlohmann::json j = props;
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_global_properties_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_pipeline_set_global_properties_json(DaiPipeline pipeline, const char* json) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_set_global_properties_json: null pipeline";
+        return false;
+    }
+    if(!json) {
+        last_error = "dai_pipeline_set_global_properties_json: null json";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto j = nlohmann::json::parse(json);
+        dai::GlobalProperties props = j.get<dai::GlobalProperties>();
+        pipe->setGlobalProperties(std::move(props));
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_set_global_properties_json failed: ") + e.what();
+        return false;
+    }
+}
+
+char* dai_pipeline_get_board_config_json(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_board_config_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto cfg = pipe->getBoardConfig();
+        nlohmann::json j = cfg;
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_board_config_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_pipeline_set_board_config_json(DaiPipeline pipeline, const char* json) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_set_board_config_json: null pipeline";
+        return false;
+    }
+    if(!json) {
+        last_error = "dai_pipeline_set_board_config_json: null json";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto j = nlohmann::json::parse(json);
+        dai::BoardConfig cfg = j.get<dai::BoardConfig>();
+        pipe->setBoardConfig(std::move(cfg));
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_set_board_config_json failed: ") + e.what();
+        return false;
+    }
+}
+
+char* dai_pipeline_get_device_config_json(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_device_config_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto cfg = pipe->getDeviceConfig();
+        // `dai::Device::Config` (alias of `dai::DeviceBase::Config`) doesn't provide
+        // a nlohmann::json implicit conversion in all DepthAI versions.
+        // Build a stable JSON representation manually.
+        nlohmann::json j;
+        j["version"] = static_cast<int>(cfg.version);
+        j["board"] = cfg.board;
+        j["nonExclusiveMode"] = cfg.nonExclusiveMode;
+        if(cfg.outputLogLevel.has_value()) {
+            j["outputLogLevel"] = static_cast<int>(cfg.outputLogLevel.value());
+        } else {
+            j["outputLogLevel"] = nullptr;
+        }
+        if(cfg.logLevel.has_value()) {
+            j["logLevel"] = static_cast<int>(cfg.logLevel.value());
+        } else {
+            j["logLevel"] = nullptr;
+        }
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_device_config_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+char* dai_pipeline_get_eeprom_data_json(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_eeprom_data_json: null pipeline";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto opt = pipe->getEepromData();
+        nlohmann::json j;
+        if(opt.has_value()) {
+            j = opt.value();
+        } else {
+            j = nullptr;
+        }
+        auto dumped = j.dump();
+        return dai_string_to_cstring(dumped.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_eeprom_data_json failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_pipeline_set_eeprom_data_json(DaiPipeline pipeline, const char* json) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_set_eeprom_data_json: null pipeline";
+        return false;
+    }
+    if(!json) {
+        last_error = "dai_pipeline_set_eeprom_data_json: null json";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+
+        auto j = nlohmann::json::parse(json);
+        if(j.is_null()) {
+            pipe->setEepromData(std::nullopt);
+        } else {
+            dai::EepromData data = j.get<dai::EepromData>();
+            pipe->setEepromData(std::move(data));
+        }
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_set_eeprom_data_json failed: ") + e.what();
+        return false;
+    }
+}
+
+uint32_t dai_pipeline_get_eeprom_id(DaiPipeline pipeline) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_get_eeprom_id: null pipeline";
+        return 0;
+    }
+    try {
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        return pipe->getEepromId();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_get_eeprom_id failed: ") + e.what();
+        return 0;
+    }
+}
+
+bool dai_pipeline_enable_holistic_record_json(DaiPipeline pipeline, const char* record_config_json) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_enable_holistic_record_json: null pipeline";
+        return false;
+    }
+    if(!record_config_json) {
+        last_error = "dai_pipeline_enable_holistic_record_json: null record_config_json";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        auto j = nlohmann::json::parse(record_config_json);
+        dai::RecordConfig cfg = j.get<dai::RecordConfig>();
+        pipe->enableHolisticRecord(cfg);
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_enable_holistic_record_json failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_pipeline_enable_holistic_replay(DaiPipeline pipeline, const char* path_to_recording) {
+    if(!pipeline) {
+        last_error = "dai_pipeline_enable_holistic_replay: null pipeline";
+        return false;
+    }
+    if(!path_to_recording) {
+        last_error = "dai_pipeline_enable_holistic_replay: null path_to_recording";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto pipe = static_cast<dai::Pipeline*>(pipeline);
+        pipe->enableHolisticReplay(std::string(path_to_recording));
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_pipeline_enable_holistic_replay failed: ") + e.what();
         return false;
     }
 }
@@ -576,6 +1254,76 @@ DaiInput dai_node_get_input(DaiNode node, const char* group, const char* name) {
         return static_cast<DaiInput>(in);
     } catch(const std::exception& e) {
         last_error = std::string("dai_node_get_input failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+int dai_node_get_id(DaiNode node) {
+    if(!node) {
+        last_error = "dai_node_get_id: null node";
+        return -1;
+    }
+    try {
+        dai_clear_last_error();
+        auto n = static_cast<dai::Node*>(node);
+        return n->id;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_node_get_id failed: ") + e.what();
+        return -1;
+    }
+}
+
+char* dai_node_get_alias(DaiNode node) {
+    if(!node) {
+        last_error = "dai_node_get_alias: null node";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto n = static_cast<dai::Node*>(node);
+        auto s = n->getAlias();
+        return dai_string_to_cstring(s.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_node_get_alias failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_node_set_alias(DaiNode node, const char* alias) {
+    if(!node) {
+        last_error = "dai_node_set_alias: null node";
+        return false;
+    }
+    if(!alias) {
+        last_error = "dai_node_set_alias: null alias";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto n = static_cast<dai::Node*>(node);
+        n->setAlias(std::string(alias));
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_node_set_alias failed: ") + e.what();
+        return false;
+    }
+}
+
+char* dai_node_get_name(DaiNode node) {
+    if(!node) {
+        last_error = "dai_node_get_name: null node";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto n = static_cast<dai::Node*>(node);
+        const char* name = n->getName();
+        if(!name) {
+            return dai_string_to_cstring("");
+        }
+        return dai_string_to_cstring(name);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_node_get_name failed: ") + e.what();
         return nullptr;
     }
 }
