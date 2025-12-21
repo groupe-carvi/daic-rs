@@ -1489,7 +1489,11 @@ fn link_all_static_libs_with_prefix(libdir: &Path, prefix: &str) {
     libs.dedup();
 
     for lib in libs {
-        println!("cargo:rustc-link-lib=static={}", lib);
+        if cfg!(target_os = "linux") {
+            println!("cargo:rustc-link-lib=static:+whole-archive={}", lib);
+        } else {
+            println!("cargo:rustc-link-lib=static={}", lib);
+        }
     }
 }
 
@@ -1536,40 +1540,74 @@ fn emit_link_directives(path: &Path) {
                 println!("cargo:rustc-link-search=native={}", protos_dir.display());
             }
 
-            // Avoid painful static library ordering issues (and cycles) by grouping.
-            if cfg!(target_os = "linux") {
-                println!("cargo:rustc-link-arg=-Wl,--start-group");
-            }
-
             // Link depthai-core itself.
             // (Linking by name keeps behavior consistent with Cargo/rustc link handling.)
-            println!("cargo:rustc-link-lib=static=depthai-core");
+            if cfg!(target_os = "linux") {
+                println!("cargo:rustc-link-lib=static:+whole-archive=depthai-core");
+            } else {
+                println!("cargo:rustc-link-lib=static=depthai-core");
+            }
 
             // depthai-core commonly requires these when linked statically.
             let xlink_dir = BUILD_FOLDER_PATH.join("_deps").join("xlink-build");
             if xlink_dir.join("libXLink.a").exists() {
                 println!("cargo:rustc-link-search=native={}", xlink_dir.display());
-                println!("cargo:rustc-link-lib=static=XLink");
+                if cfg!(target_os = "linux") {
+                    println!("cargo:rustc-link-lib=static:+whole-archive=XLink");
+                } else {
+                    println!("cargo:rustc-link-lib=static=XLink");
+                }
             }
 
             let resources = BUILD_FOLDER_PATH.join("libdepthai-resources.a");
             if resources.exists() {
                 println!("cargo:rustc-link-search=native={}", BUILD_FOLDER_PATH.display());
-                println!("cargo:rustc-link-lib=static=depthai-resources");
+                if cfg!(target_os = "linux") {
+                    println!("cargo:rustc-link-lib=static:+whole-archive=depthai-resources");
+                } else {
+                    println!("cargo:rustc-link-lib=static=depthai-resources");
+                }
             }
 
             // Protobuf-generated messages for depthai-core live in a separate archive.
             if protos_dir.join("libmessages.a").exists() {
-                println!("cargo:rustc-link-lib=static=messages");
+                if cfg!(target_os = "linux") {
+                    println!("cargo:rustc-link-lib=static:+whole-archive=messages");
+                } else {
+                    println!("cargo:rustc-link-lib=static=messages");
+                }
+            }
+
+            // Foxglove websocket server.
+            let foxglove_dir = BUILD_FOLDER_PATH.join("foxglove-websocket");
+            if foxglove_dir.join("libfoxglove_websocket.a").exists() {
+                println!("cargo:rustc-link-search=native={}", foxglove_dir.display());
+                if cfg!(target_os = "linux") {
+                    println!("cargo:rustc-link-lib=static:+whole-archive=foxglove_websocket");
+                } else {
+                    println!("cargo:rustc-link-lib=static=foxglove_websocket");
+                }
+            }
+
+            // Dynamic calibration.
+            let dcl_dir = BUILD_FOLDER_PATH.join("_deps").join("dynamic_calibration-src").join("lib");
+            if dcl_dir.join("libdynamic_calibration.so").exists() {
+                println!("cargo:rustc-link-search=native={}", dcl_dir.display());
+                println!("cargo:rustc-link-lib=dynamic_calibration");
+                if cfg!(target_os = "linux") {
+                    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", dcl_dir.display());
+                }
             }
 
             // vcpkg-provided deps used by depthai-core when OpenCV support is enabled.
             if let Some(ref libdir) = vcpkg_lib {
                 let static_if_exists = |fname: &str, name: &str| {
                     if libdir.join(fname).exists() {
-                        // For non-OpenCV deps we can still use -l since they're typically also
-                        // available system-wide; absolute paths are used for OpenCV and core archives.
-                        println!("cargo:rustc-link-lib=static={}", name);
+                        if cfg!(target_os = "linux") {
+                            println!("cargo:rustc-link-lib=static:+whole-archive={}", name);
+                        } else {
+                            println!("cargo:rustc-link-lib=static={}", name);
+                        }
                     }
                 };
 
@@ -1617,6 +1655,7 @@ fn emit_link_directives(path: &Path) {
                 // Logging stack.
                 static_if_exists("libspdlog.a", "spdlog");
                 static_if_exists("libfmt.a", "fmt");
+                static_if_exists("libyaml-cpp.a", "yaml-cpp");
 
                 // Compression/archive utilities.
                 static_if_exists("libz.a", "z");
@@ -1629,8 +1668,19 @@ fn emit_link_directives(path: &Path) {
                 static_if_exists("libmp4v2.a", "mp4v2");
 
                 // Protobuf runtime.
-                static_if_exists("libprotobuf.a", "protobuf");
-                static_if_exists("libprotobuf-lite.a", "protobuf-lite");
+                if libdir.join("libprotobuf.a").exists() {
+                    if cfg!(target_os = "linux") {
+                        println!("cargo:rustc-link-lib=static:+whole-archive=protobuf");
+                    } else {
+                        println!("cargo:rustc-link-lib=static=protobuf");
+                    }
+                } else if libdir.join("libprotobuf-lite.a").exists() {
+                    if cfg!(target_os = "linux") {
+                        println!("cargo:rustc-link-lib=static:+whole-archive=protobuf-lite");
+                    } else {
+                        println!("cargo:rustc-link-lib=static=protobuf-lite");
+                    }
+                }
 
                 // Protobuf depends on utf8_range for UTF-8 validation.
                 static_if_exists("libutf8_range.a", "utf8_range");
@@ -1666,10 +1716,6 @@ fn emit_link_directives(path: &Path) {
                 if libdir.join("libusb-1.0.so").exists() {
                     println!("cargo:rustc-link-lib=usb-1.0");
                 }
-            }
-
-            if cfg!(target_os = "linux") {
-                println!("cargo:rustc-link-arg=-Wl,--end-group");
             }
 
             // Common system libs on Linux.

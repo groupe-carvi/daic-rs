@@ -14,6 +14,8 @@ pub mod device;
 pub mod error;
 pub mod host_node;
 pub mod threaded_host_node;
+#[cfg(feature = "rerun")]
+pub mod rerun_host_node;
 pub mod output;
 pub mod pipeline;
 pub mod pointcloud;
@@ -33,3 +35,5 @@ pub use rgbd::{DepthUnit, RgbdData, RgbdNode};
 pub use stereo_depth::{PresetMode as StereoPresetMode, StereoDepthNode};
 pub use host_node::{HostNode, HostNodeImpl, MessageGroup, Buffer};
 pub use threaded_host_node::{ThreadedHostNode, ThreadedHostNodeImpl, ThreadedHostNodeContext};
+#[cfg(feature = "rerun")]
+pub use rerun_host_node::{RerunHostNode, RerunHostNodeConfig, RerunViewer, RerunWebConfig, create_rerun_host_node};
