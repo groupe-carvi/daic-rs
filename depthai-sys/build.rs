@@ -1510,6 +1510,14 @@ fn emit_link_directives(path: &Path) {
             // Many of these are provided by the internal vcpkg build under builds/vcpkg_installed.
             let vcpkg_lib = vcpkg_lib_dir();
 
+            // dynamic_calibration is built as a shared library by depthai-core's CMake.
+            // We link against it, so we must ensure the runtime loader can find it.
+            // See also: dynamic calibration block later in this function.
+            let dcl_dir = BUILD_FOLDER_PATH
+                .join("_deps")
+                .join("dynamic_calibration-src")
+                .join("lib");
+
             // If depthai-core was built using its internal vcpkg OpenCV (common on Linux),
             // linking against system OpenCV can fail due to ABI / symbol signature differences
             // (e.g. cv::cvtColor gaining an AlgorithmHint parameter in newer OpenCV).
@@ -1531,7 +1539,13 @@ fn emit_link_directives(path: &Path) {
                 // If we end up linking any shared libs from vcpkg (e.g. ffmpeg, libusb),
                 // set an rpath so binaries can run without manual LD_LIBRARY_PATH.
                 if cfg!(target_os = "linux") {
-                    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", libdir.display());
+                    // NOTE: On some toolchains, passing multiple `-Wl,-rpath,...` only keeps
+                    // the last value. Prefer a single RUNPATH containing both directories.
+                    let mut runpath = libdir.display().to_string();
+                    if dcl_dir.join("libdynamic_calibration.so").exists() {
+                        runpath = format!("{}:{}", dcl_dir.display(), runpath);
+                    }
+                    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runpath);
                 }
             }
 
@@ -1590,13 +1604,9 @@ fn emit_link_directives(path: &Path) {
             }
 
             // Dynamic calibration.
-            let dcl_dir = BUILD_FOLDER_PATH.join("_deps").join("dynamic_calibration-src").join("lib");
             if dcl_dir.join("libdynamic_calibration.so").exists() {
                 println!("cargo:rustc-link-search=native={}", dcl_dir.display());
                 println!("cargo:rustc-link-lib=dynamic_calibration");
-                if cfg!(target_os = "linux") {
-                    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", dcl_dir.display());
-                }
             }
 
             // vcpkg-provided deps used by depthai-core when OpenCV support is enabled.
@@ -1645,8 +1655,19 @@ fn emit_link_directives(path: &Path) {
                     static_if_exists("libpng16.a", "png16");
                     static_if_exists("libtiff.a", "tiff");
                     static_if_exists("libjpeg.a", "jpeg");
+                    // IMPORTANT: libwebp already includes the decoder objects.
+                    // Linking libwebp *and* libwebpdecoder (especially under --whole-archive)
+                    // causes duplicate definitions at link time.
+                    let has_webp = libdir.join("libwebp.a").exists();
+                    let has_webpdecoder = libdir.join("libwebpdecoder.a").exists();
                     static_if_exists("libwebp.a", "webp");
-                    static_if_exists("libwebpdecoder.a", "webpdecoder");
+                    if has_webp && has_webpdecoder {
+                        println_build!(
+                            "Skipping libwebpdecoder.a because libwebp.a is present (avoids duplicate symbols)"
+                        );
+                    } else {
+                        static_if_exists("libwebpdecoder.a", "webpdecoder");
+                    }
                     static_if_exists("libwebpdemux.a", "webpdemux");
                     static_if_exists("libwebpmux.a", "webpmux");
                     static_if_exists("libsharpyuv.a", "sharpyuv");
@@ -1682,9 +1703,22 @@ fn emit_link_directives(path: &Path) {
                     }
                 }
 
-                // Protobuf depends on utf8_range for UTF-8 validation.
-                static_if_exists("libutf8_range.a", "utf8_range");
-                static_if_exists("libutf8_validity.a", "utf8_validity");
+                // Protobuf depends on utf8_range/utf8_validity for UTF-8 validation.
+                // These libraries can overlap (utf8_validity may embed utf8_range objects),
+                // and linking both under --whole-archive can produce duplicate symbols.
+                let has_utf8_range = libdir.join("libutf8_range.a").exists();
+                let has_utf8_validity = libdir.join("libutf8_validity.a").exists();
+
+                if has_utf8_validity {
+                    static_if_exists("libutf8_validity.a", "utf8_validity");
+                    if has_utf8_range {
+                        println_build!(
+                            "Skipping libutf8_range.a because libutf8_validity.a is present (avoids duplicate symbols)"
+                        );
+                    }
+                } else {
+                    static_if_exists("libutf8_range.a", "utf8_range");
+                }
 
                 // depthai-core log collection uses cpr (libcurl).
                 static_if_exists("libcpr.a", "cpr");

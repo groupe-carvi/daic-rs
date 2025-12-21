@@ -28,11 +28,22 @@ fn main() {
 
     let libdir = vcpkg_root.join(triplet).join("lib");
     if libdir.exists() {
+        // dynamic_calibration is built as a shared library in the depthai-core build tree.
+        // It is not part of vcpkg_installed, so we must add it to RUNPATH as well.
+        let dcl_dir = manifest_dir
+            .join("depthai-sys")
+            .join("builds")
+            .join("_deps")
+            .join("dynamic_calibration-src")
+            .join("lib");
+
+        let mut runpath = libdir.to_string_lossy().to_string();
+        if dcl_dir.join("libdynamic_calibration.so").exists() {
+            runpath = format!("{}:{}", dcl_dir.to_string_lossy(), runpath);
+        }
+
         // Note: cargo:rustc-link-arg applies to this package's final link (bins/examples/tests).
         // Use a single argument with -Wl, to pass through the cc driver.
-        println!(
-            "cargo:rustc-link-arg=-Wl,-rpath,{}",
-            libdir.to_string_lossy()
-        );
+        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runpath);
     }
 }
