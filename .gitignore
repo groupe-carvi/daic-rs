@@ -27,10 +27,6 @@ target/
 
 /build
 
-/depthai-sys/builds
-
-/depthai-sys/builds/depthai-core
-
 # Generated files
 /depthai-sys/generated
 

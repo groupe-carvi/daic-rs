@@ -22,8 +22,14 @@ static PROJECT_ROOT: Lazy<PathBuf> = Lazy::new(|| {
     )
 });
 
-static BUILD_FOLDER_PATH: Lazy<PathBuf> =
-    Lazy::new(|| PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("builds"));
+static BUILD_FOLDER_PATH: Lazy<PathBuf> = Lazy::new(|| {
+    let out_dir = env::var("OUT_DIR").unwrap();
+    Path::new(&out_dir)
+        .ancestors()
+        .nth(4)
+        .unwrap()
+        .join("dai-build")
+});
 
 static GEN_FOLDER_PATH: Lazy<PathBuf> =
     Lazy::new(|| PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap()).join("generated"));
@@ -61,7 +67,7 @@ fn main() {
     // d'une modification de la liste `generate!(...)`, ce qui laisse des bindings obsolètes.
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=wrapper/");
-    println!("cargo:rerun-if-changed=builds/depthai-core/include/");
+    println!("cargo:rerun-if-changed={}", BUILD_FOLDER_PATH.join("depthai-core").join("include").display());
     println!("cargo:rerun-if-env-changed=DEPTHAI_SYS_LINK_SHARED");
     println!("cargo:rerun-if-env-changed=DEPTHAI_OPENCV_SUPPORT");
     println!("cargo:rerun-if-env-changed=DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT");
@@ -463,7 +469,7 @@ fn get_depthai_includes() -> Vec<PathBuf> {
     ];
 
     // When depthai-core is built via CMake, some headers are generated into the build tree
-    // (e.g. builds/include/depthai/build/version.hpp). Include that output include dir.
+    // (e.g. dai-build/include/depthai/build/version.hpp). Include that output include dir.
     let build_include = BUILD_FOLDER_PATH.join("include");
     if build_include.exists() {
         includes.push(build_include);
@@ -841,7 +847,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
             return Ok(import_lib);
         }
 
-        // Some setups may place artifacts directly under builds/. If we see a DLL there,
+        // Some setups may place artifacts directly under dai-build/. If we see a DLL there,
         // try to locate a matching import library in common locations.
         let builds_dll = BUILD_FOLDER_PATH.join("depthai-core.dll");
         if builds_dll.exists() {
@@ -893,6 +899,7 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
     if cfg!(target_os = "windows")
         && target_dir.join("depthai-core.dll").exists()
         && (target_dir.join("depthai-core.lib").exists() || deps_dir.join("depthai-core.lib").exists())
+        && depthai_core_headers_present()
     {
         let lib = if target_dir.join("depthai-core.lib").exists() {
             target_dir.join("depthai-core.lib")
@@ -906,14 +913,15 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
         println!("cargo:rustc-link-search=native={}", lib.parent().unwrap().display());
         println!("cargo:rustc-link-lib=depthai-core");
         return Ok(lib);
-    } else if !prefer_static {
+    } else if !prefer_static
+        && target_dir.join("libdepthai-core.so").exists()
+        && depthai_core_headers_present()
+    {
         // Shared path only when explicitly requested.
         let candidate = target_dir.join("libdepthai-core.so");
-        if candidate.exists() {
-            println_build!("Found {} in OUT_DIR: {}", candidate.display(), target_dir.display());
-            emit_link_directives(&candidate);
-            return Ok(candidate);
-        }
+        println_build!("Found {} in OUT_DIR: {}", candidate.display(), target_dir.display());
+        emit_link_directives(&candidate);
+        return Ok(candidate);
     }
 
     if let Some(found_lib) = probe_depthai_core_lib(BUILD_FOLDER_PATH.clone(), prefer_static) {
@@ -998,8 +1006,20 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
     println_build!("Depthai-core library not found, proceeding to build or download...");
 
     if cfg!(target_os = "windows") {
-        if !get_depthai_core_root().exists() {
-            println_build!("DEPTHAI_CORE_ROOT not set, downloading prebuilt depthai-core...");
+        if !depthai_core_headers_present() {
+            if env::var_os("DEPTHAI_CORE_ROOT").is_some() {
+                panic!(
+                    "DEPTHAI_CORE_ROOT is set to '{}' but required header '{}' was not found. \
+Please point DEPTHAI_CORE_ROOT to a full depthai-core distribution (with include/ and lib/) or unset it to let the build script download the prebuilt package.",
+                    get_depthai_core_root().display(),
+                    depthai_core_header_path().display()
+                );
+            }
+
+            println_build!(
+                "depthai-core headers not found under {}; downloading/extracting prebuilt depthai-core...",
+                get_depthai_core_root().display()
+            );
 
             let depthai_core_install = get_depthai_windows_prebuilt_binary()
                 .map_err(|_| "Failed to download prebuilt depthai-core.")?;
@@ -1046,6 +1066,17 @@ fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
     }
 
     Err("Failed to resolve depthai-core library path.")
+}
+
+fn depthai_core_header_path() -> PathBuf {
+    get_depthai_core_root()
+        .join("include")
+        .join("depthai")
+        .join("depthai.hpp")
+}
+
+fn depthai_core_headers_present() -> bool {
+    depthai_core_header_path().exists()
 }
 
 fn probe_depthai_core_lib(out: PathBuf, prefer_static: bool) -> Option<PathBuf> {
@@ -1294,6 +1325,26 @@ fn get_depthai_windows_prebuilt_binary() -> Result<PathBuf, String> {
     println_build!("Extracting prebuilt depthai-core...");
     let extracted_path = BUILD_FOLDER_PATH.join("depthai-core");
 
+    // It's possible for other steps (e.g. OpenCV runtime staging) to create
+    // DEPTHAI_CORE_ROOT/bin ahead of actually extracting depthai-core.
+    // Treat an existing directory without headers/libs as incomplete and re-extract.
+    let expected_header = extracted_path
+        .join("include")
+        .join("depthai")
+        .join("depthai.hpp");
+    let expected_lib = extracted_path.join("lib").join("depthai-core.lib");
+    let expected_dll = extracted_path.join("bin").join("depthai-core.dll");
+    let extracted_incomplete = extracted_path.exists()
+        && (!expected_header.exists() || !expected_lib.exists() || !expected_dll.exists());
+    if extracted_incomplete {
+        println_build!(
+            "Existing depthai-core directory looks incomplete (missing header/lib/dll). Removing: {}",
+            extracted_path.display()
+        );
+        fs::remove_dir_all(&extracted_path)
+            .map_err(|e| format!("Failed to remove incomplete depthai-core dir: {}", e))?;
+    }
+
     if !extracted_path.exists() {
         zip::zip_extract::zip_extract(&zip_path, &BUILD_FOLDER_PATH)
             .expect("Failed to extract prebuilt depthai-core");
@@ -1462,8 +1513,8 @@ fn vcpkg_lib_dir() -> Option<PathBuf> {
 }
 
 fn vcpkg_include_dir() -> Option<PathBuf> {
-    // `vcpkg_lib_dir` returns: <builds>/vcpkg_installed/<triplet>/lib
-    // We want:              <builds>/vcpkg_installed/<triplet>/include
+    // `vcpkg_lib_dir` returns: <dai-build>/vcpkg_installed/<triplet>/lib
+    // We want:              <dai-build>/vcpkg_installed/<triplet>/include
     let lib = vcpkg_lib_dir()?;
     let triplet = lib.parent()?;
     let include = triplet.join("include");
@@ -1507,7 +1558,7 @@ fn emit_link_directives(path: &Path) {
             // Prefer static linkage by default.
 
             // When linking statically, we must also link depthai-core's transitive deps.
-            // Many of these are provided by the internal vcpkg build under builds/vcpkg_installed.
+            // Many of these are provided by the internal vcpkg build under dai-build/vcpkg_installed.
             let vcpkg_lib = vcpkg_lib_dir();
 
             // dynamic_calibration is built as a shared library by depthai-core's CMake.

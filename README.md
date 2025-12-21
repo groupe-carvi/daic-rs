@@ -16,7 +16,7 @@ Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
 ### Crates
 
 - `depthai-sys`
-	- Builds DepthAI-Core and its dependencies (in `depthai-sys/builds/`).
+	- Builds DepthAI-Core and its dependencies (in `target/dai-build/`).
 	- Compiles a small C++ wrapper (`depthai-sys/wrapper/wrapper.cpp`) and generates Rust bindings using `autocxx`.
 - `depthai-rs`
 	- Safe(-er) Rust wrapper types like `Device`, `Pipeline`, typed camera helpers, and a generic node API.
@@ -92,7 +92,7 @@ cargo build
 Notes:
 
 - The first build can take a while because DepthAI-Core is fetched/built and dependencies are prepared.
-- Build artifacts for native code live under `depthai-sys/builds/`.
+- Build artifacts for native code live under `target/dai-build/`.
 
 ## Run examples
 
@@ -104,7 +104,7 @@ cargo run --example camera_output
 
 ## DepthAI feature support
 
-This section is generated from the native DepthAI-Core C++ examples vendored in this repo under `depthai-sys/builds/depthai-core/examples/cpp`.
+This section is generated from the native DepthAI-Core C++ examples vendored in this repo under `target/dai-build/depthai-core/examples/cpp`.
 
 - ✅ in the **Supported** column means `depthai-rs` currently wraps enough of that feature/node to build and run *at least one* equivalent pipeline.
 - A blank cell means it’s not yet wrapped/exposed in the Rust API (even if DepthAI-Core supports it).

@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf};
+use std::{env, path::Path};
 
 fn main() {
     // Ensure changes to vcpkg-installed libs re-trigger linkage when present.
@@ -10,11 +10,9 @@ fn main() {
 
     // Embed an rpath for the internal vcpkg lib directory so examples can run
     // without setting LD_LIBRARY_PATH (needed for FFmpeg/libusb when OpenCV videoio is enabled).
-    let manifest_dir = PathBuf::from(env::var("CARGO_MANIFEST_DIR").unwrap());
-    let vcpkg_root = manifest_dir
-        .join("depthai-sys")
-        .join("builds")
-        .join("vcpkg_installed");
+    let out_dir = env::var("OUT_DIR").unwrap();
+    let target_dir = Path::new(&out_dir).ancestors().nth(4).unwrap();
+    let vcpkg_root = target_dir.join("dai-build").join("vcpkg_installed");
 
     let target = env::var("TARGET").unwrap_or_default();
     let triplet = if target.contains("aarch64") {
@@ -30,9 +28,8 @@ fn main() {
     if libdir.exists() {
         // dynamic_calibration is built as a shared library in the depthai-core build tree.
         // It is not part of vcpkg_installed, so we must add it to RUNPATH as well.
-        let dcl_dir = manifest_dir
-            .join("depthai-sys")
-            .join("builds")
+        let dcl_dir = target_dir
+            .join("dai-build")
             .join("_deps")
             .join("dynamic_calibration-src")
             .join("lib");
