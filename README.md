@@ -85,11 +85,11 @@ winget install -e --id LLVM.LLVM
 
 ### Default features
 
-- `rerun`: Enables Rerun visualization support with `RerunHostNode`. Adds Tokio runtime and web viewer dependencies.
+- `rerun`: Enables Rerun visualization support with `RerunHostNode`. Adds Tokio runtime and web viewer dependencies
 
 ### Optional features
 
-- `hit`: Hardware Integration Tests - enable with `cargo test --features hit` when you have a physical device connected.
+- `hit`: Hardware Integration Tests - enable with `cargo test --features hit` when you have a physical device connected
 
 To build without the rerun feature:
 
@@ -245,9 +245,9 @@ let cameras = device.connected_cameras()?;
 // Control IR laser dot projector (on supported devices)
 device.set_ir_laser_dot_projector_intensity(0.3)?;
 
-// Check connection status
+// Check if device is still connected before sending commands
 if device.is_connected() {
-    // Device is connected
+    // Safe to use device
 }
 ```
 
@@ -368,6 +368,7 @@ Visualize data streams using Rerun:
 ```rust
 let host = pipeline.create_with::<RerunHostNode, _>(RerunHostNodeConfig {
     viewer: RerunViewer::Web(RerunWebConfig {
+        // Don't auto-open browser in remote/container environments
         open_browser: false,
         ..Default::default()
     }),
