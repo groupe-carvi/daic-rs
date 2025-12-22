@@ -422,12 +422,12 @@ pub use pipeline::Pipeline;
 pub use output::{Output, Input};
 pub use pointcloud::{Point3fRGBA, PointCloudData};
 pub use image_manip::{
-	Backend as ImageManipBackend,
-	Colormap,
-	ImageManipConfig,
-	ImageManipNode,
-	ImageManipResizeMode,
-	PerformanceMode as ImageManipPerformanceMode,
+    Backend as ImageManipBackend,
+    Colormap,
+    ImageManipConfig,
+    ImageManipNode,
+    ImageManipResizeMode,
+    PerformanceMode as ImageManipPerformanceMode,
 };
 pub use rgbd::{DepthUnit, RgbdData, RgbdNode};
 pub use stereo_depth::{PresetMode as StereoPresetMode, StereoDepthNode};
