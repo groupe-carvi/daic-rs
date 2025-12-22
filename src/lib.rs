@@ -369,13 +369,21 @@
 //! Bundles multiple nodes into a composite node:
 //!
 //! ```no_run
-//! # use depthai::depthai_composite;
-//! # use depthai::camera::CameraNode;
+//! # use depthai::{depthai_composite, Pipeline, Result};
 //! # use depthai::stereo_depth::StereoDepthNode;
+//! # use depthai::rgbd::RgbdNode;
 //! #[depthai_composite]
 //! pub struct MyComposite {
-//!     pub camera: CameraNode,
-//!     pub processor: StereoDepthNode,
+//!     pub stereo: StereoDepthNode,
+//!     pub rgbd: RgbdNode,
+//! }
+//!
+//! impl MyComposite {
+//!     pub fn new(pipeline: &Pipeline) -> Result<Self> {
+//!         let stereo = pipeline.create::<StereoDepthNode>()?;
+//!         let rgbd = pipeline.create::<RgbdNode>()?;
+//!         Ok(Self { stereo, rgbd })
+//!     }
 //! }
 //! ```
 
@@ -394,6 +402,7 @@ pub mod common;
 pub mod device;
 pub mod error;
 pub mod host_node;
+pub mod image_manip;
 pub mod threaded_host_node;
 #[cfg(feature = "rerun")]
 pub mod rerun_host_node;
@@ -412,6 +421,14 @@ pub use pipeline::Pipeline;
 
 pub use output::{Output, Input};
 pub use pointcloud::{Point3fRGBA, PointCloudData};
+pub use image_manip::{
+	Backend as ImageManipBackend,
+	Colormap,
+	ImageManipConfig,
+	ImageManipNode,
+	ImageManipResizeMode,
+	PerformanceMode as ImageManipPerformanceMode,
+};
 pub use rgbd::{DepthUnit, RgbdData, RgbdNode};
 pub use stereo_depth::{PresetMode as StereoPresetMode, StereoDepthNode};
 pub use host_node::{HostNode, HostNodeImpl, MessageGroup, Buffer};

@@ -207,6 +207,44 @@ API void dai_stereo_initial_set_threshold_filter_max_range(DaiNode stereo, int m
 // RGBD configuration helpers
 API void dai_rgbd_set_depth_unit(DaiNode rgbd, int depth_unit);
 
+// ImageManip node helpers
+API void dai_image_manip_set_num_frames_pool(DaiNode manip, int num_frames_pool);
+API void dai_image_manip_set_max_output_frame_size(DaiNode manip, int max_frame_size);
+API void dai_image_manip_set_run_on_host(DaiNode manip, bool run_on_host);
+API void dai_image_manip_set_backend(DaiNode manip, int backend);
+API void dai_image_manip_set_performance_mode(DaiNode manip, int performance_mode);
+API bool dai_image_manip_run_on_host(DaiNode manip);
+API void dai_image_manip_run(DaiNode manip);
+
+// ImageManipConfig helpers
+// Returned handle is a `std::shared_ptr<dai::Buffer>*` actually pointing to a `dai::ImageManipConfig`.
+API DaiBuffer dai_image_manip_config_new();
+API DaiBuffer dai_image_manip_get_initial_config(DaiNode manip);
+API void dai_image_manip_config_clear_ops(DaiBuffer cfg);
+API void dai_image_manip_config_add_crop_xywh(DaiBuffer cfg, uint32_t x, uint32_t y, uint32_t w, uint32_t h);
+API void dai_image_manip_config_add_crop_rect(DaiBuffer cfg, float x, float y, float w, float h, bool normalized_coords);
+API void dai_image_manip_config_add_crop_rotated_rect(DaiBuffer cfg, float cx, float cy, float w, float h, float angle_deg, bool normalized_coords);
+API void dai_image_manip_config_add_scale(DaiBuffer cfg, float scale_x, float scale_y);
+API void dai_image_manip_config_add_rotate_deg(DaiBuffer cfg, float angle_deg);
+API void dai_image_manip_config_add_rotate_deg_center(DaiBuffer cfg, float angle_deg, float center_x, float center_y);
+API void dai_image_manip_config_add_flip_horizontal(DaiBuffer cfg);
+API void dai_image_manip_config_add_flip_vertical(DaiBuffer cfg);
+API void dai_image_manip_config_add_transform_affine(DaiBuffer cfg, const float* matrix4);
+API void dai_image_manip_config_add_transform_perspective(DaiBuffer cfg, const float* matrix9);
+API void dai_image_manip_config_add_transform_four_points(DaiBuffer cfg, const float* src8, const float* dst8, bool normalized_coords);
+API void dai_image_manip_config_set_output_size(DaiBuffer cfg, uint32_t w, uint32_t h, int resize_mode);
+API void dai_image_manip_config_set_output_center(DaiBuffer cfg, bool center);
+API void dai_image_manip_config_set_colormap(DaiBuffer cfg, int colormap);
+API void dai_image_manip_config_set_background_color_rgb(DaiBuffer cfg, uint32_t red, uint32_t green, uint32_t blue);
+API void dai_image_manip_config_set_background_color_gray(DaiBuffer cfg, uint32_t val);
+API void dai_image_manip_config_set_frame_type(DaiBuffer cfg, int frame_type);
+API void dai_image_manip_config_set_undistort(DaiBuffer cfg, bool undistort);
+API bool dai_image_manip_config_get_undistort(DaiBuffer cfg);
+API void dai_image_manip_config_set_reuse_previous_image(DaiBuffer cfg, bool reuse);
+API void dai_image_manip_config_set_skip_current_image(DaiBuffer cfg, bool skip);
+API bool dai_image_manip_config_get_reuse_previous_image(DaiBuffer cfg);
+API bool dai_image_manip_config_get_skip_current_image(DaiBuffer cfg);
+
 // Low-level camera node operations
 API DaiCameraNode dai_pipeline_create_camera(DaiPipeline pipeline, int board_socket);
 

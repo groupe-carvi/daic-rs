@@ -42,6 +42,11 @@ name = "camera"
 path = "examples/camera.rs"
 
 [[example]]
+name = "image_manip"
+path = "examples/image_manip.rs"
+required-features = ["rerun"]
+
+[[example]]
 name = "threaded_host_node"
 path = "examples/threaded_host_node.rs"
 

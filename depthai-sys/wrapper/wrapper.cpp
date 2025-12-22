@@ -1567,6 +1567,422 @@ void dai_rgbd_set_depth_unit(DaiNode rgbd, int depth_unit) {
     }
 }
 
+static inline dai::node::ImageManip* _dai_as_image_manip(DaiNode manip) {
+    return static_cast<dai::node::ImageManip*>(manip);
+}
+
+static inline std::shared_ptr<dai::ImageManipConfig> _dai_as_image_manip_config(DaiBuffer cfg, const char* ctx) {
+    if(!cfg) {
+        last_error = std::string(ctx) + ": null cfg";
+        return nullptr;
+    }
+    auto base_ptr = static_cast<std::shared_ptr<dai::Buffer>*>(cfg);
+    auto typed = std::dynamic_pointer_cast<dai::ImageManipConfig>(*base_ptr);
+    if(!typed) {
+        last_error = std::string(ctx) + ": cfg is not ImageManipConfig";
+        return nullptr;
+    }
+    return typed;
+}
+
+void dai_image_manip_set_num_frames_pool(DaiNode manip, int num_frames_pool) {
+    if(!manip) {
+        last_error = "dai_image_manip_set_num_frames_pool: null manip";
+        return;
+    }
+    try {
+        _dai_as_image_manip(manip)->setNumFramesPool(num_frames_pool);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_set_num_frames_pool failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_set_max_output_frame_size(DaiNode manip, int max_frame_size) {
+    if(!manip) {
+        last_error = "dai_image_manip_set_max_output_frame_size: null manip";
+        return;
+    }
+    try {
+        _dai_as_image_manip(manip)->setMaxOutputFrameSize(max_frame_size);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_set_max_output_frame_size failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_set_run_on_host(DaiNode manip, bool run_on_host) {
+    if(!manip) {
+        last_error = "dai_image_manip_set_run_on_host: null manip";
+        return;
+    }
+    try {
+        _dai_as_image_manip(manip)->setRunOnHost(run_on_host);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_set_run_on_host failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_set_backend(DaiNode manip, int backend) {
+    if(!manip) {
+        last_error = "dai_image_manip_set_backend: null manip";
+        return;
+    }
+    try {
+        _dai_as_image_manip(manip)->setBackend(static_cast<dai::node::ImageManip::Backend>(backend));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_set_backend failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_set_performance_mode(DaiNode manip, int performance_mode) {
+    if(!manip) {
+        last_error = "dai_image_manip_set_performance_mode: null manip";
+        return;
+    }
+    try {
+        _dai_as_image_manip(manip)->setPerformanceMode(static_cast<dai::node::ImageManip::PerformanceMode>(performance_mode));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_set_performance_mode failed: ") + e.what();
+    }
+}
+
+bool dai_image_manip_run_on_host(DaiNode manip) {
+    if(!manip) {
+        last_error = "dai_image_manip_run_on_host: null manip";
+        return false;
+    }
+    try {
+        return _dai_as_image_manip(manip)->runOnHost();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_run_on_host failed: ") + e.what();
+        return false;
+    }
+}
+
+void dai_image_manip_run(DaiNode manip) {
+    if(!manip) {
+        last_error = "dai_image_manip_run: null manip";
+        return;
+    }
+    try {
+        _dai_as_image_manip(manip)->run();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_run failed: ") + e.what();
+    }
+}
+
+DaiBuffer dai_image_manip_config_new() {
+    try {
+        auto cfg = std::make_shared<dai::ImageManipConfig>();
+        return new std::shared_ptr<dai::Buffer>(std::static_pointer_cast<dai::Buffer>(std::move(cfg)));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_new failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiBuffer dai_image_manip_get_initial_config(DaiNode manip) {
+    if(!manip) {
+        last_error = "dai_image_manip_get_initial_config: null manip";
+        return nullptr;
+    }
+    try {
+        auto m = _dai_as_image_manip(manip);
+        if(!m->initialConfig) {
+            last_error = "dai_image_manip_get_initial_config: initialConfig is null";
+            return nullptr;
+        }
+        return new std::shared_ptr<dai::Buffer>(std::static_pointer_cast<dai::Buffer>(m->initialConfig));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_get_initial_config failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+void dai_image_manip_config_clear_ops(DaiBuffer cfg) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_clear_ops");
+        if(!c) return;
+        c->clearOps();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_clear_ops failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_crop_xywh(DaiBuffer cfg, uint32_t x, uint32_t y, uint32_t w, uint32_t h) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_crop_xywh");
+        if(!c) return;
+        c->addCrop(x, y, w, h);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_crop_xywh failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_crop_rect(DaiBuffer cfg, float x, float y, float w, float h, bool normalized_coords) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_crop_rect");
+        if(!c) return;
+        dai::Rect r;
+        r.x = x;
+        r.y = y;
+        r.width = w;
+        r.height = h;
+        r.hasNormalized = true;
+        r.normalized = normalized_coords;
+        c->addCrop(r, normalized_coords);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_crop_rect failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_crop_rotated_rect(DaiBuffer cfg, float cx, float cy, float w, float h, float angle_deg, bool normalized_coords) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_crop_rotated_rect");
+        if(!c) return;
+        dai::Point2f center(cx, cy, normalized_coords);
+        dai::Size2f size(w, h, normalized_coords);
+        dai::RotatedRect rr(center, size, angle_deg);
+        c->addCropRotatedRect(rr, normalized_coords);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_crop_rotated_rect failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_scale(DaiBuffer cfg, float scale_x, float scale_y) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_scale");
+        if(!c) return;
+        c->addScale(scale_x, scale_y);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_scale failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_rotate_deg(DaiBuffer cfg, float angle_deg) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_rotate_deg");
+        if(!c) return;
+        c->addRotateDeg(angle_deg);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_rotate_deg failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_rotate_deg_center(DaiBuffer cfg, float angle_deg, float center_x, float center_y) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_rotate_deg_center");
+        if(!c) return;
+        c->addRotateDeg(angle_deg, dai::Point2f(center_x, center_y, true));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_rotate_deg_center failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_flip_horizontal(DaiBuffer cfg) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_flip_horizontal");
+        if(!c) return;
+        c->addFlipHorizontal();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_flip_horizontal failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_flip_vertical(DaiBuffer cfg) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_flip_vertical");
+        if(!c) return;
+        c->addFlipVertical();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_flip_vertical failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_transform_affine(DaiBuffer cfg, const float* matrix4) {
+    if(!matrix4) {
+        last_error = "dai_image_manip_config_add_transform_affine: null matrix4";
+        return;
+    }
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_transform_affine");
+        if(!c) return;
+        std::array<float, 4> m{{matrix4[0], matrix4[1], matrix4[2], matrix4[3]}};
+        c->addTransformAffine(m);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_transform_affine failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_transform_perspective(DaiBuffer cfg, const float* matrix9) {
+    if(!matrix9) {
+        last_error = "dai_image_manip_config_add_transform_perspective: null matrix9";
+        return;
+    }
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_transform_perspective");
+        if(!c) return;
+        std::array<float, 9> m{{
+            matrix9[0], matrix9[1], matrix9[2],
+            matrix9[3], matrix9[4], matrix9[5],
+            matrix9[6], matrix9[7], matrix9[8],
+        }};
+        c->addTransformPerspective(m);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_transform_perspective failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_add_transform_four_points(DaiBuffer cfg, const float* src8, const float* dst8, bool normalized_coords) {
+    if(!src8 || !dst8) {
+        last_error = "dai_image_manip_config_add_transform_four_points: null src8 or dst8";
+        return;
+    }
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_add_transform_four_points");
+        if(!c) return;
+
+        std::array<dai::Point2f, 4> src{{
+            dai::Point2f(src8[0], src8[1], normalized_coords),
+            dai::Point2f(src8[2], src8[3], normalized_coords),
+            dai::Point2f(src8[4], src8[5], normalized_coords),
+            dai::Point2f(src8[6], src8[7], normalized_coords),
+        }};
+        std::array<dai::Point2f, 4> dst{{
+            dai::Point2f(dst8[0], dst8[1], normalized_coords),
+            dai::Point2f(dst8[2], dst8[3], normalized_coords),
+            dai::Point2f(dst8[4], dst8[5], normalized_coords),
+            dai::Point2f(dst8[6], dst8[7], normalized_coords),
+        }};
+
+        c->addTransformFourPoints(src, dst, normalized_coords);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_add_transform_four_points failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_set_output_size(DaiBuffer cfg, uint32_t w, uint32_t h, int resize_mode) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_set_output_size");
+        if(!c) return;
+        c->setOutputSize(w, h, static_cast<dai::ImageManipConfig::ResizeMode>(resize_mode));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_set_output_size failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_set_output_center(DaiBuffer cfg, bool center) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_set_output_center");
+        if(!c) return;
+        c->setOutputCenter(center);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_set_output_center failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_set_colormap(DaiBuffer cfg, int colormap) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_set_colormap");
+        if(!c) return;
+        c->setColormap(static_cast<dai::Colormap>(colormap));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_set_colormap failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_set_background_color_rgb(DaiBuffer cfg, uint32_t red, uint32_t green, uint32_t blue) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_set_background_color_rgb");
+        if(!c) return;
+        c->setBackgroundColor(red, green, blue);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_set_background_color_rgb failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_set_background_color_gray(DaiBuffer cfg, uint32_t val) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_set_background_color_gray");
+        if(!c) return;
+        c->setBackgroundColor(val);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_set_background_color_gray failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_set_frame_type(DaiBuffer cfg, int frame_type) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_set_frame_type");
+        if(!c) return;
+        c->setFrameType(static_cast<dai::ImgFrame::Type>(frame_type));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_set_frame_type failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_set_undistort(DaiBuffer cfg, bool undistort) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_set_undistort");
+        if(!c) return;
+        c->setUndistort(undistort);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_set_undistort failed: ") + e.what();
+    }
+}
+
+bool dai_image_manip_config_get_undistort(DaiBuffer cfg) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_get_undistort");
+        if(!c) return false;
+        return c->getUndistort();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_get_undistort failed: ") + e.what();
+        return false;
+    }
+}
+
+void dai_image_manip_config_set_reuse_previous_image(DaiBuffer cfg, bool reuse) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_set_reuse_previous_image");
+        if(!c) return;
+        c->setReusePreviousImage(reuse);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_set_reuse_previous_image failed: ") + e.what();
+    }
+}
+
+void dai_image_manip_config_set_skip_current_image(DaiBuffer cfg, bool skip) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_set_skip_current_image");
+        if(!c) return;
+        c->setSkipCurrentImage(skip);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_set_skip_current_image failed: ") + e.what();
+    }
+}
+
+bool dai_image_manip_config_get_reuse_previous_image(DaiBuffer cfg) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_get_reuse_previous_image");
+        if(!c) return false;
+        return c->getReusePreviousImage();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_get_reuse_previous_image failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_image_manip_config_get_skip_current_image(DaiBuffer cfg) {
+    try {
+        auto c = _dai_as_image_manip_config(cfg, "dai_image_manip_config_get_skip_current_image");
+        if(!c) return false;
+        return c->getSkipCurrentImage();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_manip_config_get_skip_current_image failed: ") + e.what();
+        return false;
+    }
+}
+
 // Wrapper-owned pointcloud view. PointCloudData::getPointsRGB() returns by value, so we
 // store the returned vector and expose a stable pointer + length to Rust.
 struct DaiPointCloudView {
