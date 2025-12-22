@@ -8,6 +8,28 @@ use rerun as rr;
 
 use std::time::{Duration, Instant};
 
+fn url_encode_component(input: &str) -> String {
+    // Minimal percent-encoding for URL query components.
+    // We keep the unreserved set from RFC 3986 and percent-encode everything else.
+    let mut out = String::with_capacity(input.len());
+    for b in input.as_bytes() {
+        match *b {
+            b'A'..=b'Z'
+            | b'a'..=b'z'
+            | b'0'..=b'9'
+            | b'-'
+            | b'.'
+            | b'_'
+            | b'~' => out.push(*b as char),
+            _ => {
+                out.push('%');
+                out.push_str(&format!("{:02X}", b));
+            }
+        }
+    }
+    out
+}
+
 pub struct RerunWebConfig {
     pub bind_ip: String,
     /// Port for hosting the Web Viewer (HTTP).
@@ -63,10 +85,8 @@ struct RerunHostNodeImpl {
     _tokio_rt: Option<tokio::runtime::Runtime>,
     entity_path: String,
     frame_index: i64,
-    received_frames: u64,
     logged_frames: u64,
     skipped_frames: u64,
-    last_stats: Instant,
     last_skip_note: Instant,
 }
 
@@ -113,8 +133,16 @@ impl RerunHostNodeImpl {
                 })
                 .map_err(rerun_err)?;
 
+                let base_url = web_server.server_url();
+                let autoconnect_url = format!(
+                    "{}/?url={}",
+                    base_url.trim_end_matches('/'),
+                    url_encode_component(&connect_to)
+                );
+
                 eprintln!("rerun: gRPC /proxy connect URL: {connect_to}");
-                eprintln!("rerun: web viewer served at: {}", web_server.server_url());
+                eprintln!("rerun: web viewer served at: {base_url}");
+                eprintln!("rerun: web viewer (autoconnect) URL: {autoconnect_url}");
                 web_server.detach();
 
                 eprintln!(
@@ -128,10 +156,8 @@ impl RerunHostNodeImpl {
                     _tokio_rt: Some(rt),
                     entity_path: config.entity_path,
                     frame_index: 0,
-                    received_frames: 0,
                     logged_frames: 0,
                     skipped_frames: 0,
-                    last_stats: Instant::now(),
                     last_skip_note: Instant::now() - Duration::from_secs(60),
                 })
             }
@@ -151,10 +177,8 @@ impl RerunHostNodeImpl {
                     _tokio_rt: None,
                     entity_path: config.entity_path,
                     frame_index: 0,
-                    received_frames: 0,
                     logged_frames: 0,
                     skipped_frames: 0,
-                    last_stats: Instant::now(),
                     last_skip_note: Instant::now() - Duration::from_secs(60),
                 })
             }
@@ -165,23 +189,6 @@ impl RerunHostNodeImpl {
         while ctx.is_running() {
             match self.input.get_frame() {
                 Ok(frame) => {
-                    self.received_frames += 1;
-
-                    // Print periodic stats so we can tell whether we are receiving frames at all.
-                    if self.last_stats.elapsed() >= Duration::from_secs(2) {
-                        let (w, h) = (frame.width(), frame.height());
-                        eprintln!(
-                            "rerun: stats: received={} logged={} skipped={} last_frame={}x{} format={:?}",
-                            self.received_frames,
-                            self.logged_frames,
-                            self.skipped_frames,
-                            w,
-                            h,
-                            frame.format()
-                        );
-                        self.last_stats = Instant::now();
-                    }
-
                     if let Err(e) = self.log_frame(&frame) {
                         // Previously we silently ignored errors which makes debugging painful.
                         eprintln!("rerun: failed to process frame: {e}");
@@ -195,8 +202,8 @@ impl RerunHostNodeImpl {
         }
 
         eprintln!(
-            "rerun: host node stopping (received={} logged={} skipped={})",
-            self.received_frames, self.logged_frames, self.skipped_frames
+            "rerun: host node stopping (logged={} skipped={})",
+            self.logged_frames, self.skipped_frames
         );
     }
 
