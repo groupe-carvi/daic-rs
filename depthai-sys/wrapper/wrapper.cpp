@@ -1571,6 +1571,16 @@ static inline dai::node::ImageManip* _dai_as_image_manip(DaiNode manip) {
     return static_cast<dai::node::ImageManip*>(manip);
 }
 
+// Helper to validate and cast a DaiBuffer to ImageManipConfig.
+// 
+// Error handling contract:
+// - Returns nullptr on failure (null cfg or wrong type)
+// - Sets global last_error with context-specific message
+// - Callers MUST check return value and return early on nullptr
+// - Error is propagated to Rust via dai_get_last_error()
+//
+// This pattern ensures all validation failures are consistently reported
+// to the Rust layer without requiring per-function error handling.
 static inline std::shared_ptr<dai::ImageManipConfig> _dai_as_image_manip_config(DaiBuffer cfg, const char* ctx) {
     if(!cfg) {
         last_error = std::string(ctx) + ": null cfg";
