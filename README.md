@@ -91,6 +91,34 @@ winget install -e --id LLVM.LLVM
 
 - `hit`: Hardware Integration Tests - enable with `cargo test --features hit` when you have a physical device connected.
 
+### DepthAI-Core version selection (advanced)
+
+`depthai-sys` can download/build different **DepthAI-Core** versions. Because this crate links native code (FFI), only a small set of versions is supported at any given time.
+
+Select **exactly one** of the following Cargo features:
+
+- `latest` (default; maps to the latest supported tag)
+- `v3-2-1` (maps to tag `v3.2.1`)
+- `v3-2-0` (maps to tag `v3.2.0`)
+- `v3-1-0` (maps to tag `v3.1.0`)
+
+Note: Cargo feature names can’t contain dots (`.`), so version selectors use hyphens.
+
+Examples:
+
+```bash
+# Build against DepthAI-Core v3.2.0
+cargo build --features v3-2-0
+
+# Run an example against DepthAI-Core v3.1.0
+cargo run --example pipeline_creation --features v3-1-0
+
+# Explicitly select latest (usually unnecessary; it's the default)
+cargo build --features latest
+```
+
+If you enable more than one of these, the build will fail early with an explicit error.
+
 To build without the rerun feature:
 
 ```bash
@@ -108,7 +136,8 @@ cargo build
 Notes:
 
 - The first build can take a while because DepthAI-Core is fetched/built and dependencies are prepared.
-- Build artifacts for native code live under `target/dai-build/`.
+- Build artifacts for native code are cached under `target/dai-build/<depthai-core-tag>/`.
+	(So if you switch between `--features v3-2-1` and `--features v3-2-0`, each version keeps its own build cache.)
 
 ## Run examples
 

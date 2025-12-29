@@ -8,13 +8,36 @@
 #include "depthai/pipeline/datatype/RGBDData.hpp"
 #include "XLink/XLink.h"
 #include "XLink/XLinkPublicDefines.h"
+
+// Some nodes were introduced in DepthAI-Core after v3.1.0.
+// For older versions, avoid referencing the missing types so this wrapper can still compile.
+#if defined(__has_include)
+    #if __has_include(<depthai/pipeline/node/Rectification.hpp>)
+        #include <depthai/pipeline/node/Rectification.hpp>
+        #define DAI_HAS_NODE_RECTIFICATION 1
+    #else
+        #define DAI_HAS_NODE_RECTIFICATION 0
+    #endif
+
+    #if __has_include(<depthai/pipeline/node/NeuralDepth.hpp>)
+        #include <depthai/pipeline/node/NeuralDepth.hpp>
+        #define DAI_HAS_NODE_NEURAL_DEPTH 1
+    #else
+        #define DAI_HAS_NODE_NEURAL_DEPTH 0
+    #endif
+#else
+    #define DAI_HAS_NODE_RECTIFICATION 0
+    #define DAI_HAS_NODE_NEURAL_DEPTH 0
+#endif
 #include <chrono>
 #include <cstring>
 #include <cstdlib>
 #include <limits>
 #include <memory>
 #include <mutex>
+#include <optional>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
 #include <functional>
 
@@ -22,6 +45,32 @@
 static std::string last_error = "";
 
 namespace {
+template <typename T>
+struct _dai_is_std_optional : std::false_type {};
+
+template <typename U>
+struct _dai_is_std_optional<std::optional<U>> : std::true_type {};
+
+template <typename T>
+inline constexpr bool _dai_is_std_optional_v = _dai_is_std_optional<std::decay_t<T>>::value;
+
+template <typename T, typename Out>
+static bool _dai_optionalish_to_out(const std::optional<T>& value, Out* out) {
+    if(!out) return false;
+    if(value.has_value()) {
+        *out = static_cast<Out>(value.value());
+        return true;
+    }
+    return false;
+}
+
+template <typename T, typename Out>
+static bool _dai_optionalish_to_out(const T& value, Out* out) {
+    if(!out) return false;
+    *out = static_cast<Out>(value);
+    return true;
+}
+
 struct HostNodeCallbacks {
     dai::DaiHostNodeProcessGroup process = nullptr;
     dai::DaiHostNodeCallback on_start = nullptr;
@@ -1173,9 +1222,17 @@ static std::unordered_map<std::string, NodeCreator>& get_node_registry() {
         REGISTER_NODE(dai::node::SpatialDetectionNetwork);
         REGISTER_NODE(dai::node::BenchmarkIn);
         REGISTER_NODE(dai::node::BenchmarkOut);
+
+    #if DAI_HAS_NODE_RECTIFICATION
         REGISTER_NODE(dai::node::Rectification);
+    #endif
+
         REGISTER_NODE(dai::node::MessageDemux);
+
+    #if DAI_HAS_NODE_NEURAL_DEPTH
         REGISTER_NODE(dai::node::NeuralDepth);
+    #endif
+
         REGISTER_NODE(dai::node::SPIIn);
         REGISTER_NODE(dai::node::SPIOut);
         REGISTER_NODE(dai::node::Thermal);
@@ -3073,12 +3130,8 @@ bool dai_camera_get_outputs_num_frames_pool(DaiCameraNode camera, int* out_num) 
     }
     try {
         auto cam = static_cast<dai::node::Camera*>(camera);
-        auto opt = cam->getOutputsNumFramesPool();
-        if(opt.has_value()) {
-            *out_num = opt.value();
-            return true;
-        }
-        return false;
+        auto value = cam->getOutputsNumFramesPool();
+        return _dai_optionalish_to_out(value, out_num);
     } catch(const std::exception& e) {
         last_error = std::string("dai_camera_get_outputs_num_frames_pool failed: ") + e.what();
         return false;
@@ -3092,12 +3145,8 @@ bool dai_camera_get_outputs_max_size_pool(DaiCameraNode camera, size_t* out_size
     }
     try {
         auto cam = static_cast<dai::node::Camera*>(camera);
-        auto opt = cam->getOutputsMaxSizePool();
-        if(opt.has_value()) {
-            *out_size = opt.value();
-            return true;
-        }
-        return false;
+        auto value = cam->getOutputsMaxSizePool();
+        return _dai_optionalish_to_out(value, out_size);
     } catch(const std::exception& e) {
         last_error = std::string("dai_camera_get_outputs_max_size_pool failed: ") + e.what();
         return false;

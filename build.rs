@@ -1,5 +1,25 @@
 use std::{env, path::Path};
 
+fn selected_depthai_core_tag() -> String {
+    // This mirrors `depthai-sys/build.rs`'s version-selection logic.
+    // Feature naming note: Cargo features can't contain '.', so users select `v3-2-1`
+    // to mean DepthAI-Core tag `v3.2.1`.
+    if env::var_os("CARGO_FEATURE_V3_2_1").is_some() {
+        return "v3.2.1".to_string();
+    }
+    if env::var_os("CARGO_FEATURE_V3_2_0").is_some() {
+        return "v3.2.0".to_string();
+    }
+    if env::var_os("CARGO_FEATURE_V3_1_0").is_some() {
+        return "v3.1.0".to_string();
+    }
+
+    // Default to the crate version (workspace version is kept aligned with the
+    // latest supported DepthAI-Core tag).
+    let pkg_version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "3.2.1".to_string());
+    format!("v{}", pkg_version)
+}
+
 fn main() {
     // Ensure changes to vcpkg-installed libs re-trigger linkage when present.
     println!("cargo:rerun-if-env-changed=DEPTHAI_RPATH_DISABLE");
@@ -12,7 +32,11 @@ fn main() {
     // without setting LD_LIBRARY_PATH (needed for FFmpeg/libusb when OpenCV videoio is enabled).
     let out_dir = env::var("OUT_DIR").unwrap();
     let target_dir = Path::new(&out_dir).ancestors().nth(4).unwrap();
-    let vcpkg_root = target_dir.join("dai-build").join("vcpkg_installed");
+    let tag = selected_depthai_core_tag();
+    let vcpkg_root = target_dir
+        .join("dai-build")
+        .join(&tag)
+        .join("vcpkg_installed");
 
     let target = env::var("TARGET").unwrap_or_default();
     let triplet = if target.contains("aarch64") {
@@ -30,6 +54,7 @@ fn main() {
         // It is not part of vcpkg_installed, so we must add it to RUNPATH as well.
         let dcl_dir = target_dir
             .join("dai-build")
+            .join(&tag)
             .join("_deps")
             .join("dynamic_calibration-src")
             .join("lib");

@@ -22,13 +22,22 @@ static PROJECT_ROOT: Lazy<PathBuf> = Lazy::new(|| {
     )
 });
 
-static BUILD_FOLDER_PATH: Lazy<PathBuf> = Lazy::new(|| {
+static BASE_BUILD_FOLDER_PATH: Lazy<PathBuf> = Lazy::new(|| {
     let out_dir = env::var("OUT_DIR").unwrap();
     Path::new(&out_dir)
         .ancestors()
         .nth(4)
         .unwrap()
         .join("dai-build")
+});
+
+static BUILD_FOLDER_PATH: Lazy<PathBuf> = Lazy::new(|| {
+    // Versioned cache directory so multiple DepthAI-Core versions can coexist.
+    // This enables users to switch Cargo features (e.g. v3-2-1 -> v3-2-0) without
+    // losing the previous build, and ensures we don't accidentally link against the
+    // wrong native artifacts.
+    let tag = selected_depthai_core_version().tag();
+    BASE_BUILD_FOLDER_PATH.join(tag)
 });
 
 static GEN_FOLDER_PATH: Lazy<PathBuf> =
@@ -48,9 +57,8 @@ static DEPTHAI_CORE_ROOT: Lazy<RwLock<PathBuf>> = Lazy::new(|| {
 
 const DEPTHAI_CORE_REPOSITORY: &str = "https://github.com/luxonis/depthai-core.git";
 
-const DEPTHAI_CORE_BRANCH: &str = "v3.2.1";
-
-const DEPTHAI_CORE_WINPREBUILT_URL: &str = "https://github.com/luxonis/depthai-core/releases/download/v3.2.1/depthai-core-v3.2.1-win64.zip";
+// Latest DepthAI-Core version supported by this crate.
+const LATEST_SUPPORTED_DEPTHAI_CORE_TAG: DepthaiCoreVersion = DepthaiCoreVersion::V3_2_1;
 
 const OPENCV_WIN_PREBUILT_URL: &str =
     "https://github.com/opencv/opencv/releases/download/4.11.0/opencv-4.11.0-windows.exe";
@@ -61,10 +69,80 @@ macro_rules! println_build {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DepthaiCoreVersion {
+    Latest,
+    V3_2_1,
+    V3_2_0,
+    V3_1_0,
+}
+
+impl DepthaiCoreVersion {
+    fn tag(self) -> &'static str {
+        match self {
+            DepthaiCoreVersion::Latest => LATEST_SUPPORTED_DEPTHAI_CORE_TAG.tag(),
+            DepthaiCoreVersion::V3_2_1 => "v3.2.1",
+            DepthaiCoreVersion::V3_2_0 => "v3.2.0",
+            DepthaiCoreVersion::V3_1_0 => "v3.1.0",
+        }
+    }
+}
+
+fn selected_depthai_core_version() -> DepthaiCoreVersion {
+    // Cargo exposes enabled features to build scripts via environment variables.
+    // See: https://doc.rust-lang.org/cargo/reference/environment-variables.html
+    //
+    // We intentionally keep this a small, explicit allow-list. This is an FFI crate
+    // linking a native SDK, so arbitrary versions may break ABI expectations.
+    //
+    // Feature naming note:
+    // - Cargo features cannot contain '.', so users select `v3-2-1` to mean tag `v3.2.1`.
+
+    let candidates: &[(&str, DepthaiCoreVersion)] = &[
+        ("CARGO_FEATURE_LATEST", DepthaiCoreVersion::Latest),
+        ("CARGO_FEATURE_V3_2_1", DepthaiCoreVersion::V3_2_1),
+        ("CARGO_FEATURE_V3_2_0", DepthaiCoreVersion::V3_2_0),
+        ("CARGO_FEATURE_V3_1_0", DepthaiCoreVersion::V3_1_0),
+    ];
+
+    let mut enabled: Vec<&'static str> = Vec::new();
+    let mut picked: Vec<DepthaiCoreVersion> = Vec::new();
+    for (env_key, ver) in candidates {
+        if env::var_os(env_key).is_some() {
+            enabled.push(*env_key);
+            picked.push(*ver);
+        }
+    }
+
+    if picked.len() > 1 {
+        panic!(
+            "Multiple DepthAI-Core version features are enabled ({:?}). Please enable at most one of: latest, v3-2-1, v3-2-0, v3-1-0.",
+            enabled
+        );
+    }
+
+    picked.first().copied().unwrap_or(DepthaiCoreVersion::Latest)
+}
+
+fn selected_depthai_core_tag() -> String {
+    selected_depthai_core_version().tag().to_string()
+}
+
+fn depthai_core_winprebuilt_url(tag: &str) -> String {
+    // depthai-core release artifacts follow the convention:
+    //   https://github.com/luxonis/depthai-core/releases/download/<tag>/depthai-core-<tag>-win64.zip
+    // where <tag> includes the leading 'v' (e.g. v3.2.1).
+    let tag = if tag.starts_with('v') {
+        tag.to_string()
+    } else {
+        format!("v{}", tag)
+    };
+    format!(
+        "https://github.com/luxonis/depthai-core/releases/download/{tag}/depthai-core-{tag}-win64.zip"
+    )
+}
+
 fn main() {
-    // autocxx_build::Builder lit `src/lib.rs` (include_cpp!) pour déterminer l'allowlist.
-    // Sans ce rerun-if-changed, Cargo ne relance pas toujours le build script lors
-    // d'une modification de la liste `generate!(...)`, ce qui laisse des bindings obsolètes.
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=wrapper/");
     println!("cargo:rerun-if-changed={}", BUILD_FOLDER_PATH.join("depthai-core").join("include").display());
@@ -74,6 +152,9 @@ fn main() {
     println!("cargo:rerun-if-env-changed=DEPTHAI_ENABLE_EVENTS_MANAGER");
     println!("cargo:rerun-if-env-changed=DEPTHAI_RPATH_DISABLE");
     println_build!("Checking for depthai-core...");
+
+    let selected_tag = selected_depthai_core_tag();
+    println_build!("Using DepthAI-Core tag: {}", selected_tag);
 
     let depthai_core_lib = resolve_depthai_core_lib().expect("Failed to resolve depthai-core path");
     let windows_static_lib = if cfg!(target_os = "windows") {
@@ -1126,10 +1207,13 @@ Please point DEPTHAI_CORE_ROOT to a full depthai-core distribution (with include
                 clone_path.display()
             );
 
+            let selected_tag = selected_depthai_core_tag();
+            println_build!("Cloning depthai-core tag: {}", selected_tag);
+
             clone_repository(
                 DEPTHAI_CORE_REPOSITORY,
                 &clone_path,
-                Some(DEPTHAI_CORE_BRANCH),
+                Some(selected_tag.as_str()),
             )
             .expect("Failed to clone depthai-core repository");
 
@@ -1399,7 +1483,10 @@ fn get_depthai_windows_prebuilt_binary() -> Result<PathBuf, String> {
     let mut zip_path = BUILD_FOLDER_PATH.join("depthai-core.zip");
 
     if !zip_path.exists() {
-        let downloaded = download_file(DEPTHAI_CORE_WINPREBUILT_URL, BUILD_FOLDER_PATH.as_path())?;
+        let selected_tag = selected_depthai_core_tag();
+        let url = depthai_core_winprebuilt_url(&selected_tag);
+        println_build!("Downloading depthai-core prebuilt for tag {}", selected_tag);
+        let downloaded = download_file(&url, BUILD_FOLDER_PATH.as_path())?;
         zip_path.set_file_name(downloaded.file_name().unwrap());
         fs::rename(&downloaded, &zip_path);
         println_build!(
