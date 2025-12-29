@@ -15,3 +15,58 @@ tasks:
   test:hdep:
     cmds:
       - cargo test --features hdep_tests
+  valgrind:check-all:
+    platforms: [linux]
+    desc: Run Valgrind against all examples to check ffi memory issues
+    cmds:
+      # NOTE: Valgrind is typically available on Linux. On Windows, run this via WSL.
+      - cmd: cargo valgrind run --example camera
+      - cmd: cargo valgrind run --example pipeline_creation
+      - cmd: cargo valgrind run --example composite_node
+      - cmd: cargo valgrind run --example host_node
+      - cmd: cargo valgrind run --example threaded_host_node
+      # Examples that require the optional rerun feature
+      - cmd: cargo valgrind run --example rerun_host_node --features rerun
+      - cmd: cargo valgrind run --example rgbd_rerun --features rerun
+      - cmd: cargo valgrind run --example image_manip --features rerun
+
+  valgrind:check:*:
+    platforms: [linux]
+    desc: Run Valgrind against examples matching a pattern (supports wildcards like cam*).
+    vars:
+      # Usage:
+      #   task valgrind:check:camera
+      #   task "valgrind:check:cam*"
+      #   task valgrind:check:rgbd_rerun
+      # NOTE: This task requires bash (Linux/WSL).
+      PATTERN: '{{index .MATCH 0}}'
+    cmds:
+      - cmd: >
+          bash -lc 'set -euo pipefail;
+          pat="${1:-}";
+          shopt -s nullglob;
+          matches=(examples/${pat}.rs);
+          if [ ${#matches[@]} -eq 0 ]; then
+            echo "No examples match pattern: ${pat}";
+            exit 1;
+          fi;
+          for f in "${matches[@]}"; do
+            ex=$(basename "$f" .rs);
+            echo "==> cargo valgrind run --example ${ex}";
+            case "$ex" in
+              rerun_host_node|rgbd_rerun|image_manip)
+                cargo valgrind run --example "$ex" --features rerun
+                ;;
+              *)
+                cargo valgrind run --example "$ex"
+                ;;
+            esac;
+          done' -- {{.PATTERN}}
+    
+
+  deps:install-valgrind:
+    platforms: [linux]
+    desc: Install cargo-valgrind
+    cmds:
+      - cmd: sudo apt-get install valgrind
+      - cmd: cargo install cargo-valgrind
