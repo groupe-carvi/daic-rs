@@ -265,7 +265,7 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 This usually means another process already owns the device connection.
 
 - Close other DepthAI apps (including Python scripts) and try again.
-- Prefer `Pipeline::with_device(&device)` so you don’t accidentally open two connections.
+- Prefer `Pipeline::new().with_device(&device).build()?` so you don’t accidentally open two connections.
 
 ### Clang/libclang errors while building bindings
 

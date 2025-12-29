@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // (No-op on devices that don't support it.)
     let _ = device.set_ir_laser_dot_projector_intensity(0.3);
 
-    let pipeline = Pipeline::with_device(&device)?;
+    let pipeline = Pipeline::new().with_device(&device).build()?;
 
     // Cameras: typical OAK-D layout (CamA = color, CamB/CamC = mono stereo).
     let cam_color = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;

@@ -22,7 +22,7 @@ impl FrameTap {
 }
 
 fn main() -> Result<()> {
-    let pipeline = Pipeline::new()?;
+    let pipeline = Pipeline::new().build()?;
     let camera = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;
     let out = camera.request_output(CameraOutputConfig::new((640, 400)))?;
 

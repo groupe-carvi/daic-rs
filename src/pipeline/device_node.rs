@@ -38,7 +38,7 @@ pub trait CreateInPipelineWith<P>: Sized {
 /// use depthai::camera::CameraNode;
 /// use depthai::pipeline::DeviceNode;
 /// 
-/// let pipeline = Pipeline::new()?;
+/// let pipeline = Pipeline::new().build()?;
 /// 
 /// // For nodes that don't need parameters, use DeviceNode trait
 /// // (future nodes like StereoDepth, RGBD would implement this)
@@ -105,7 +105,7 @@ where
 /// use depthai::common::CameraBoardSocket;
 /// use depthai::pipeline::DeviceNodeWithParams;
 /// 
-/// let pipeline = Pipeline::new()?;
+/// let pipeline = Pipeline::new().build()?;
 /// 
 /// // Camera nodes need a socket parameter
 /// let camera = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;

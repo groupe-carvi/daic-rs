@@ -4,7 +4,7 @@ use depthai::camera::{CameraBoardSocket, CameraNode, CameraOutputConfig, ImageFr
 use depthai::{Pipeline, RerunHostNode, RerunHostNodeConfig, RerunViewer, RerunWebConfig, Result};
 
 fn main() -> Result<()> {
-    let pipeline = Pipeline::new()?;
+    let pipeline = Pipeline::new().build()?;
     let camera = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;
     // Important: the default frame_type is "native" (often NV12), which the RerunHostNode
     // intentionally ignores. Request an explicit RGB output so it can be logged.

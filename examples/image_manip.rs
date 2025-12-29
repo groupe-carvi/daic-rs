@@ -18,7 +18,7 @@ fn main() -> Result<()> {
     const CAM_H: u32 = 480;
 
     // Use an implicit/default device (keeps the example short).
-    let pipeline = Pipeline::new()?;
+    let pipeline = Pipeline::new().build()?;
 
     // Camera (built immediately by create_with).
     let cam = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;

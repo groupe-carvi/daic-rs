@@ -8,7 +8,7 @@ use depthai::Result;
 
 fn main() -> Result<()> {
     let device = Device::new()?;
-    let pipeline = Pipeline::with_device(&device)?;
+    let pipeline = Pipeline::new().with_device(&device).build()?;
 
     let cam = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;
     let out = cam.request_output(CameraOutputConfig {

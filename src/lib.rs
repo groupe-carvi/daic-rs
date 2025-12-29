@@ -50,7 +50,7 @@
 //!
 //! - `Device::new()` opens/returns a device handle.
 //! - `Device::clone()` / `Device::try_clone()` creates another handle to the same underlying connection.
-//! - `Pipeline::with_device(&device)` binds a pipeline to an existing device connection (recommended).
+//! - `Pipeline::new().with_device(&device).build()?` binds a pipeline to an existing device connection (recommended).
 //! - `Pipeline::start()` starts the pipeline using its associated device connection.
 //!
 //! ### Creating nodes
@@ -65,7 +65,7 @@
 //! # use depthai::rgbd::RgbdNode;
 //! # use depthai::camera::{CameraNode, CameraBoardSocket};
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! // Nodes without parameters
 //! let stereo = pipeline.create::<StereoDepthNode>()?;
 //! let rgbd = pipeline.create::<RgbdNode>()?;
@@ -81,7 +81,7 @@
 //! ```no_run
 //! # use depthai::{Pipeline, Result};
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! let node = pipeline.create_node("dai::node::StereoDepth")?;
 //! # Ok(())
 //! # }
@@ -117,7 +117,7 @@
 //! }
 //!
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! // Use as a regular node
 //! let bundle = pipeline.create::<CameraStereoBundle>()?;
 //! # Ok(())
@@ -147,7 +147,7 @@
 //! }
 //!
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! let host = pipeline.create_host_node(FrameLogger)?;
 //! # Ok(())
 //! # }
@@ -175,7 +175,7 @@
 //! }
 //!
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! let host = pipeline.create_threaded_host_node(|node| {
 //!     let input = node.create_input(Some("in"))?;
 //!     Ok(FrameProcessor { input })
@@ -193,7 +193,7 @@
 //! # use depthai::{Pipeline, Result, RerunHostNode, RerunHostNodeConfig, RerunViewer, RerunWebConfig};
 //! # #[cfg(feature = "rerun")]
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! # let out = pipeline.create_node("dai::node::Camera")?.output("raw")?;
 //! let host = pipeline.create_with::<RerunHostNode, _>(RerunHostNodeConfig {
 //!     viewer: RerunViewer::Web(RerunWebConfig {
@@ -221,7 +221,7 @@
 //! # use depthai::camera::{CameraNode, CameraBoardSocket, CameraOutputConfig};
 //! # use depthai::stereo_depth::StereoDepthNode;
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! # let camera = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;
 //! # let camera_out = camera.request_output(CameraOutputConfig::new((640, 400)))?;
 //! # let stereo = pipeline.create::<StereoDepthNode>()?;
@@ -246,7 +246,7 @@
 //! # use depthai::{Pipeline, Result};
 //! # use depthai::camera::{CameraNode, CameraBoardSocket, CameraOutputConfig, ImageFrameType, ResizeMode};
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! # let camera = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;
 //! let out = camera.request_output(CameraOutputConfig {
 //!     size: (640, 400),
@@ -268,7 +268,7 @@
 //! ```no_run
 //! # use depthai::{Pipeline, Result, StereoDepthNode, StereoPresetMode};
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! let stereo = pipeline.create::<StereoDepthNode>()?;
 //! stereo.set_default_profile_preset(StereoPresetMode::Robotics);
 //! stereo.set_left_right_check(true);
@@ -285,7 +285,7 @@
 //! ```no_run
 //! # use depthai::{Pipeline, Result, RgbdNode, DepthUnit};
 //! # fn main() -> Result<()> {
-//! # let pipeline = Pipeline::new()?;
+//! # let pipeline = Pipeline::new().build()?;
 //! # let color_out = pipeline.create_node("dai::node::Camera")?.output("raw")?;
 //! # let depth_out = pipeline.create_node("dai::node::StereoDepth")?.output("depth")?;
 //! let rgbd = pipeline.create::<RgbdNode>()?;

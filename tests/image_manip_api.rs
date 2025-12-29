@@ -3,7 +3,7 @@ use depthai::common::ImageFrameType;
 
 #[test]
 fn image_manip_api_smoke() -> Result<()> {
-    let pipeline = Pipeline::new()?;
+    let pipeline = Pipeline::new().build()?;
 
     // Node creation via generic `pipeline.create::<T>()`.
     let manip = pipeline.create::<ImageManipNode>()?;

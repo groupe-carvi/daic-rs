@@ -16,7 +16,7 @@ fn main() -> Result<()> {
     let device = Device::new()?;
 
     // Create pipeline bound to that device (matches DepthAI C++ `Pipeline(device)`)
-    let pipeline = Pipeline::with_device(&device)?;
+    let pipeline = Pipeline::new().with_device(&device).build()?;
     
     // Using the generic create_with API for creating camera nodes
     let left = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamB)?;

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::{
     ffi::{CStr, CString},
-    path::Path,
+    path::{Path, PathBuf},
 };
 
 use crate::{
@@ -108,8 +108,193 @@ pub struct Pipeline {
     inner: Arc<PipelineInner>,
 }
 
+/// Builder for constructing a [`Pipeline`] with optional configuration.
+///
+/// This allows setting pipeline-wide options (device binding, OpenVINO version, tuning blob, etc.)
+/// before creating the underlying DepthAI pipeline handle.
+///
+/// # Example
+/// ```no_run
+/// # use depthai::{Device, Pipeline, Result};
+/// # fn main() -> Result<()> {
+/// let device = Device::new()?;
+/// let pipeline = Pipeline::new().with_device(&device).build()?;
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone, Default)]
+pub struct PipelineBuilder {
+    device: Option<Device>,
+    create_implicit_device: Option<bool>,
+
+    xlink_chunk_size: Option<i32>,
+    sipp_buffer_size: Option<i32>,
+    sipp_dma_buffer_size: Option<i32>,
+    camera_tuning_blob_path: Option<PathBuf>,
+    openvino_version: Option<OpenVinoVersion>,
+
+    calibration_data_json: Option<serde_json::Value>,
+    global_properties_json: Option<serde_json::Value>,
+    board_config_json: Option<serde_json::Value>,
+    eeprom_data_json: Option<serde_json::Value>,
+
+    holistic_record_json: Option<serde_json::Value>,
+    holistic_replay_path: Option<PathBuf>,
+}
+
+impl PipelineBuilder {
+    /// Start a new pipeline builder.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Bind the pipeline to an existing device connection.
+    ///
+    /// Internally this clones the device handle, mirroring the common C++ pattern of sharing one
+    /// underlying device connection.
+    pub fn with_device(mut self, device: &Device) -> Self {
+        self.device = Some(device.clone());
+        self
+    }
+
+    /// Control whether the pipeline should create an implicit/default device.
+    ///
+    /// If you call [`PipelineBuilder::with_device`], that takes precedence.
+    pub fn with_implicit_device(mut self, create_implicit_device: bool) -> Self {
+        self.create_implicit_device = Some(create_implicit_device);
+        self
+    }
+
+    /// Convenience for a host-only pipeline (no implicit/default device).
+    pub fn host_only(mut self) -> Self {
+        self.device = None;
+        self.create_implicit_device = Some(false);
+        self
+    }
+
+    pub fn xlink_chunk_size(mut self, size_bytes: i32) -> Self {
+        self.xlink_chunk_size = Some(size_bytes);
+        self
+    }
+
+    pub fn sipp_buffer_size(mut self, size_bytes: i32) -> Self {
+        self.sipp_buffer_size = Some(size_bytes);
+        self
+    }
+
+    pub fn sipp_dma_buffer_size(mut self, size_bytes: i32) -> Self {
+        self.sipp_dma_buffer_size = Some(size_bytes);
+        self
+    }
+
+    pub fn camera_tuning_blob_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.camera_tuning_blob_path = Some(path.into());
+        self
+    }
+
+    pub fn openvino_version(mut self, version: OpenVinoVersion) -> Self {
+        self.openvino_version = Some(version);
+        self
+    }
+
+    pub fn calibration_data_json(mut self, value: serde_json::Value) -> Self {
+        self.calibration_data_json = Some(value);
+        self
+    }
+
+    pub fn global_properties_json(mut self, value: serde_json::Value) -> Self {
+        self.global_properties_json = Some(value);
+        self
+    }
+
+    pub fn board_config_json(mut self, value: serde_json::Value) -> Self {
+        self.board_config_json = Some(value);
+        self
+    }
+
+    pub fn eeprom_data_json(mut self, value: serde_json::Value) -> Self {
+        self.eeprom_data_json = Some(value);
+        self
+    }
+
+    pub fn holistic_record_json(mut self, value: serde_json::Value) -> Self {
+        self.holistic_record_json = Some(value);
+        self
+    }
+
+    pub fn holistic_replay_path(mut self, path: impl Into<PathBuf>) -> Self {
+        self.holistic_replay_path = Some(path.into());
+        self
+    }
+
+    /// Create the [`Pipeline`] instance using the chosen options.
+    ///
+    /// Note: this does **not** call [`Pipeline::build`] (DepthAI graph compilation). It only
+    /// constructs and configures the pipeline object.
+    pub fn build(self) -> Result<Pipeline> {
+        let pipeline = if let Some(device) = &self.device {
+            Pipeline::create_with_device(device)?
+        } else if let Some(create_implicit_device) = self.create_implicit_device {
+            Pipeline::new_with_implicit_device(create_implicit_device)?
+        } else {
+            Pipeline::try_new()?
+        };
+
+        if let Some(v) = self.xlink_chunk_size {
+            pipeline.set_xlink_chunk_size(v)?;
+        }
+        if let Some(v) = self.sipp_buffer_size {
+            pipeline.set_sipp_buffer_size(v)?;
+        }
+        if let Some(v) = self.sipp_dma_buffer_size {
+            pipeline.set_sipp_dma_buffer_size(v)?;
+        }
+        if let Some(path) = self.camera_tuning_blob_path {
+            pipeline.set_camera_tuning_blob_path(path)?;
+        }
+        if let Some(v) = self.openvino_version {
+            pipeline.set_openvino_version(v)?;
+        }
+
+        if let Some(v) = self.calibration_data_json {
+            pipeline.set_calibration_data_json(&v)?;
+        }
+        if let Some(v) = self.global_properties_json {
+            pipeline.set_global_properties_json(&v)?;
+        }
+        if let Some(v) = self.board_config_json {
+            pipeline.set_board_config_json(&v)?;
+        }
+        if let Some(v) = self.eeprom_data_json {
+            pipeline.set_eeprom_data_json(&v)?;
+        }
+
+        if let Some(v) = self.holistic_record_json {
+            pipeline.enable_holistic_record_json(&v)?;
+        }
+        if let Some(path) = self.holistic_replay_path {
+            pipeline.enable_holistic_replay(path)?;
+        }
+
+        Ok(pipeline)
+    }
+}
+
 impl Pipeline {
-    pub fn new() -> Result<Self> {
+    /// Start a new [`PipelineBuilder`].
+    pub fn new() -> PipelineBuilder {
+        PipelineBuilder::new()
+    }
+
+    /// Alias for [`Pipeline::new`], in case you prefer explicit naming.
+    pub fn builder() -> PipelineBuilder {
+        PipelineBuilder::new()
+    }
+
+    /// Create a pipeline using DepthAI defaults.
+    ///
+    /// This was previously exposed as `Pipeline::new() -> Result<Pipeline>`.
+    pub fn try_new() -> Result<Self> {
         clear_error_flag();
         let handle = depthai::dai_pipeline_new();
         if handle.is_null() {
@@ -151,6 +336,10 @@ impl Pipeline {
     /// This matches the DepthAI C++ pattern:
     /// `auto device = std::make_shared<dai::Device>(); dai::Pipeline pipeline(device);`
     pub fn with_device(device: &Device) -> Result<Self> {
+        Self::create_with_device(device)
+    }
+
+    pub(crate) fn create_with_device(device: &Device) -> Result<Self> {
         clear_error_flag();
         let handle = unsafe { depthai::dai_pipeline_new_with_device(device.handle()) };
         if handle.is_null() {
@@ -180,7 +369,7 @@ impl Pipeline {
     /// 
     /// # Example
     /// ```ignore
-    /// let pipeline = Pipeline::new()?;
+    /// let pipeline = Pipeline::new().build()?;
     /// let camera = pipeline.create::<CameraNode>()?;
     /// let stereo = pipeline.create::<StereoDepthNode>()?;
     /// ```
@@ -192,7 +381,7 @@ impl Pipeline {
     /// 
     /// # Example
     /// ```ignore
-    /// let pipeline = Pipeline::new()?;
+    /// let pipeline = Pipeline::new().build()?;
     /// let camera = pipeline.create_with::<CameraNode, _>(CameraBoardSocket::CamA)?;
     /// ```
     pub fn create_with<T: CreateInPipelineWith<P>, P>(&self, params: P) -> Result<T> {
@@ -233,8 +422,8 @@ impl Pipeline {
     /// This mirrors the DepthAI C++ API: `pipeline.start()`.
     ///
     /// If the pipeline was created via [`Pipeline::with_device`], it will start using
-    /// that device. If it was created via [`Pipeline::new`], DepthAI will use the
-    /// pipeline's internally-managed default device.
+    /// that device. If it was created via [`Pipeline::new`] (builder) without an explicit device,
+    /// DepthAI will use the pipeline's internally-managed default device.
     pub fn start(&self) -> Result<()> {
         clear_error_flag();
         let started = unsafe { depthai::dai_pipeline_start(self.inner.handle) };

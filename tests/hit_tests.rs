@@ -30,6 +30,7 @@ mod hardware_integration_tests {
     fn test_pipeline_creation_with_hardware() {
         // This test requires actual hardware and may take several seconds
         let pipeline = Pipeline::new()
+            .build()
             .expect("Failed to create pipeline - ensure DepthAI hardware is connected");
 
         // Test that the pipeline is properly initialized

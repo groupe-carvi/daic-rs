@@ -13,7 +13,7 @@ mod pipeline_create_tests {
     #[test]
     #[ignore] // Requires hardware
     fn test_create_with_camera_node() {
-        let pipeline = Pipeline::new().expect("Failed to create pipeline");
+        let pipeline = Pipeline::new().build().expect("Failed to create pipeline");
         
         // Using the new generic create_with API for creating camera nodes
         // This is similar to C++: auto camera = pipeline.create<dai::node::Camera>();

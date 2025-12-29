@@ -31,7 +31,7 @@ impl CameraStereoBundle {
 
 fn main() -> Result<()> {
     let device = Device::new()?;
-    let pipeline = Pipeline::with_device(&device)?;
+    let pipeline = Pipeline::new().with_device(&device).build()?;
 
     // Create the composite node using the generic API
     let bundle = pipeline.create::<CameraStereoBundle>()?;
