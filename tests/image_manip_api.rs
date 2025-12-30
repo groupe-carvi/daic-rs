@@ -1,3 +1,5 @@
+#[cfg(feature = "hit")]
+
 use depthai::{Colormap, ImageManipConfig, ImageManipNode, ImageManipResizeMode, Pipeline, Result};
 use depthai::common::ImageFrameType;
 
