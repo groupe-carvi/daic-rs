@@ -425,6 +425,29 @@ DaiNode dai_rgbd_build(DaiNode rgbd) {
     }
 }
 
+DaiNode dai_rgbd_build_ex(DaiNode rgbd, bool autocreate, int preset_mode, int width, int height, float fps) {
+    if(!rgbd) {
+        last_error = "dai_rgbd_build_ex: null rgbd";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto node = static_cast<dai::node::RGBD*>(rgbd);
+
+        std::optional<float> fpsOpt = std::nullopt;
+        if(fps > 0.0f) {
+            fpsOpt = fps;
+        }
+
+        auto mode = static_cast<dai::node::StereoDepth::PresetMode>(preset_mode);
+        auto built = node->build(autocreate, mode, {width, height}, fpsOpt);
+        return static_cast<DaiNode>(built.get());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_rgbd_build_ex failed: ") + e.what();
+        return nullptr;
+    }
+}
+
 void dai_pipeline_delete(DaiPipeline pipeline) {
     if (pipeline) {
         auto pipe = static_cast<dai::Pipeline*>(pipeline);
@@ -1577,6 +1600,30 @@ void dai_stereo_enable_distortion_correction(DaiNode stereo, bool enable) {
     }
 }
 
+void dai_stereo_set_output_size(DaiNode stereo, int width, int height) {
+    if(!stereo) {
+        last_error = "dai_stereo_set_output_size: null stereo";
+        return;
+    }
+    try {
+        _dai_as_stereo(stereo)->setOutputSize(width, height);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_set_output_size failed: ") + e.what();
+    }
+}
+
+void dai_stereo_set_output_keep_aspect_ratio(DaiNode stereo, bool keep) {
+    if(!stereo) {
+        last_error = "dai_stereo_set_output_keep_aspect_ratio: null stereo";
+        return;
+    }
+    try {
+        _dai_as_stereo(stereo)->setOutputKeepAspectRatio(keep);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_stereo_set_output_keep_aspect_ratio failed: ") + e.what();
+    }
+}
+
 void dai_stereo_initial_set_left_right_check_threshold(DaiNode stereo, int threshold) {
     if(!stereo) {
         last_error = "dai_stereo_initial_set_left_right_check_threshold: null stereo";
@@ -1621,6 +1668,46 @@ void dai_rgbd_set_depth_unit(DaiNode rgbd, int depth_unit) {
         r->setDepthUnit(static_cast<dai::StereoDepthConfig::AlgorithmControl::DepthUnit>(depth_unit));
     } catch(const std::exception& e) {
         last_error = std::string("dai_rgbd_set_depth_unit failed: ") + e.what();
+    }
+}
+
+static inline dai::node::ImageAlign* _dai_as_image_align(DaiNode align) {
+    return static_cast<dai::node::ImageAlign*>(align);
+}
+
+void dai_image_align_set_run_on_host(DaiNode align, bool run_on_host) {
+    if(!align) {
+        last_error = "dai_image_align_set_run_on_host: null align";
+        return;
+    }
+    try {
+        _dai_as_image_align(align)->setRunOnHost(run_on_host);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_align_set_run_on_host failed: ") + e.what();
+    }
+}
+
+void dai_image_align_set_output_size(DaiNode align, int width, int height) {
+    if(!align) {
+        last_error = "dai_image_align_set_output_size: null align";
+        return;
+    }
+    try {
+        _dai_as_image_align(align)->setOutputSize(width, height);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_align_set_output_size failed: ") + e.what();
+    }
+}
+
+void dai_image_align_set_out_keep_aspect_ratio(DaiNode align, bool keep) {
+    if(!align) {
+        last_error = "dai_image_align_set_out_keep_aspect_ratio: null align";
+        return;
+    }
+    try {
+        _dai_as_image_align(align)->setOutKeepAspectRatio(keep);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_image_align_set_out_keep_aspect_ratio failed: ") + e.what();
     }
 }
 

@@ -1845,6 +1845,15 @@ fn emit_link_directives(path: &Path) {
                     }
                 };
 
+                // Like `static_if_exists`, but *without* `--whole-archive` even on Linux.
+                // This is important for leaf/static deps where whole-archiving can
+                // unnecessarily bloat the link or pull in extra objects.
+                let static_no_whole_if_exists = |fname: &str, name: &str| {
+                    if libdir.join(fname).exists() {
+                        println!("cargo:rustc-link-lib=static={}", name);
+                    }
+                };
+
                 let static_whole_if_exists = |fname: &str, name: &str| {
                     if libdir.join(fname).exists() {
                         // Ensures symbols are available regardless of archive ordering.
@@ -1901,6 +1910,13 @@ fn emit_link_directives(path: &Path) {
                 static_if_exists("libspdlog.a", "spdlog");
                 static_if_exists("libfmt.a", "fmt");
                 static_if_exists("libyaml-cpp.a", "yaml-cpp");
+
+                // AprilTag support.
+                // depthai-core includes AprilTag.cpp; because we link depthai-core with
+                // `--whole-archive` on Linux (to avoid archive ordering issues), we must
+                // also link its apriltag dependency explicitly. We also whole-archive it
+                // on Linux to keep ordering robust in the final link line.
+                static_if_exists("libapriltag.a", "apriltag");
 
                 // Compression/archive utilities.
                 static_if_exists("libz.a", "z");

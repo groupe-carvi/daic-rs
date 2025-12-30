@@ -1,5 +1,9 @@
 use std::{env, path::Path};
 
+// Keep this in sync with `depthai-sys/build.rs`.
+// This crate's Cargo version is not necessarily the same as the DepthAI-Core tag.
+const LATEST_SUPPORTED_DEPTHAI_CORE_TAG: &str = "v3.2.1";
+
 fn selected_depthai_core_tag() -> String {
     // This mirrors `depthai-sys/build.rs`'s version-selection logic.
     // Feature naming note: Cargo features can't contain '.', so users select `v3-2-1`
@@ -14,10 +18,9 @@ fn selected_depthai_core_tag() -> String {
         return "v3.1.0".to_string();
     }
 
-    // Default to the crate version (workspace version is kept aligned with the
-    // latest supported DepthAI-Core tag).
-    let pkg_version = env::var("CARGO_PKG_VERSION").unwrap_or_else(|_| "3.2.1".to_string());
-    format!("v{}", pkg_version)
+    // Default to the latest supported DepthAI-Core tag.
+    // (The Rust crate version is NOT guaranteed to track the upstream native tag.)
+    LATEST_SUPPORTED_DEPTHAI_CORE_TAG.to_string()
 }
 
 fn main() {
@@ -25,6 +28,11 @@ fn main() {
     println!("cargo:rerun-if-env-changed=DEPTHAI_RPATH_DISABLE");
 
     if env::var("DEPTHAI_RPATH_DISABLE").ok().as_deref() == Some("1") {
+        return;
+    }
+
+    // `-Wl,-rpath,...` is Linux-specific. (macOS uses @loader_path; Windows doesn't use rpath.)
+    if !cfg!(target_os = "linux") {
         return;
     }
 
@@ -49,23 +57,27 @@ fn main() {
     };
 
     let libdir = vcpkg_root.join(triplet).join("lib");
-    if libdir.exists() {
-        // dynamic_calibration is built as a shared library in the depthai-core build tree.
-        // It is not part of vcpkg_installed, so we must add it to RUNPATH as well.
-        let dcl_dir = target_dir
-            .join("dai-build")
-            .join(&tag)
-            .join("_deps")
-            .join("dynamic_calibration-src")
-            .join("lib");
 
-        let mut runpath = libdir.to_string_lossy().to_string();
-        if dcl_dir.join("libdynamic_calibration.so").exists() {
-            runpath = format!("{}:{}", dcl_dir.to_string_lossy(), runpath);
-        }
+    // dynamic_calibration is built as a shared library in the depthai-core build tree.
+    // It is not part of vcpkg_installed, so we must add it to RUNPATH as well.
+    let dcl_dir = target_dir
+        .join("dai-build")
+        .join(&tag)
+        .join("_deps")
+        .join("dynamic_calibration-src")
+        .join("lib");
 
-        // Note: cargo:rustc-link-arg applies to this package's final link (bins/examples/tests).
-        // Use a single argument with -Wl, to pass through the cc driver.
-        println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runpath);
+    // Always include $ORIGIN so staged .so files next to executables work out-of-the-box.
+    // Then include the internal build outputs if present.
+    let mut runpaths: Vec<String> = vec!["$ORIGIN".to_string()];
+    if dcl_dir.join("libdynamic_calibration.so").exists() {
+        runpaths.push(dcl_dir.to_string_lossy().to_string());
     }
+    if libdir.exists() {
+        runpaths.push(libdir.to_string_lossy().to_string());
+    }
+
+    // Note: cargo:rustc-link-arg applies to this package's final link (bins/examples/tests).
+    // Use a single argument with -Wl, to pass through the cc driver.
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runpaths.join(":"));
 }

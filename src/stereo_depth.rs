@@ -48,4 +48,20 @@ impl StereoDepthNode {
         clear_error_flag();
         unsafe { depthai::dai_stereo_enable_distortion_correction(self.node.handle(), enable) };
     }
+
+    /// Specify disparity/depth output resolution size, implemented by scaling.
+    ///
+    /// Mirrors C++: `StereoDepth::setOutputSize(width, height)`.
+    pub fn set_output_size(&self, width: i32, height: i32) {
+        clear_error_flag();
+        unsafe { depthai::dai_stereo_set_output_size(self.node.handle(), c_int(width), c_int(height)) };
+    }
+
+    /// Whether resizing done by `set_output_size` should keep aspect ratio (with potential cropping).
+    ///
+    /// Mirrors C++: `StereoDepth::setOutputKeepAspectRatio(keep)`.
+    pub fn set_output_keep_aspect_ratio(&self, keep: bool) {
+        clear_error_flag();
+        unsafe { depthai::dai_stereo_set_output_keep_aspect_ratio(self.node.handle(), keep) };
+    }
 }

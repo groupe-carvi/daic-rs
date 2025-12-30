@@ -402,6 +402,7 @@ pub mod common;
 pub mod device;
 pub mod error;
 pub mod host_node;
+pub mod image_align;
 pub mod image_manip;
 pub mod threaded_host_node;
 #[cfg(feature = "rerun")]
@@ -429,6 +430,7 @@ pub use image_manip::{
     ImageManipResizeMode,
     PerformanceMode as ImageManipPerformanceMode,
 };
+pub use image_align::ImageAlignNode;
 pub use rgbd::{DepthUnit, RgbdData, RgbdNode};
 pub use stereo_depth::{PresetMode as StereoPresetMode, StereoDepthNode};
 pub use host_node::{HostNode, HostNodeImpl, MessageGroup, Buffer};

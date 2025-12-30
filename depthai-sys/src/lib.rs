@@ -71,6 +71,7 @@ include_cpp! {
     generate!("dai::dai_pipeline_create_host_node")
     generate!("dai::dai_pipeline_create_threaded_host_node")
     generate!("dai::dai_rgbd_build")
+    generate!("dai::dai_rgbd_build_ex")
     generate!("dai::dai_pipeline_create_camera")
 
     // Generic node creation / linking
@@ -106,11 +107,18 @@ include_cpp! {
     generate!("dai::dai_stereo_set_left_right_check")
     generate!("dai::dai_stereo_set_rectify_edge_fill_color")
     generate!("dai::dai_stereo_enable_distortion_correction")
+    generate!("dai::dai_stereo_set_output_size")
+    generate!("dai::dai_stereo_set_output_keep_aspect_ratio")
     generate!("dai::dai_stereo_initial_set_left_right_check_threshold")
     generate!("dai::dai_stereo_initial_set_threshold_filter_max_range")
 
     // RGBD configuration helpers
     generate!("dai::dai_rgbd_set_depth_unit")
+
+    // ImageAlign helpers
+    generate!("dai::dai_image_align_set_run_on_host")
+    generate!("dai::dai_image_align_set_output_size")
+    generate!("dai::dai_image_align_set_out_keep_aspect_ratio")
 
     // ImageManip helpers
     generate!("dai::dai_image_manip_set_num_frames_pool")

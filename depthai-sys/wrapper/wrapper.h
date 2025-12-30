@@ -150,6 +150,9 @@ API DaiNode dai_pipeline_create_threaded_host_node(DaiPipeline pipeline,
                                                    DaiHostNodeCallback drop_cb);
 // Builder helpers (mirror native API: `pipeline.create<node::RGBD>()->build()`).
 API DaiNode dai_rgbd_build(DaiNode rgbd);
+// Extended builder helper: `pipeline.create<node::RGBD>()->build(autocreate, mode, size, fps)`.
+// Pass fps <= 0 to leave it unspecified.
+API DaiNode dai_rgbd_build_ex(DaiNode rgbd, bool autocreate, int preset_mode, int width, int height, float fps);
 
 // Pipeline <-> device interop
 API DaiDevice dai_pipeline_get_default_device(DaiPipeline pipeline);
@@ -201,11 +204,18 @@ API void dai_stereo_set_default_profile_preset(DaiNode stereo, int preset_mode);
 API void dai_stereo_set_left_right_check(DaiNode stereo, bool enable);
 API void dai_stereo_set_rectify_edge_fill_color(DaiNode stereo, int color);
 API void dai_stereo_enable_distortion_correction(DaiNode stereo, bool enable);
+API void dai_stereo_set_output_size(DaiNode stereo, int width, int height);
+API void dai_stereo_set_output_keep_aspect_ratio(DaiNode stereo, bool keep);
 API void dai_stereo_initial_set_left_right_check_threshold(DaiNode stereo, int threshold);
 API void dai_stereo_initial_set_threshold_filter_max_range(DaiNode stereo, int max_range);
 
 // RGBD configuration helpers
 API void dai_rgbd_set_depth_unit(DaiNode rgbd, int depth_unit);
+
+// ImageAlign node helpers
+API void dai_image_align_set_run_on_host(DaiNode align, bool run_on_host);
+API void dai_image_align_set_output_size(DaiNode align, int width, int height);
+API void dai_image_align_set_out_keep_aspect_ratio(DaiNode align, bool keep);
 
 // ImageManip node helpers
 API void dai_image_manip_set_num_frames_pool(DaiNode manip, int num_frames_pool);

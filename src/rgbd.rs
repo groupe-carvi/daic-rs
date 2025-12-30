@@ -34,6 +34,41 @@ impl RgbdNode {
         }
     }
 
+    /// Build the RGBD node with explicit configuration.
+    ///
+    /// This maps to the native overload:
+    /// `dai::node::RGBD::build(autocreate, mode, size, fps)`.
+    ///
+    /// Some devices/firmwares produce depth frames at sizes that don't match the requested
+    /// RGB frames. Using this builder allows the host node to be configured with the
+    /// expected size (and optionally FPS), preventing runtime "Color and depth frame sizes do not match" errors.
+    pub fn build_ex(
+        &self,
+        autocreate: bool,
+        mode: crate::stereo_depth::PresetMode,
+        size: (i32, i32),
+        fps: Option<f32>,
+    ) -> Result<()> {
+        clear_error_flag();
+        let (w, h) = size;
+        let fps_val = fps.unwrap_or(-1.0);
+        let out = unsafe {
+            depthai::dai_rgbd_build_ex(
+                self.node.handle(),
+                autocreate,
+                c_int(mode as i32),
+                c_int(w),
+                c_int(h),
+                fps_val,
+            )
+        };
+        if out.is_null() {
+            Err(last_error("failed to build RGBD node (build_ex)"))
+        } else {
+            Ok(())
+        }
+    }
+
     pub fn set_depth_unit(&self, unit: DepthUnit) {
         // setter cannot fail at the C ABI level (will record last_error on exception)
         clear_error_flag();
