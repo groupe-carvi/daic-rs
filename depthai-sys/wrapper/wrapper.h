@@ -48,6 +48,7 @@ typedef void* DaiOutput;      // currently: `dai::Node::Output*`
 typedef void* DaiInput;       // currently: `dai::Node::Input*`
 typedef void* DaiDataQueue;   // currently: `std::shared_ptr<dai::MessageQueue>*`
 typedef void* DaiImgFrame;    // currently: `std::shared_ptr<dai::ImgFrame>*`
+typedef void* DaiEncodedFrame; // currently: `std::shared_ptr<dai::EncodedFrame>*`
 typedef void* DaiPointCloud;  // currently: wrapper-owned view of `std::shared_ptr<dai::PointCloudData>`
 typedef void* DaiRGBDData;    // currently: `std::shared_ptr<dai::RGBDData>*`
 typedef void* DaiMessageGroup; // currently: `std::shared_ptr<dai::MessageGroup>*`
@@ -226,6 +227,32 @@ API void dai_image_manip_set_performance_mode(DaiNode manip, int performance_mod
 API bool dai_image_manip_run_on_host(DaiNode manip);
 API void dai_image_manip_run(DaiNode manip);
 
+// VideoEncoder node helpers
+API void dai_video_encoder_set_default_profile_preset(DaiNode encoder, float fps, int profile);
+API void dai_video_encoder_set_num_frames_pool(DaiNode encoder, int frames);
+API int dai_video_encoder_get_num_frames_pool(DaiNode encoder);
+
+API void dai_video_encoder_set_rate_control_mode(DaiNode encoder, int mode);
+API int dai_video_encoder_get_rate_control_mode(DaiNode encoder);
+API void dai_video_encoder_set_profile(DaiNode encoder, int profile);
+API int dai_video_encoder_get_profile(DaiNode encoder);
+API void dai_video_encoder_set_bitrate(DaiNode encoder, int bitrate);
+API int dai_video_encoder_get_bitrate(DaiNode encoder);
+API void dai_video_encoder_set_bitrate_kbps(DaiNode encoder, int bitrate_kbps);
+API int dai_video_encoder_get_bitrate_kbps(DaiNode encoder);
+API void dai_video_encoder_set_keyframe_frequency(DaiNode encoder, int freq);
+API int dai_video_encoder_get_keyframe_frequency(DaiNode encoder);
+API void dai_video_encoder_set_num_bframes(DaiNode encoder, int num_bframes);
+API int dai_video_encoder_get_num_bframes(DaiNode encoder);
+API void dai_video_encoder_set_quality(DaiNode encoder, int quality);
+API int dai_video_encoder_get_quality(DaiNode encoder);
+API void dai_video_encoder_set_lossless(DaiNode encoder, bool lossless);
+API bool dai_video_encoder_get_lossless(DaiNode encoder);
+API void dai_video_encoder_set_frame_rate(DaiNode encoder, float frame_rate);
+API float dai_video_encoder_get_frame_rate(DaiNode encoder);
+API void dai_video_encoder_set_max_output_frame_size(DaiNode encoder, int max_frame_size);
+API int dai_video_encoder_get_max_output_frame_size(DaiNode encoder);
+
 // ImageManipConfig helpers
 // Returned handle is a `std::shared_ptr<dai::Buffer>*` actually pointing to a `dai::ImageManipConfig`.
 API DaiBuffer dai_image_manip_config_new();
@@ -297,6 +324,9 @@ API void dai_queue_delete(DaiDataQueue queue);
 API DaiImgFrame dai_queue_get_frame(DaiDataQueue queue, int timeout_ms);
 API DaiImgFrame dai_queue_try_get_frame(DaiDataQueue queue);
 
+API DaiEncodedFrame dai_queue_get_encoded_frame(DaiDataQueue queue, int timeout_ms);
+API DaiEncodedFrame dai_queue_try_get_encoded_frame(DaiDataQueue queue);
+
 // Message retrieval for non-ImgFrame outputs
 API DaiPointCloud dai_queue_get_pointcloud(DaiDataQueue queue, int timeout_ms);
 API DaiPointCloud dai_queue_try_get_pointcloud(DaiDataQueue queue);
@@ -343,6 +373,21 @@ API int dai_frame_get_height(DaiImgFrame frame);
 API int dai_frame_get_type(DaiImgFrame frame);
 API size_t dai_frame_get_size(DaiImgFrame frame);
 API void dai_frame_release(DaiImgFrame frame);
+
+// EncodedFrame accessors
+API void* dai_encoded_frame_get_data(DaiEncodedFrame frame);
+API size_t dai_encoded_frame_get_data_size(DaiEncodedFrame frame);
+API uint32_t dai_encoded_frame_get_frame_offset(DaiEncodedFrame frame);
+API uint32_t dai_encoded_frame_get_frame_size(DaiEncodedFrame frame);
+API int dai_encoded_frame_get_width(DaiEncodedFrame frame);
+API int dai_encoded_frame_get_height(DaiEncodedFrame frame);
+API int dai_encoded_frame_get_profile(DaiEncodedFrame frame);
+API int dai_encoded_frame_get_frame_type(DaiEncodedFrame frame);
+API int dai_encoded_frame_get_quality(DaiEncodedFrame frame);
+API int dai_encoded_frame_get_bitrate(DaiEncodedFrame frame);
+API bool dai_encoded_frame_get_lossless(DaiEncodedFrame frame);
+API int dai_encoded_frame_get_instance_num(DaiEncodedFrame frame);
+API void dai_encoded_frame_release(DaiEncodedFrame frame);
 
 // Low-level utility functions
 API int dai_device_get_connected_camera_sockets(DaiDevice device, int* sockets, int max_count);

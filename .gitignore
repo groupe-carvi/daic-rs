@@ -32,3 +32,8 @@ target/
 
 # autocxx generated files
 **/autocxx-build-dir/
+
+*.h264
+*.h265
+*.hevc
+*.avc

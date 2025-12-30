@@ -6,6 +6,7 @@
 #include "depthai/common/Point3fRGBA.hpp"
 #include "depthai/pipeline/datatype/PointCloudData.hpp"
 #include "depthai/pipeline/datatype/RGBDData.hpp"
+#include "depthai/pipeline/datatype/EncodedFrame.hpp"
 #include "XLink/XLink.h"
 #include "XLink/XLinkPublicDefines.h"
 
@@ -1715,6 +1716,10 @@ static inline dai::node::ImageManip* _dai_as_image_manip(DaiNode manip) {
     return static_cast<dai::node::ImageManip*>(manip);
 }
 
+static inline dai::node::VideoEncoder* _dai_as_video_encoder(DaiNode encoder) {
+    return static_cast<dai::node::VideoEncoder*>(encoder);
+}
+
 // Helper to validate and cast a DaiBuffer to ImageManipConfig.
 // 
 // Error handling contract:
@@ -1821,6 +1826,300 @@ void dai_image_manip_run(DaiNode manip) {
         _dai_as_image_manip(manip)->run();
     } catch(const std::exception& e) {
         last_error = std::string("dai_image_manip_run failed: ") + e.what();
+    }
+}
+
+void dai_video_encoder_set_default_profile_preset(DaiNode encoder, float fps, int profile) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_default_profile_preset: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setDefaultProfilePreset(
+            fps,
+            static_cast<dai::VideoEncoderProperties::Profile>(profile)
+        );
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_default_profile_preset failed: ") + e.what();
+    }
+}
+
+void dai_video_encoder_set_num_frames_pool(DaiNode encoder, int frames) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_num_frames_pool: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setNumFramesPool(frames);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_num_frames_pool failed: ") + e.what();
+    }
+}
+
+int dai_video_encoder_get_num_frames_pool(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_num_frames_pool: null encoder";
+        return 0;
+    }
+    try {
+        return _dai_as_video_encoder(encoder)->getNumFramesPool();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_num_frames_pool failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_video_encoder_set_rate_control_mode(DaiNode encoder, int mode) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_rate_control_mode: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setRateControlMode(
+            static_cast<dai::VideoEncoderProperties::RateControlMode>(mode)
+        );
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_rate_control_mode failed: ") + e.what();
+    }
+}
+
+int dai_video_encoder_get_rate_control_mode(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_rate_control_mode: null encoder";
+        return 0;
+    }
+    try {
+        return static_cast<int>(_dai_as_video_encoder(encoder)->getRateControlMode());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_rate_control_mode failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_video_encoder_set_profile(DaiNode encoder, int profile) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_profile: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setProfile(
+            static_cast<dai::VideoEncoderProperties::Profile>(profile)
+        );
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_profile failed: ") + e.what();
+    }
+}
+
+int dai_video_encoder_get_profile(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_profile: null encoder";
+        return 0;
+    }
+    try {
+        return static_cast<int>(_dai_as_video_encoder(encoder)->getProfile());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_profile failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_video_encoder_set_bitrate(DaiNode encoder, int bitrate) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_bitrate: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setBitrate(bitrate);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_bitrate failed: ") + e.what();
+    }
+}
+
+int dai_video_encoder_get_bitrate(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_bitrate: null encoder";
+        return 0;
+    }
+    try {
+        return _dai_as_video_encoder(encoder)->getBitrate();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_bitrate failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_video_encoder_set_bitrate_kbps(DaiNode encoder, int bitrate_kbps) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_bitrate_kbps: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setBitrateKbps(bitrate_kbps);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_bitrate_kbps failed: ") + e.what();
+    }
+}
+
+int dai_video_encoder_get_bitrate_kbps(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_bitrate_kbps: null encoder";
+        return 0;
+    }
+    try {
+        return _dai_as_video_encoder(encoder)->getBitrateKbps();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_bitrate_kbps failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_video_encoder_set_keyframe_frequency(DaiNode encoder, int freq) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_keyframe_frequency: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setKeyframeFrequency(freq);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_keyframe_frequency failed: ") + e.what();
+    }
+}
+
+int dai_video_encoder_get_keyframe_frequency(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_keyframe_frequency: null encoder";
+        return 0;
+    }
+    try {
+        return _dai_as_video_encoder(encoder)->getKeyframeFrequency();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_keyframe_frequency failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_video_encoder_set_num_bframes(DaiNode encoder, int num_bframes) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_num_bframes: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setNumBFrames(num_bframes);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_num_bframes failed: ") + e.what();
+    }
+}
+
+int dai_video_encoder_get_num_bframes(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_num_bframes: null encoder";
+        return 0;
+    }
+    try {
+        return _dai_as_video_encoder(encoder)->getNumBFrames();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_num_bframes failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_video_encoder_set_quality(DaiNode encoder, int quality) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_quality: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setQuality(quality);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_quality failed: ") + e.what();
+    }
+}
+
+int dai_video_encoder_get_quality(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_quality: null encoder";
+        return 0;
+    }
+    try {
+        return _dai_as_video_encoder(encoder)->getQuality();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_quality failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_video_encoder_set_lossless(DaiNode encoder, bool lossless) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_lossless: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setLossless(lossless);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_lossless failed: ") + e.what();
+    }
+}
+
+bool dai_video_encoder_get_lossless(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_lossless: null encoder";
+        return false;
+    }
+    try {
+        return _dai_as_video_encoder(encoder)->getLossless();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_lossless failed: ") + e.what();
+        return false;
+    }
+}
+
+void dai_video_encoder_set_frame_rate(DaiNode encoder, float frame_rate) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_frame_rate: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setFrameRate(frame_rate);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_frame_rate failed: ") + e.what();
+    }
+}
+
+float dai_video_encoder_get_frame_rate(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_frame_rate: null encoder";
+        return 0.0f;
+    }
+    try {
+        return _dai_as_video_encoder(encoder)->getFrameRate();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_frame_rate failed: ") + e.what();
+        return 0.0f;
+    }
+}
+
+void dai_video_encoder_set_max_output_frame_size(DaiNode encoder, int max_frame_size) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_set_max_output_frame_size: null encoder";
+        return;
+    }
+    try {
+        _dai_as_video_encoder(encoder)->setMaxOutputFrameSize(max_frame_size);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_set_max_output_frame_size failed: ") + e.what();
+    }
+}
+
+int dai_video_encoder_get_max_output_frame_size(DaiNode encoder) {
+    if(!encoder) {
+        last_error = "dai_video_encoder_get_max_output_frame_size: null encoder";
+        return 0;
+    }
+    try {
+        return _dai_as_video_encoder(encoder)->getMaxOutputFrameSize();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_video_encoder_get_max_output_frame_size failed: ") + e.what();
+        return 0;
     }
 }
 
@@ -3343,6 +3642,51 @@ DaiImgFrame dai_queue_try_get_frame(DaiDataQueue queue) {
     }
 }
 
+DaiEncodedFrame dai_queue_get_encoded_frame(DaiDataQueue queue, int timeout_ms) {
+    if(!queue) {
+        last_error = "dai_queue_get_encoded_frame: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        std::shared_ptr<dai::EncodedFrame> frame;
+        if(timeout_ms < 0) {
+            frame = (*ptr)->get<dai::EncodedFrame>();
+        } else {
+            bool timedOut = false;
+            frame = (*ptr)->get<dai::EncodedFrame>(std::chrono::milliseconds(timeout_ms), timedOut);
+            if(timedOut) {
+                return nullptr;
+            }
+        }
+        if(!frame) {
+            return nullptr;
+        }
+        return new std::shared_ptr<dai::EncodedFrame>(frame);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get_encoded_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiEncodedFrame dai_queue_try_get_encoded_frame(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_try_get_encoded_frame: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto frame = (*ptr)->tryGet<dai::EncodedFrame>();
+        if(!frame) {
+            return nullptr;
+        }
+        return new std::shared_ptr<dai::EncodedFrame>(frame);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_try_get_encoded_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
 // Low-level frame operations
 void* dai_frame_get_data(DaiImgFrame frame) {
     if (!frame) {
@@ -3432,6 +3776,217 @@ size_t dai_frame_get_size(DaiImgFrame frame) {
 void dai_frame_release(DaiImgFrame frame) {
     if(frame) {
         auto ptr = static_cast<std::shared_ptr<dai::ImgFrame>*>(frame);
+        delete ptr;
+    }
+}
+
+void* dai_encoded_frame_get_data(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_data: null frame";
+        return nullptr;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return nullptr;
+        }
+        return (*sharedFrame)->getData().data();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_data failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+size_t dai_encoded_frame_get_data_size(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_data_size: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return (*sharedFrame)->getData().size();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_data_size failed: ") + e.what();
+        return 0;
+    }
+}
+
+uint32_t dai_encoded_frame_get_frame_offset(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_frame_offset: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return (*sharedFrame)->frameOffset;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_frame_offset failed: ") + e.what();
+        return 0;
+    }
+}
+
+uint32_t dai_encoded_frame_get_frame_size(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_frame_size: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return (*sharedFrame)->frameSize;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_frame_size failed: ") + e.what();
+        return 0;
+    }
+}
+
+int dai_encoded_frame_get_width(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_width: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return static_cast<int>((*sharedFrame)->getWidth());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_width failed: ") + e.what();
+        return 0;
+    }
+}
+
+int dai_encoded_frame_get_height(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_height: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return static_cast<int>((*sharedFrame)->getHeight());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_height failed: ") + e.what();
+        return 0;
+    }
+}
+
+int dai_encoded_frame_get_profile(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_profile: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return static_cast<int>((*sharedFrame)->getProfile());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_profile failed: ") + e.what();
+        return 0;
+    }
+}
+
+int dai_encoded_frame_get_frame_type(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_frame_type: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return static_cast<int>((*sharedFrame)->getFrameType());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_frame_type failed: ") + e.what();
+        return 0;
+    }
+}
+
+int dai_encoded_frame_get_quality(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_quality: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return static_cast<int>((*sharedFrame)->getQuality());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_quality failed: ") + e.what();
+        return 0;
+    }
+}
+
+int dai_encoded_frame_get_bitrate(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_bitrate: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return static_cast<int>((*sharedFrame)->getBitrate());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_bitrate failed: ") + e.what();
+        return 0;
+    }
+}
+
+bool dai_encoded_frame_get_lossless(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_lossless: null frame";
+        return false;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return false;
+        }
+        return (*sharedFrame)->getLossless();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_lossless failed: ") + e.what();
+        return false;
+    }
+}
+
+int dai_encoded_frame_get_instance_num(DaiEncodedFrame frame) {
+    if(!frame) {
+        last_error = "dai_encoded_frame_get_instance_num: null frame";
+        return 0;
+    }
+    try {
+        auto sharedFrame = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
+        if(!sharedFrame->get()) {
+            return 0;
+        }
+        return static_cast<int>((*sharedFrame)->getInstanceNum());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_encoded_frame_get_instance_num failed: ") + e.what();
+        return 0;
+    }
+}
+
+void dai_encoded_frame_release(DaiEncodedFrame frame) {
+    if(frame) {
+        auto ptr = static_cast<std::shared_ptr<dai::EncodedFrame>*>(frame);
         delete ptr;
     }
 }

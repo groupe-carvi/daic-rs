@@ -155,6 +155,31 @@ include_cpp! {
     generate!("dai::dai_image_manip_config_get_reuse_previous_image")
     generate!("dai::dai_image_manip_config_get_skip_current_image")
 
+    // VideoEncoder helpers
+    generate!("dai::dai_video_encoder_set_default_profile_preset")
+    generate!("dai::dai_video_encoder_set_num_frames_pool")
+    generate!("dai::dai_video_encoder_get_num_frames_pool")
+    generate!("dai::dai_video_encoder_set_rate_control_mode")
+    generate!("dai::dai_video_encoder_get_rate_control_mode")
+    generate!("dai::dai_video_encoder_set_profile")
+    generate!("dai::dai_video_encoder_get_profile")
+    generate!("dai::dai_video_encoder_set_bitrate")
+    generate!("dai::dai_video_encoder_get_bitrate")
+    generate!("dai::dai_video_encoder_set_bitrate_kbps")
+    generate!("dai::dai_video_encoder_get_bitrate_kbps")
+    generate!("dai::dai_video_encoder_set_keyframe_frequency")
+    generate!("dai::dai_video_encoder_get_keyframe_frequency")
+    generate!("dai::dai_video_encoder_set_num_bframes")
+    generate!("dai::dai_video_encoder_get_num_bframes")
+    generate!("dai::dai_video_encoder_set_quality")
+    generate!("dai::dai_video_encoder_get_quality")
+    generate!("dai::dai_video_encoder_set_lossless")
+    generate!("dai::dai_video_encoder_get_lossless")
+    generate!("dai::dai_video_encoder_set_frame_rate")
+    generate!("dai::dai_video_encoder_get_frame_rate")
+    generate!("dai::dai_video_encoder_set_max_output_frame_size")
+    generate!("dai::dai_video_encoder_get_max_output_frame_size")
+
     // Camera functions
     generate!("dai::dai_camera_request_output")
     generate!("dai::dai_camera_request_full_resolution_output")
@@ -185,6 +210,8 @@ include_cpp! {
     generate!("dai::dai_queue_delete")
     generate!("dai::dai_queue_get_frame")
     generate!("dai::dai_queue_try_get_frame")
+    generate!("dai::dai_queue_get_encoded_frame")
+    generate!("dai::dai_queue_try_get_encoded_frame")
     generate!("dai::dai_queue_get_pointcloud")
     generate!("dai::dai_queue_try_get_pointcloud")
     generate!("dai::dai_queue_get_rgbd")
@@ -195,6 +222,21 @@ include_cpp! {
     generate!("dai::dai_frame_get_type")
     generate!("dai::dai_frame_get_size")
     generate!("dai::dai_frame_release")
+
+    // EncodedFrame accessors
+    generate!("dai::dai_encoded_frame_get_data")
+    generate!("dai::dai_encoded_frame_get_data_size")
+    generate!("dai::dai_encoded_frame_get_frame_offset")
+    generate!("dai::dai_encoded_frame_get_frame_size")
+    generate!("dai::dai_encoded_frame_get_width")
+    generate!("dai::dai_encoded_frame_get_height")
+    generate!("dai::dai_encoded_frame_get_profile")
+    generate!("dai::dai_encoded_frame_get_frame_type")
+    generate!("dai::dai_encoded_frame_get_quality")
+    generate!("dai::dai_encoded_frame_get_bitrate")
+    generate!("dai::dai_encoded_frame_get_lossless")
+    generate!("dai::dai_encoded_frame_get_instance_num")
+    generate!("dai::dai_encoded_frame_release")
 
     // PointCloudData accessors
     generate!("dai::dai_pointcloud_get_width")
@@ -249,6 +291,7 @@ pub type DaiOutput = *mut autocxx::c_void;
 pub type DaiInput = *mut autocxx::c_void;
 pub type DaiDataQueue = *mut autocxx::c_void;
 pub type DaiImgFrame = *mut autocxx::c_void;
+pub type DaiEncodedFrame = *mut autocxx::c_void;
 pub type DaiPointCloud = *mut autocxx::c_void;
 pub type DaiRGBDData = *mut autocxx::c_void;
 pub type DaiMessageGroup = *mut autocxx::c_void;

@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 
 [features]
-default = ["rerun"]
+default = []
 hit = [] # Hardware Integration Tests
 rerun = ["dep:rerun", "dep:tokio", "dep:re_web_viewer_server"]
 
@@ -66,6 +66,12 @@ path = "examples/host_node.rs"
 [[example]]
 name = "rerun_host_node"
 path = "examples/rerun_host_node.rs"
+required-features = ["rerun"]
+
+[[example]]
+name = "video_encoder_rerun"
+path = "examples/video_encoder_rerun.rs"
+features = ["rerun"]
 required-features = ["rerun"]
 
 [workspace]

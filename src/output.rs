@@ -5,6 +5,7 @@ use autocxx::c_uint;
 use depthai_sys::{depthai, DaiOutput, DaiInput};
 
 use crate::camera::{ImageFrame, OutputQueue};
+use crate::encoded_frame::EncodedFrameQueue;
 use crate::error::{clear_error_flag, last_error, Result};
 use crate::host_node::Buffer;
 use crate::pipeline::{Node, PipelineInner};
@@ -74,6 +75,19 @@ impl Output {
             Err(last_error("failed to create output queue"))
         } else {
             Ok(OutputQueue::from_handle(handle))
+        }
+    }
+
+    /// Create an output queue that yields `EncodedFrame` messages.
+    ///
+    /// This is primarily used with `VideoEncoderNode::out()`.
+    pub fn create_encoded_frame_queue(&self, max_size: u32, blocking: bool) -> Result<EncodedFrameQueue> {
+        clear_error_flag();
+        let handle = unsafe { depthai::dai_output_create_queue(self.handle, c_uint(max_size), blocking) };
+        if handle.is_null() {
+            Err(last_error("failed to create encoded frame output queue"))
+        } else {
+            Ok(EncodedFrameQueue::from_handle(handle))
         }
     }
 

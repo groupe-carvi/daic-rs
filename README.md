@@ -16,7 +16,7 @@ Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
 ### Crates
 
 - `depthai-sys`
-	- Builds DepthAI-Core and its dependencies (in `target/dai-build/`).
+	- Builds DepthAI-Core and its dependencies (in `depthai-sys/builds/`).
 	- Compiles a small C++ wrapper (`depthai-sys/wrapper/wrapper.cpp`) and generates Rust bindings using `autocxx`.
 - `depthai-rs`
 	- Safe(-er) Rust wrapper types like `Device`, `Pipeline`, typed camera helpers, and a generic node API.
@@ -81,50 +81,6 @@ Example (PowerShell):
 winget install -e --id LLVM.LLVM
 ```
 
-## Features
-
-### Default features
-
-- `rerun`: Enables Rerun visualization support with `RerunHostNode`. Adds Tokio runtime and web viewer dependencies.
-
-### Optional features
-
-- `hit`: Hardware Integration Tests - enable with `cargo test --features hit` when you have a physical device connected.
-
-### DepthAI-Core version selection (advanced)
-
-`depthai-sys` can download/build different **DepthAI-Core** versions. Because this crate links native code (FFI), only a small set of versions is supported at any given time.
-
-Select **exactly one** of the following Cargo features:
-
-- `latest` (default; maps to the latest supported tag)
-- `v3-2-1` (maps to tag `v3.2.1`)
-- `v3-2-0` (maps to tag `v3.2.0`)
-- `v3-1-0` (maps to tag `v3.1.0`)
-
-Note: Cargo feature names can’t contain dots (`.`), so version selectors use hyphens.
-
-Examples:
-
-```bash
-# Build against DepthAI-Core v3.2.0
-cargo build --features v3-2-0
-
-# Run an example against DepthAI-Core v3.1.0
-cargo run --example pipeline_creation --features v3-1-0
-
-# Explicitly select latest (usually unnecessary; it's the default)
-cargo build --features latest
-```
-
-If you enable more than one of these, the build will fail early with an explicit error.
-
-To build without the rerun feature:
-
-```bash
-cargo build --no-default-features
-```
-
 ## Build
 
 From the repo root:
@@ -136,29 +92,19 @@ cargo build
 Notes:
 
 - The first build can take a while because DepthAI-Core is fetched/built and dependencies are prepared.
-- Build artifacts for native code are cached under `target/dai-build/<depthai-core-tag>/`.
-	(So if you switch between `--features v3-2-1` and `--features v3-2-0`, each version keeps its own build cache.)
+- Build artifacts for native code live under `depthai-sys/builds/`.
 
 ## Run examples
 
 ```bash
-# Basic examples
 cargo run --example pipeline_creation
 cargo run --example camera
-cargo run --example composite_node
-
-# Host node examples
-cargo run --example host_node
-cargo run --example threaded_host_node
-
-# Rerun visualization examples (requires rerun feature)
-cargo run --example rerun_host_node --features rerun
-cargo run --example rgbd_rerun --features rerun
+cargo run --example camera_output
 ```
 
 ## DepthAI feature support
 
-This section is generated from the native DepthAI-Core C++ examples vendored in this repo under `target/dai-build/depthai-core/examples/cpp`.
+This section is generated from the native DepthAI-Core C++ examples vendored in this repo under `depthai-sys/builds/depthai-core/examples/cpp`.
 
 - ✅ in the **Supported** column means `depthai-rs` currently wraps enough of that feature/node to build and run *at least one* equivalent pipeline.
 - A blank cell means it’s not yet wrapped/exposed in the Rust API (even if DepthAI-Core supports it).
@@ -169,12 +115,12 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 |---|---|:---:|---|
 | `AprilTags` | `AprilTag`, `Camera`, `ImageManip`, `ThreadedHostNode` |  |  |
 | `Benchmark` | `BenchmarkIn`, `BenchmarkOut`, `Camera`, `NeuralNetwork` |  |  |
-| `Camera` |  `Camera`, `ImageManip`, `Script` | ✅ | `examples/camera.rs`, `examples/host_node.rs`, `examples/threaded_host_node.rs`, `examples/rerun_host_node.rs`, `examples/rgbd_rerun.rs`, `examples/composite_node.rs` |
+| `Camera` |  `Camera`, `ImageManip`, `Script` | ✅ | `examples/camera.rs`, `examples/camera_output.rs` |
 | `DetectionNetwork` | `Camera`, `DetectionNetwork`, `ReplayVideo`, `StereoDepth` |  |  |
 | `DynamicCalibration` | `Camera`, `DynamicCalibration`, `StereoDepth` |  |  |
 | `Events` | `Camera`, `DetectionNetwork` |  |  |
 | `FeatureTracker` | `Camera`, `FeatureTracker`, `ImageManip` |  |  |
-| `HostNodes` | `Camera`, `CustomNode`, `CustomThreadedNode`, `Display`, `HostCamera`, `HostNode`, `ImageManip`, `ReplayVideo` | ✅ | `examples/host_node.rs`, `examples/threaded_host_node.rs`, `examples/rerun_host_node.rs` |
+| `HostNodes` | `Camera`, `CustomNode`, `CustomThreadedNode`, `Display`, `HostCamera`, `HostNode`, `ImageManip`, `ReplayVideo` |  |  |
 | `IMU` | `IMU` |  |  |
 | `ImageAlign` | `Camera`, `ImageAlign`, `StereoDepth`, `Sync` | ✅ | `examples/rgbd_rerun.rs` |
 | `ImageManip` | `Camera`, `Display`, `ImageManip` |  |  |
@@ -213,15 +159,15 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 | `BenchmarkIn` | `Benchmark` |  |
 | `BenchmarkOut` | `Benchmark` |  |
 | `Camera` | `AprilTags`, `Benchmark`, `Camera`, `DetectionNetwork`, `DynamicCalibration`, `Events`, … (+25) | ✅ |
-| `CustomNode` | `HostNodes`, `VideoEncoder` | ✅ |
-| `CustomThreadedNode` | `HostNodes` | ✅ |
+| `CustomNode` | `HostNodes`, `VideoEncoder` |  |
+| `CustomThreadedNode` | `HostNodes` |  |
 | `DetectionNetwork` | `DetectionNetwork`, `Events`, `ObjectTracker`, `RVC2/NNArchive`, `RVC2/Thermal`, `Visualizer` |  |
 | `Display` | `HostNodes`, `ImageManip`, `RecordReplay` |  |
 | `DynamicCalibration` | `DynamicCalibration` |  |
 | `EdgeDetector` | `RVC2/EdgeDetector` |  |
 | `FeatureTracker` | `FeatureTracker`, `RVC2/VSLAM` |  |
 | `HostCamera` | `HostNodes` |  |
-| `HostNode` | `HostNodes`, `SpatialDetectionNetwork`, `Visualizer` | ✅ |
+| `HostNode` | `HostNodes`, `SpatialDetectionNetwork`, `Visualizer` |  |
 | `IMU` | `IMU`, `RVC2/VSLAM`, `RecordReplay` |  |
 | `ImageAlign` | `ImageAlign`, `NeuralDepth`, `RGBD`, `RVC2/ImageAlign`, `RVC2/Thermal`, `RVC2/ToF` | ✅ |
 | `ImageManip` | `AprilTags`, `Camera`, `FeatureTracker`, `HostNodes`, `ImageManip` |  |
@@ -242,11 +188,33 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 | `Sync` | `ImageAlign`, `NeuralDepth`, `RVC2/ImageAlign`, `RVC2/Thermal`, `RVC2/ToF`, `Sync` |  |
 | `SystemLogger` | `RVC2/SystemLogger` |  |
 | `Thermal` | `RVC2/Thermal` |  |
-| `ThreadedHostNode` | `AprilTags`, `RGBD` | ✅ |
+| `ThreadedHostNode` | `AprilTags`, `RGBD` |  |
 | `ToF` | `RVC2/ToF` |  |
 | `VideoEncoder` | `RecordReplay`, `VideoEncoder`, `Visualizer` |  |
 | `Warp` | `Warp` |  |
 <!-- END depthai-node-matrix -->
+
+## API overview
+
+### Device ownership
+
+DepthAI device connections are typically exclusive. `depthai-rs` mirrors the common C++ pattern of sharing one device connection:
+
+- `Device::new()` opens/returns a device handle.
+- `Device::clone()` / `Device::try_clone()` creates another handle to the same underlying connection.
+- `Pipeline::with_device(&device)` binds a pipeline to an existing device connection (recommended).
+- `Pipeline::start_default()` starts the pipeline using its internally-held device.
+
+### Generic node linking
+
+The generic node API supports linking by explicit port names *or* by choosing a compatible default when you omit port names.
+For example, `StereoDepth` expects inputs named `"left"` and `"right"`:
+
+```rust
+let stereo = pipeline.create_node("dai::node::StereoDepth")?;
+left_camera.as_node().link(None, None, &stereo, None, Some("left"))?;
+right_camera.as_node().link(None, None, &stereo, None, Some("right"))?;
+```
 
 ## Environment variables (advanced)
 
@@ -265,7 +233,7 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 This usually means another process already owns the device connection.
 
 - Close other DepthAI apps (including Python scripts) and try again.
-- Prefer `Pipeline::new().with_device(&device).build()?` so you don’t accidentally open two connections.
+- Prefer `Pipeline::with_device(&device)` so you don’t accidentally open two connections.
 
 ### Clang/libclang errors while building bindings
 

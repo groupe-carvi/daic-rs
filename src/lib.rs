@@ -402,6 +402,7 @@ pub mod common;
 pub mod device;
 pub mod error;
 pub mod host_node;
+pub mod encoded_frame;
 pub mod image_align;
 pub mod image_manip;
 pub mod threaded_host_node;
@@ -412,6 +413,7 @@ pub mod pipeline;
 pub mod pointcloud;
 pub mod rgbd;
 pub mod stereo_depth;
+pub mod video_encoder;
 
 pub use error::{DepthaiError, Result};
 pub use pipeline::{CreateInPipeline, CreateInPipelineWith, DeviceNode, DeviceNodeWithParams};
@@ -431,8 +433,10 @@ pub use image_manip::{
     PerformanceMode as ImageManipPerformanceMode,
 };
 pub use image_align::ImageAlignNode;
+pub use encoded_frame::{EncodedFrame, EncodedFrameProfile, EncodedFrameQueue, EncodedFrameType};
 pub use rgbd::{DepthUnit, RgbdData, RgbdNode};
 pub use stereo_depth::{PresetMode as StereoPresetMode, StereoDepthNode};
+pub use video_encoder::{VideoEncoderNode, VideoEncoderProfile, VideoEncoderRateControlMode};
 pub use host_node::{HostNode, HostNodeImpl, MessageGroup, Buffer};
 pub use threaded_host_node::{ThreadedHostNode, ThreadedHostNodeImpl, ThreadedHostNodeContext};
 #[cfg(feature = "rerun")]
