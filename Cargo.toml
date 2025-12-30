@@ -24,8 +24,10 @@ v3-1-0 = ["depthai-sys/v3-1-0"]
 image = "0.25.9"
 memmap2 = "0.9.9"
 ndarray = "0.17.1"
-depthai-sys = { path = "depthai-sys" }
-depthai-macros = { path = "depthai-macros" }
+# Include both `path` and `version` so local workspace builds use the path,
+# while published crates will use the version on crates.io.
+depthai-sys = { version = "0.1.0", path = "depthai-sys" }
+depthai-macros = { version = "0.1.0", path = "depthai-macros" }
 imageproc = "0.25.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
@@ -71,7 +73,11 @@ required-features = ["rerun"]
 [[example]]
 name = "video_encoder_rerun"
 path = "examples/video_encoder_rerun.rs"
-features = ["rerun"]
+required-features = ["rerun"]
+
+[[example]]
+name = "video_encoder_rerun_h265"
+path = "examples/video_encoder_rerun_h265.rs"
 required-features = ["rerun"]
 
 [workspace]

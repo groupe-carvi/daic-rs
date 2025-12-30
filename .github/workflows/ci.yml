@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang libclang-dev \
+            cmake ninja-build pkg-config \
+            python3 \
+            autoconf automake autoconf-archive libtool \
+            libudev-dev libssl-dev \
+            nasm \
+            libdw-dev libelf-dev
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          # depthai-sys builds a large native dependency tree; caching helps a lot.
+          cache-on-failure: true
+
+      - name: Build (workspace)
+        run: cargo build --workspace --all-targets --locked
+
+      - name: Test (workspace)
+        run: cargo test --workspace --all-targets --locked
