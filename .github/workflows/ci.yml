@@ -46,3 +46,42 @@ jobs:
 
       - name: Test (workspace)
         run: cargo test --workspace --all-targets --locked
+
+  doc:
+    name: Documentation (docs.rs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            clang libclang-dev
+
+      - name: Set up Rust (nightly)
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Install cargo-docs-rs
+        uses: dtolnay/install@cargo-docs-rs
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      # Run cargo rustdoc with the same options that would be used by docs.rs,
+      # taking into account package.metadata.docs.rs configured in Cargo.toml.
+      - name: Document depthai-sys (docs.rs)
+        env:
+          # Keep this strict, but allow the known autocxx-generated lint noise.
+          RUSTDOCFLAGS: -D warnings -A unsafe-op-in-unsafe-fn
+        run: cargo docs-rs -p depthai-sys
+
+      - name: Document depthai (docs.rs)
+        env:
+          RUSTDOCFLAGS: -D warnings -A unsafe-op-in-unsafe-fn
+        run: cargo docs-rs -p depthai
