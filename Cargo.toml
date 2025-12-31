@@ -90,7 +90,7 @@ members = [
 
 [workspace.package]
 edition = "2024"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Groupe CARVI Inc."]
 license = "MIT"
 
