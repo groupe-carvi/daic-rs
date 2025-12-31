@@ -350,7 +350,8 @@
 //! Transform and process images on-device:
 //!
 //! ```no_run
-//! # use depthai::{Pipeline, Result, ImageManipNode, ImageManipConfig};
+//! # use depthai::{Pipeline, Result, ImageManipNode};
+//! # use depthai::common::ImageFrameType;
 //! # fn main() -> Result<()> {
 //! # let pipeline = Pipeline::new().build()?;
 //! # let camera_out = pipeline.create_node("dai::node::Camera")?.output("raw")?;
@@ -359,13 +360,11 @@
 //! // Configure manipulation via initial config
 //! let mut config = manip.initial_config()?;
 //! config.add_crop_xywh(100, 100, 640, 480)
-//!       .add_rotate_deg(90.0);
-//! 
-//! // Send config to the input config port
-//! manip.input_config()?.send(config.into_buffer())?;
+//!       .add_rotate_deg(90.0)
+//!       .set_frame_type(ImageFrameType::RGB888i);
 //!
 //! // Link camera to manipulator
-//! camera_out.link(manip.as_node())?;
+//! camera_out.link(&manip.inputImage()?)?;
 //! # Ok(())
 //! # }
 //! ```
