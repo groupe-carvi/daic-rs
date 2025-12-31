@@ -12,3 +12,26 @@ Most users should depend on the high-level crate instead:
 
 - Repository: https://github.com/groupe-carvi/depthai-rs
 - Crate documentation (docs.rs): https://docs.rs/depthai-sys
+
+## Documentation builds on docs.rs (`no-native`)
+
+`depthai-sys` normally builds or downloads **DepthAI-Core** (and its dependencies) and links the native libraries.
+That can be too slow for docs.rs, which is time-limited and often network-restricted.
+
+To keep docs.rs builds reliable, this crate provides a feature flag:
+
+- `no-native`: **bindings-only** mode.
+
+When `no-native` is enabled (or when `DOCS_RS=1` is set by docs.rs):
+
+- ✅ `autocxx` still runs, and the crate still generates the Rust FFI API.
+- ✅ the generated C++ glue from `autocxx` is still compiled.
+- ❌ DepthAI-Core is **not** downloaded/built.
+- ❌ the custom wrapper (`wrapper/wrapper.cpp`) is **not** compiled.
+- ❌ no native link directives are emitted.
+
+This is sufficient for documentation generation, but it is **not a runnable configuration**.
+
+To build docs locally in the same mode as docs.rs:
+
+- `cargo doc -p depthai-sys --no-default-features --features no-native`

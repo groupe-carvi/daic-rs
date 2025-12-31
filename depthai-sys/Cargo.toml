@@ -26,6 +26,7 @@ cxx.workspace = true
 autocxx.workspace = true
 
 [features]
+no-native = []
 force-binding-regeneration = []
 default = ["force-binding-regeneration"]
 
@@ -37,6 +38,13 @@ latest = []
 v3-2-1 = []
 v3-2-0 = []
 v3-1-0 = []
+
+[package.metadata.docs.rs]
+# docs.rs builds have strict time/network constraints. Building DepthAI-Core from source can time out,
+# so we build in `no-native` mode (bindings-only) for documentation.
+no-default-features = true
+features = ["no-native"]
+rustdoc-args = ["--cfg", "docsrs"]
 
 [build-dependencies]
 autocxx-build.workspace = true

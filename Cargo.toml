@@ -47,6 +47,7 @@ include = [
 
 [features]
 default = []
+docs = ["depthai-sys/no-native"]
 hit = [] # Hardware Integration Tests
 rerun = ["dep:rerun", "dep:tokio", "dep:re_web_viewer_server"]
 
@@ -58,6 +59,12 @@ latest = ["depthai-sys/latest"]
 v3-2-1 = ["depthai-sys/v3-2-1"]
 v3-2-0 = ["depthai-sys/v3-2-0"]
 v3-1-0 = ["depthai-sys/v3-1-0"]
+
+[package.metadata.docs.rs]
+# docs.rs builds are time-limited and network-restricted; avoid building DepthAI-Core.
+no-default-features = true
+features = ["docs"]
+rustdoc-args = ["--cfg", "docsrs"]
 
 
 [dependencies]

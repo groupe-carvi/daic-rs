@@ -142,10 +142,17 @@ fn depthai_core_winprebuilt_url(tag: &str) -> String {
     )
 }
 
+fn no_native_build_enabled() -> bool {
+    // docs.rs sets DOCS_RS=1 when building documentation.
+    // We also expose an explicit `no-native` Cargo feature for local builds.
+    env::var_os("DOCS_RS").is_some() || env::var_os("CARGO_FEATURE_NO_NATIVE").is_some()
+}
+
 fn main() {
     println!("cargo:rerun-if-changed=src/lib.rs");
     println!("cargo:rerun-if-changed=wrapper/");
     println!("cargo:rerun-if-changed={}", BUILD_FOLDER_PATH.join("depthai-core").join("include").display());
+    println!("cargo:rerun-if-env-changed=DOCS_RS");
     println!("cargo:rerun-if-env-changed=DEPTHAI_SYS_LINK_SHARED");
     println!("cargo:rerun-if-env-changed=DEPTHAI_OPENCV_SUPPORT");
     println!("cargo:rerun-if-env-changed=DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT");
@@ -153,14 +160,28 @@ fn main() {
     println!("cargo:rerun-if-env-changed=DEPTHAI_RPATH_DISABLE");
     println_build!("Checking for depthai-core...");
 
+    let no_native = no_native_build_enabled();
+    if no_native {
+        println_build!(
+            "no-native mode enabled (DOCS_RS or feature): skipping DepthAI-Core build/download, wrapper.cpp compilation, and native link directives"
+        );
+    }
+
     let selected_tag = selected_depthai_core_tag();
     println_build!("Using DepthAI-Core tag: {}", selected_tag);
 
-    let depthai_core_lib = resolve_depthai_core_lib().expect("Failed to resolve depthai-core path");
-    let windows_static_lib = if cfg!(target_os = "windows") {
-        Some(get_depthai_core_root().join("lib").join("depthai-core.lib"))
+    // In `no-native` mode we intentionally avoid resolving/building/linking the native SDK.
+    let (depthai_core_lib, windows_static_lib) = if no_native {
+        (None, None)
     } else {
-        None
+        let depthai_core_lib =
+            resolve_depthai_core_lib().expect("Failed to resolve depthai-core path");
+        let windows_static_lib = if cfg!(target_os = "windows") {
+            Some(get_depthai_core_root().join("lib").join("depthai-core.lib"))
+        } else {
+            None
+        };
+        (Some(depthai_core_lib), windows_static_lib)
     };
     let out_dir = env::var("OUT_DIR").unwrap();
     let target_dir = Path::new(&out_dir).ancestors().nth(3).unwrap();
@@ -169,16 +190,22 @@ fn main() {
 
     if cfg!(target_os = "windows") {
         ensure_libclang_path_for_windows();
-        download_and_prepare_opencv();
+        if !no_native {
+            download_and_prepare_opencv();
+        }
     }
 
-    // Build using autocxx instead of bindgen
-    let include_paths = build_with_autocxx();
-    let opencv_enabled = env_bool("DEPTHAI_OPENCV_SUPPORT").unwrap_or(false);
-    build_cpp_wrapper(&include_paths, opencv_enabled);
+    // Build using autocxx instead of bindgen.
+    // In `no-native` mode we still generate bindings and compile the autocxx C++ glue,
+    // but we avoid compiling our custom wrapper (it depends on DepthAI headers).
+    let include_paths = build_with_autocxx(no_native);
+    if !no_native {
+        let opencv_enabled = env_bool("DEPTHAI_OPENCV_SUPPORT").unwrap_or(false);
+        build_cpp_wrapper(&include_paths, opencv_enabled);
+    }
 
     if cfg!(target_os = "windows") {
-        if windows_static_lib.clone().is_some_and(|p| p.exists()) {
+        if !no_native && windows_static_lib.clone().is_some_and(|p| p.exists()) {
             let lib_path = windows_static_lib.clone().unwrap();
             let lib_name = lib_path.file_name().unwrap().to_str().unwrap();
             println_build!("Found static library: {}", lib_path.display());
@@ -191,6 +218,11 @@ fn main() {
         // `cargo run` executes examples from target/<profile>/examples, and Windows DLL
         // resolution is directory-based. To prevent STATUS_DLL_NOT_FOUND (0xc0000135),
         // copy all runtime DLLs shipped with depthai-core into target/<profile>, deps and examples.
+        if no_native {
+            // Nothing to stage in no-native mode.
+            return;
+        }
+
         let bin_path = get_depthai_core_root().join("bin");
         if !bin_path.exists() {
             println_build!(
@@ -245,6 +277,12 @@ fn main() {
             // next to the produced executables instead.
         }
     } else {
+        if no_native {
+            // In no-native mode we intentionally do not emit native link args (rpath, libs)
+            // and do not stage runtime .so files.
+            return;
+        }
+
         // Ensure downstream binaries can resolve staged .so files when this crate is used as a
         // dependency. Linux does NOT search the executable directory by default.
         if env::var("DEPTHAI_RPATH_DISABLE").ok().as_deref() != Some("1") {
@@ -252,6 +290,8 @@ fn main() {
             // we copy next to them.
             println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
         }
+
+        let depthai_core_lib = depthai_core_lib.expect("depthai-core path should be available when not in no-native mode");
 
         match depthai_core_lib.extension().and_then(|e| e.to_str()) {
             Some("so") => {
@@ -533,31 +573,35 @@ fn ensure_libclang_path_for_windows() {
     );
 }
 
-fn build_with_autocxx() -> Vec<PathBuf> {
+fn build_with_autocxx(no_native: bool) -> Vec<PathBuf> {
     println_build!("Building with autocxx...");
 
-    let includes = get_depthai_includes();
-
-    // Create autocxx builder with include paths
+    // In `no-native` mode we want docs to build without requiring DepthAI-Core headers.
+    // Only our own wrapper headers are needed.
     let mut include_paths: Vec<PathBuf> = vec![PROJECT_ROOT.join("wrapper")];
-    include_paths.extend(includes.clone());
+    if !no_native {
+        let includes = get_depthai_includes();
+        include_paths.extend(includes.clone());
 
-    // Add additional includes from deps
-    let deps_includes_path = resolve_deps_includes();
-    println_build!(
-        "Walking through depthai-core deps directory: {}",
-        deps_includes_path.display()
-    );
+        // Add additional includes from deps
+        let deps_includes_path = resolve_deps_includes();
+        println_build!(
+            "Walking through depthai-core deps directory: {}",
+            deps_includes_path.display()
+        );
 
-    for entry in WalkDir::new(&deps_includes_path) {
-        if let Ok(entry) = entry {
-            if entry.file_type().is_dir() && entry.path().join("include").exists() {
-                if let Ok(canonical) = entry.path().join("include").canonicalize() {
-                    println_build!("Found include directory: {}", canonical.display());
-                    include_paths.push(canonical);
+        for entry in WalkDir::new(&deps_includes_path) {
+            if let Ok(entry) = entry {
+                if entry.file_type().is_dir() && entry.path().join("include").exists() {
+                    if let Ok(canonical) = entry.path().join("include").canonicalize() {
+                        println_build!("Found include directory: {}", canonical.display());
+                        include_paths.push(canonical);
+                    }
                 }
             }
         }
+    } else {
+        println_build!("no-native: using minimal include path set (wrapper only)");
     }
 
     println_build!("Total include paths: {}", include_paths.len());
@@ -566,14 +610,41 @@ fn build_with_autocxx() -> Vec<PathBuf> {
     let include_refs: Vec<&Path> = include_paths.iter().map(|p| p.as_path()).collect();
 
     // Create builder
+    // NOTE: `extra_clang_args` are used both for parsing (bindgen) and compiling the generated C++.
+    // In `no-native` mode we define a macro that prevents pulling in DepthAI headers.
     let builder = if cfg!(target_arch = "aarch64") {
-        autocxx_build::Builder::new("src/lib.rs", &include_refs).extra_clang_args(&["-std=c++17", "-I/usr/lib/gcc/aarch64-linux-gnu/13/include"])
-    } else {   
-        autocxx_build::Builder::new("src/lib.rs", &include_refs).extra_clang_args(&["-std=c++17"])
+        if no_native {
+            autocxx_build::Builder::new("src/lib.rs", &include_refs)
+                .extra_clang_args(&[
+                    "-std=c++17",
+                    "-I/usr/lib/gcc/aarch64-linux-gnu/13/include",
+                    "-DDEPTHAI_SYS_NO_NATIVE",
+                ])
+        } else {
+            autocxx_build::Builder::new("src/lib.rs", &include_refs)
+                .extra_clang_args(&["-std=c++17", "-I/usr/lib/gcc/aarch64-linux-gnu/13/include"])
+        }
+    } else {
+        if no_native {
+            autocxx_build::Builder::new("src/lib.rs", &include_refs)
+                .extra_clang_args(&["-std=c++17", "-DDEPTHAI_SYS_NO_NATIVE"])
+        } else {
+            autocxx_build::Builder::new("src/lib.rs", &include_refs).extra_clang_args(&["-std=c++17"])
+        }
     };
 
     // Build with extra C++ flags
     let mut build = builder.build().expect("Failed to build autocxx");
+
+    // `extra_clang_args` affects the bindgen/clang parsing step, but the generated C++ glue is
+    // compiled separately via cc-rs. Define the same macro for that compilation too.
+    if no_native {
+        if cfg!(target_os = "windows") {
+            build.flag("/DDEPTHAI_SYS_NO_NATIVE");
+        } else {
+            build.flag("-DDEPTHAI_SYS_NO_NATIVE");
+        }
+    }
 
     // Set C++ standard
     if cfg!(target_os = "windows") {

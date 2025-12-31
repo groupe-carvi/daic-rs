@@ -4,6 +4,7 @@ Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
 
 - High-level crate: `depthai-rs` (Rust API)
 - Low-level crate: `depthai-sys` (builds DepthAI-Core and exposes an FFI surface via `autocxx`)
+ - Proc-macro crate: `depthai-macros`
 
 > [!CAUTION]
 > This project is experimental and in active development. APIs and behavior can change.
@@ -93,6 +94,21 @@ Notes:
 
 - The first build can take a while because DepthAI-Core is fetched/built and dependencies are prepared.
 - Build artifacts for native code live under `depthai-sys/builds/`.
+
+### Building documentation (docs.rs)
+
+docs.rs builds are time-limited and often network-restricted. Building DepthAI-Core from source (or downloading large native artifacts) can time out.
+
+To make documentation builds reliable, this repo provides a `no-native` feature (propagated to `depthai-sys`) that:
+
+- still runs `autocxx` to generate the Rust FFI API (and compiles the autocxx C++ glue),
+- but **does not** download/build/link DepthAI-Core, and **does not** compile the custom C++ wrapper.
+
+This mode is **for docs only** and is not runnable.
+
+To build docs locally like docs.rs:
+
+- `cargo doc --no-default-features --features no-native`
 
 ## Run examples
 

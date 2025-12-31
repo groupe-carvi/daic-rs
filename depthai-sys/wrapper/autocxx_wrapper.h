@@ -12,5 +12,7 @@
 #include "wrapper.h"
 
 #ifdef __cplusplus
+#ifndef DEPTHAI_SYS_NO_NATIVE
 #include "depthai/depthai.hpp"
+#endif
 #endif
