@@ -2,32 +2,34 @@
 
 Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
 
-- High-level crate: `depthai-rs` (Rust API)
+- High-level crate: `depthai` (Rust API; this repo is `depthai-rs`)
 - Low-level crate: `depthai-sys` (builds DepthAI-Core and exposes an FFI surface via `autocxx`)
- - Proc-macro crate: `depthai-macros`
+- Proc-macro crate: `depthai-macros`
 
 > [!CAUTION]
 > This project is experimental and in active development. APIs and behavior can change.
 
 > [!WARNING]
-> DepthAI-Core itself does not provide strong API stability guarantees yet. This repo currently targets **DepthAI-Core `>v3.0.0`**.
+> DepthAI-Core itself does not provide strong API stability guarantees yet.
+> This repo targets **DepthAI-Core v3.1.0+** (supported tags: **v3.1.0 / v3.2.0 / v3.2.1**; default: **`latest` = v3.2.1**).
 
 ## What’s in this repo
 
 ### Crates
 
 - `depthai-sys`
-	- Builds DepthAI-Core and its dependencies (in `depthai-sys/builds/`).
-	- Compiles a small C++ wrapper (`depthai-sys/wrapper/wrapper.cpp`) and generates Rust bindings using `autocxx`.
-- `depthai-rs`
-	- Safe(-er) Rust wrapper types like `Device`, `Pipeline`, typed camera helpers, and a generic node API.
+- Builds DepthAI-Core and its dependencies (cached under `target/dai-build/<tag>/...`).
+- Compiles a small C++ wrapper (`depthai-sys/wrapper/wrapper.cpp`) and generates Rust bindings using `autocxx`.
+- `depthai`
+- Safe(-er) Rust wrapper types like `Device`, `Pipeline`, typed camera helpers, and a generic node API.
 
 ### Repository layout (high-level)
 
-```
+```text
 depthai-sys/            # FFI crate (build script + wrapper)
-	build.rs           # clones/builds DepthAI-Core (Linux) or downloads prebuilt (Windows)
-	wrapper/           # C ABI functions used by Rust
+
+  build.rs           # clones/builds DepthAI-Core (Linux) or downloads prebuilt (Windows)
+  wrapper/           # C ABI functions used by Rust
 src/                 # Rust API (`Device`, `Pipeline`, nodes, camera helpers)
 examples/            # runnable examples
 tests/               # tests (some are ignored unless you enable hardware testing)
@@ -48,13 +50,13 @@ Install build tooling used by `autocxx` + CMake builds:
 
 ```bash
 sudo apt -y install \
-	clang libclang-dev \
-	cmake ninja-build pkg-config \
-	python3 \
-	autoconf automake autoconf-archive libtool \
-	libudev-dev libssl-dev \
-	nasm \
-	libdw-dev libelf-dev
+  clang libclang-dev \
+  cmake ninja-build pkg-config \
+  python3 \
+  autoconf automake autoconf-archive libtool \
+  libudev-dev libssl-dev \
+  nasm \
+  libdw-dev libelf-dev
 ```
 
 Optional (not required for core builds, but useful for local OpenCV tooling):
@@ -93,13 +95,13 @@ cargo build
 Notes:
 
 - The first build can take a while because DepthAI-Core is fetched/built and dependencies are prepared.
-- Build artifacts for native code live under `depthai-sys/builds/`.
+- Build artifacts for native code are cached under `target/dai-build/<tag>/...`.
 
 ### Building documentation (docs.rs)
 
 docs.rs builds are time-limited and often network-restricted. Building DepthAI-Core from source (or downloading large native artifacts) can time out.
 
-To make documentation builds reliable, this repo provides a `no-native` feature (propagated to `depthai-sys`) that:
+To make documentation builds reliable, the top-level crate provides a `docs` feature which enables `depthai-sys/no-native` and:
 
 - still runs `autocxx` to generate the Rust FFI API (and compiles the autocxx C++ glue),
 - but **does not** download/build/link DepthAI-Core, and **does not** compile the custom C++ wrapper.
@@ -108,107 +110,66 @@ This mode is **for docs only** and is not runnable.
 
 To build docs locally like docs.rs:
 
-- `cargo doc --no-default-features --features no-native`
+- `cargo doc -p depthai --no-default-features --features docs`
 
 ## Run examples
 
 ```bash
 cargo run --example pipeline_creation
 cargo run --example camera
-cargo run --example camera_output
+cargo run --example host_node
+
+# Examples requiring the optional `rerun` feature
+cargo run --features rerun --example rgbd_rerun
+cargo run --features rerun --example video_encoder_rerun
+cargo run --features rerun --example rerun_host_node
 ```
 
 ## DepthAI feature support
 
-This section is generated from the native DepthAI-Core C++ examples vendored in this repo under `depthai-sys/builds/depthai-core/examples/cpp`.
+This table reflects what the Rust crates in this repo currently wrap and demonstrate via `examples/` and `tests/`.
 
-- ✅ in the **Supported** column means `depthai-rs` currently wraps enough of that feature/node to build and run *at least one* equivalent pipeline.
-- A blank cell means it’s not yet wrapped/exposed in the Rust API (even if DepthAI-Core supports it).
+- 🟢 Supported: usable Rust wrapper API and at least one example/test that exercises it.
+- 🟡 Partially: some Rust API exists, but it’s incomplete and/or lacks examples/tests.
+- 🔴 Unsupported: not wrapped/exposed in the Rust API yet (even if DepthAI-Core supports it).
 
-### Feature support matrix
-<!-- BEGIN depthai-feature-matrix -->
-| DepthAI Feature | Nodes referenced (approx) | Supported | Rust reference |
-|---|---|:---:|---|
-| `AprilTags` | `AprilTag`, `Camera`, `ImageManip`, `ThreadedHostNode` |  |  |
-| `Benchmark` | `BenchmarkIn`, `BenchmarkOut`, `Camera`, `NeuralNetwork` |  |  |
-| `Camera` |  `Camera`, `ImageManip`, `Script` | ✅ | `examples/camera.rs`, `examples/camera_output.rs` |
-| `DetectionNetwork` | `Camera`, `DetectionNetwork`, `ReplayVideo`, `StereoDepth` |  |  |
-| `DynamicCalibration` | `Camera`, `DynamicCalibration`, `StereoDepth` |  |  |
-| `Events` | `Camera`, `DetectionNetwork` |  |  |
-| `FeatureTracker` | `Camera`, `FeatureTracker`, `ImageManip` |  |  |
-| `HostNodes` | `Camera`, `CustomNode`, `CustomThreadedNode`, `Display`, `HostCamera`, `HostNode`, `ImageManip`, `ReplayVideo` |  |  |
-| `IMU` | `IMU` |  |  |
-| `ImageAlign` | `Camera`, `ImageAlign`, `StereoDepth`, `Sync` | ✅ | `examples/rgbd_rerun.rs` |
-| `ImageManip` | `Camera`, `Display`, `ImageManip` |  |  |
-| `Misc/AutoReconnect` | `Camera` |  |  |
-| `Misc/Projectors` | `Camera` | ✅ | `Device::set_ir_dot_projector_intensity` |
-| `ModelZoo` | — |  |  |
-| `NeuralDepth` | `Camera`, `ImageAlign`, `NeuralDepth`, `RGBD`, `Sync` |  |  |
-| `NeuralNetwork` | `Camera`, `NeuralNetwork` |  |  |
-| `ObjectTracker` | `Camera`, `DetectionNetwork`, `ObjectTracker`, `ReplayVideo`, `SpatialDetectionNetwork`, `StereoDepth` |  |  |
-| `RGBD` | `Camera`, `ImageAlign`, `RGBD`, `StereoDepth`, `ThreadedHostNode` | ✅ | `examples/rgbd_rerun.rs` |
-| `RVC2/EdgeDetector` | `Camera`, `EdgeDetector` |  |  |
-| `RVC2/ImageAlign` | `Camera`, `ImageAlign`, `Sync` |  |  |
-| `RVC2/NNArchive` | `Camera`, `DetectionNetwork`, `NeuralNetwork` |  |  |
-| `RVC2/SystemLogger` | `SystemLogger` |  |  |
-| `RVC2/Thermal` | `Camera`, `DetectionNetwork`, `ImageAlign`, `Sync`, `Thermal` |  |  |
-| `RVC2/ToF` | `Camera`, `ImageAlign`, `Sync`, `ToF` |  |  |
-| `RVC2/VSLAM` | `BasaltVIO`, `Camera`, `FeatureTracker`, `IMU`, `RTABMapSLAM`, `RTABMapVIO`, `StereoDepth` |  |  |
-| `RecordReplay` | `Camera`, `Display`, `IMU`, `RecordMetadataOnly`, `RecordVideo`, `ReplayMetadataOnly`, `ReplayVideo`, `VideoEncoder` |  |  |
-| `Script` | `Camera`, `Script` |  |  |
-| `SpatialDetectionNetwork` | `Camera`, `HostNode`, `SpatialDetectionNetwork`, `StereoDepth` |  |  |
-| `SpatialLocationCalculator` | `Camera`, `SpatialLocationCalculator`, `StereoDepth` |  |  |
-| `StereoDepth` | `Camera`, `StereoDepth` | ✅ | `examples/rgbd_rerun.rs` |
-| `Sync` | `Camera`, `Sync` |  |  |
-| `VideoEncoder` | `Camera`, `CustomNode`, `VideoEncoder` |  |  |
-| `Visualizer` | `Camera`, `DetectionNetwork`, `HostNode`, `VideoEncoder` |  |  |
-| `Warp` | `Camera`, `Warp` |  |  |
-| `utility` | — |  |  |
-<!-- END depthai-feature-matrix -->
-
-### Node support matrix
-<!-- BEGIN depthai-node-matrix -->
-| Native Node | Example area(s) | Supported |
-|---|---|:---:|
-| `AprilTag` | `AprilTags` |  |
-| `BasaltVIO` | `RVC2/VSLAM` |  |
-| `BenchmarkIn` | `Benchmark` |  |
-| `BenchmarkOut` | `Benchmark` |  |
-| `Camera` | `AprilTags`, `Benchmark`, `Camera`, `DetectionNetwork`, `DynamicCalibration`, `Events`, … (+25) | ✅ |
-| `CustomNode` | `HostNodes`, `VideoEncoder` |  |
-| `CustomThreadedNode` | `HostNodes` |  |
-| `DetectionNetwork` | `DetectionNetwork`, `Events`, `ObjectTracker`, `RVC2/NNArchive`, `RVC2/Thermal`, `Visualizer` |  |
-| `Display` | `HostNodes`, `ImageManip`, `RecordReplay` |  |
-| `DynamicCalibration` | `DynamicCalibration` |  |
-| `EdgeDetector` | `RVC2/EdgeDetector` |  |
-| `FeatureTracker` | `FeatureTracker`, `RVC2/VSLAM` |  |
-| `HostCamera` | `HostNodes` |  |
-| `HostNode` | `HostNodes`, `SpatialDetectionNetwork`, `Visualizer` |  |
-| `IMU` | `IMU`, `RVC2/VSLAM`, `RecordReplay` |  |
-| `ImageAlign` | `ImageAlign`, `NeuralDepth`, `RGBD`, `RVC2/ImageAlign`, `RVC2/Thermal`, `RVC2/ToF` | ✅ |
-| `ImageManip` | `AprilTags`, `Camera`, `FeatureTracker`, `HostNodes`, `ImageManip` |  |
-| `NeuralDepth` | `NeuralDepth` |  |
-| `NeuralNetwork` | `Benchmark`, `NeuralNetwork`, `RVC2/NNArchive` |  |
-| `ObjectTracker` | `ObjectTracker` |  |
-| `RGBD` | `NeuralDepth`, `RGBD` | ✅ |
-| `RTABMapSLAM` | `RVC2/VSLAM` |  |
-| `RTABMapVIO` | `RVC2/VSLAM` |  |
-| `RecordMetadataOnly` | `RecordReplay` |  |
-| `RecordVideo` | `RecordReplay` |  |
-| `ReplayMetadataOnly` | `RecordReplay` |  |
-| `ReplayVideo` | `DetectionNetwork`, `HostNodes`, `ObjectTracker`, `RecordReplay` |  |
-| `Script` | `Camera`, `Script` |  |
-| `SpatialDetectionNetwork` | `ObjectTracker`, `SpatialDetectionNetwork` |  |
-| `SpatialLocationCalculator` | `SpatialLocationCalculator` |  |
-| `StereoDepth` | `DetectionNetwork`, `DynamicCalibration`, `ImageAlign`, `ObjectTracker`, `RGBD`, `RVC2/VSLAM`, … (+3) | ✅ |
-| `Sync` | `ImageAlign`, `NeuralDepth`, `RVC2/ImageAlign`, `RVC2/Thermal`, `RVC2/ToF`, `Sync` |  |
-| `SystemLogger` | `RVC2/SystemLogger` |  |
-| `Thermal` | `RVC2/Thermal` |  |
-| `ThreadedHostNode` | `AprilTags`, `RGBD` |  |
-| `ToF` | `RVC2/ToF` |  |
-| `VideoEncoder` | `RecordReplay`, `VideoEncoder`, `Visualizer` |  |
-| `Warp` | `Warp` |  |
-<!-- END depthai-node-matrix -->
+| DepthAI Feature             | State     | Rust evidence                                             |
+| --------------------------- | :-------: | --------------------------------------------------------- |
+| `AprilTags`                 |    🔴     |                                                           |
+| `Benchmark`                 |    🔴     |                                                           |
+| `Camera`                    |    🟢     | `examples/camera.rs`                                      |
+| `DetectionNetwork`          |    🔴     |                                                           |
+| `DynamicCalibration`        |    🔴     |                                                           |
+| `Events`                    |    🔴     |                                                           |
+| `FeatureTracker`            |    🔴     |                                                           |
+| `HostNodes`                 |    🟢     | `examples/host_node.rs`, `examples/threaded_host_node.rs` |
+| `IMU`                       |    🔴     |                                                           |
+| `ImageAlign`                |    🟢     | `examples/rgbd_rerun.rs`, `src/image_align.rs`            |
+| `ImageManip`                |    🟢     | `examples/image_manip.rs`, `src/image_manip.rs`           |
+| `Misc/AutoReconnect`        |    🔴     |                                                           |
+| `Misc/Projectors`           |    🟡     | `Device::set_ir_laser_dot_projector_intensity`            |
+| `ModelZoo`                  |    🔴     |                                                           |
+| `NeuralDepth`               |    🔴     |                                                           |
+| `NeuralNetwork`             |    🔴     |                                                           |
+| `ObjectTracker`             |    🔴     |                                                           |
+| `RGBD`                      |    🟢     | `examples/rgbd_rerun.rs`, `src/rgbd.rs`                   |
+| `RVC2/EdgeDetector`         |    🔴     |                                                           |
+| `RVC2/ImageAlign`           |    🟡     | `src/image_align.rs`                                      |
+| `RVC2/NNArchive`            |    🔴     |                                                           |
+| `RVC2/SystemLogger`         |    🔴     |                                                           |
+| `RVC2/Thermal`              |    🔴     |                                                           |
+| `RVC2/ToF`                  |    🔴     |                                                           |
+| `RVC2/VSLAM`                |    🔴     |                                                           |
+| `RecordReplay`              |    🟡     | `Pipeline::enable_holistic_record_json` (no example yet)  |
+| `Script`                    |    🔴     |                                                           |
+| `SpatialDetectionNetwork`   |    🔴     |                                                           |
+| `SpatialLocationCalculator` |    🔴     |                                                           |
+| `StereoDepth`               |    🟢     | `examples/rgbd_rerun.rs`, `src/stereo_depth.rs`           |
+| `Sync`                      |    🔴     |                                                           |
+| `VideoEncoder`              |    🟢     | `examples/video_encoder.rs`, `src/video_encoder.rs`       |
+| `Visualizer`                |    🔴     |                                                           |
+| `Warp`                      |    🔴     |                                                           |
+| `utility`                   |    🔴     |                                                           |
 
 ## Environment variables (advanced)
 
