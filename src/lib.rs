@@ -1,6 +1,6 @@
 //! # depthai-rs
 //!
-//! Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
+//! Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3.1.0+** (supports v3.1.0, v3.2.0, v3.2.1, and latest).
 //!
 //! ## API Overview
 //!
@@ -259,7 +259,18 @@
 //! # }
 //! ```
 //!
-//! Supported frame types include: `RGB888i`, `GRAY8`, `NV12`, and more.
+//! Supported frame types include: `RGB888i`, `BGR888i`, `GRAY8`, `NV12`, `NV21`, `YUV420p`, `RAW8`, `RAW10`, `RAW12`, and more.
+//!
+//! Available camera board sockets: `CamA`, `CamB`, `CamC`, `CamD`, `CamE`, `CamF`.
+//!
+//! ### Common types and enums
+//!
+//! The `common` module provides frequently used types:
+//!
+//! - **`ImageFrameType`**: Frame pixel formats (RGB888i, GRAY8, NV12, etc.)
+//! - **`ResizeMode`**: How to resize images (Crop, Stretch, Letterbox)
+//! - **`CameraBoardSocket`**: Physical camera ports on the device
+//! - **`CameraSensorType`**: Camera sensor types (Color, Mono, Thermal, ToF)
 //!
 //! ### Stereo depth
 //!
@@ -305,6 +316,94 @@
 //!     for point in pcl.points() {
 //!         // Access point.x, point.y, point.z, point.r, point.g, point.b
 //!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Video encoding
+//!
+//! Encode camera frames to H.264 or H.265:
+//!
+//! ```no_run
+//! # use depthai::{Pipeline, Result, VideoEncoderNode, VideoEncoderProfile, VideoEncoderRateControlMode};
+//! # fn main() -> Result<()> {
+//! # let pipeline = Pipeline::new().build()?;
+//! # let camera_out = pipeline.create_node("dai::node::Camera")?.output("raw")?;
+//! let encoder = pipeline.create::<VideoEncoderNode>()?;
+//! encoder.set_default_profile_preset(30.0, VideoEncoderProfile::H264_HIGH);
+//! encoder.set_rate_control_mode(VideoEncoderRateControlMode::Cbr);
+//! encoder.set_bitrate_kbps(5000);
+//! encoder.set_keyframe_frequency(30);
+//!
+//! // Link camera to encoder
+//! camera_out.link(&encoder.input()?)?;
+//!
+//! // Get encoded output
+//! let q = encoder.bitstream()?.create_queue(30, false)?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Image manipulation
+//!
+//! Transform and process images on-device:
+//!
+//! ```no_run
+//! # use depthai::{Pipeline, Result, ImageManipNode};
+//! # use depthai::common::ImageFrameType;
+//! # fn main() -> Result<()> {
+//! # let pipeline = Pipeline::new().build()?;
+//! # let camera_out = pipeline.create_node("dai::node::Camera")?.output("raw")?;
+//! let manip = pipeline.create::<ImageManipNode>()?;
+//! 
+//! // Configure manipulation via initial config
+//! let mut config = manip.initial_config()?;
+//! config.add_crop_xywh(100, 100, 640, 480)
+//!       .add_rotate_deg(90.0)
+//!       .set_frame_type(ImageFrameType::RGB888i);
+//!
+//! // Link camera to manipulator
+//! camera_out.link(&manip.inputImage()?)?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Error handling
+//!
+//! All fallible operations return `Result<T, DepthaiError>`:
+//!
+//! ```no_run
+//! # use depthai::{Device, Result, DepthaiError};
+//! # fn main() -> Result<()> {
+//! match Device::new() {
+//!     Ok(device) => {
+//!         println!("Device connected");
+//!     }
+//!     Err(e) => {
+//!         eprintln!("Failed to connect: {}", e);
+//!     }
+//! }
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ### Pipeline introspection
+//!
+//! Query pipeline structure and connections:
+//!
+//! ```no_run
+//! # use depthai::{Pipeline, Result};
+//! # fn main() -> Result<()> {
+//! # let pipeline = Pipeline::new().build()?;
+//! // Get all nodes in the pipeline
+//! let nodes = pipeline.all_nodes()?;
+//! println!("Pipeline has {} nodes", nodes.len());
+//!
+//! // Get all connections
+//! let connections = pipeline.connections()?;
+//! for conn in connections {
+//!     println!("Connection: {} -> {}", conn.output_name, conn.input_name);
 //! }
 //! # Ok(())
 //! # }
