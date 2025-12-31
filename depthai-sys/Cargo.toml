@@ -5,6 +5,21 @@ authors.workspace = true
 edition.workspace = true
 license.workspace = true
 links = "depthai-core"
+description = "Low-level FFI crate that builds/links Luxonis DepthAI-Core v3 and exposes Rust bindings."
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/depthai-sys"
+readme = "README.md"
+keywords = ["depthai", "luxonis", "ffi", "bindings"]
+categories = ["api-bindings", "computer-vision"]
+include = [
+	"Cargo.toml",
+	"README.md",
+	"build.rs",
+	"src/**",
+	"wrapper/**",
+	"scripts/**",
+]
 
 [dependencies]
 cxx.workspace = true

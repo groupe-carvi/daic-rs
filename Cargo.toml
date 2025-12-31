@@ -10,6 +10,9 @@ edition = "2024"
 version = "0.1.1"
 authors = ["Groupe CARVI Inc."]
 license = "MIT"
+repository = "https://github.com/groupe-carvi/depthai-rs"
+homepage = "https://github.com/groupe-carvi/depthai-rs"
+rust-version = "1.85"
 
 [workspace.dependencies]
 autocxx = "0.30.0"
@@ -25,6 +28,22 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Experimental Rust bindings and idiomatic wrapper for Luxonis DepthAI-Core v3."
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/depthai"
+readme = "README.md"
+keywords = ["depthai", "luxonis", "computer-vision", "camera", "vision"]
+categories = ["api-bindings", "computer-vision"]
+include = [
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+    "build.rs",
+    "src/**",
+    "examples/**",
+    "tests/**",
+]
 
 [features]
 default = []

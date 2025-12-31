@@ -4,6 +4,18 @@ version.workspace = true
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Procedural macros used by the depthai crate."
+repository.workspace = true
+homepage.workspace = true
+documentation = "https://docs.rs/depthai-macros"
+readme = "README.md"
+keywords = ["depthai", "luxonis", "proc-macro"]
+categories = ["development-tools::procedural-macro-helpers"]
+include = [
+	"Cargo.toml",
+	"README.md",
+	"src/**",
+]
 
 [lib]
 proc-macro = true
