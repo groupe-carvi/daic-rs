@@ -1,3 +1,24 @@
+[workspace]
+resolver = "3"
+members = [
+    "./depthai-sys",
+    "./depthai-macros",
+]
+
+[workspace.package]
+edition = "2024"
+version = "0.1.1"
+authors = ["Groupe CARVI Inc."]
+license = "MIT"
+
+[workspace.dependencies]
+autocxx = "0.30.0"
+cxx = "1.0.192"
+autocxx-build = "0.30.0"
+cxx-build = "1.0.192"
+
+
+
 [package]
 name = "depthai"
 version.workspace = true
@@ -26,8 +47,8 @@ memmap2 = "0.9.9"
 ndarray = "0.17.1"
 # Include both `path` and `version` so local workspace builds use the path,
 # while published crates will use the version on crates.io.
-depthai-sys = { version = "0.1.0", path = "depthai-sys" }
-depthai-macros = { version = "0.1.0", path = "depthai-macros" }
+depthai-sys = { version = "0.1.1", path = "./depthai-sys" }
+depthai-macros = { version = "0.1.1", path = "./depthai-macros" }
 imageproc = "0.25.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
@@ -80,22 +101,3 @@ name = "video_encoder_rerun_h265"
 path = "examples/video_encoder_rerun_h265.rs"
 required-features = ["rerun"]
 
-[workspace]
-resolver = "3"
-members = [
-    ".",
-    "./depthai-sys",
-    "./depthai-macros",
-]
-
-[workspace.package]
-edition = "2024"
-version = "0.1.1"
-authors = ["Groupe CARVI Inc."]
-license = "MIT"
-
-[workspace.dependencies]
-autocxx = "0.30.0"
-cxx = "1.0.192"
-autocxx-build = "0.30.0"
-cxx-build = "1.0.192"
