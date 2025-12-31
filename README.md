@@ -9,7 +9,7 @@ Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
 > This project is experimental and in active development. APIs and behavior can change.
 
 > [!WARNING]
-> DepthAI-Core itself does not provide strong API stability guarantees yet. This repo currently targets **DepthAI-Core `v3.2.1`**.
+> DepthAI-Core itself does not provide strong API stability guarantees yet. This repo currently targets **DepthAI-Core `>v3.0.0`**.
 
 ## What’s in this repo
 
