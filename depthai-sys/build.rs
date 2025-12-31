@@ -1,7 +1,9 @@
 #![allow(warnings)]
 
+#[cfg(feature = "native")]
 use cmake::Config;
 use once_cell::sync::Lazy;
+#[cfg(feature = "native")]
 use pkg_config::Config as PkgConfig;
 use std::{
     env,
@@ -12,7 +14,9 @@ use std::{
     sync::RwLock,
     vec,
 };
+#[cfg(feature = "native")]
 use walkdir::WalkDir;
+#[cfg(feature = "native")]
 use zip_extensions as zip;
 
 static PROJECT_ROOT: Lazy<PathBuf> = Lazy::new(|| {
@@ -171,17 +175,25 @@ fn main() {
     println_build!("Using DepthAI-Core tag: {}", selected_tag);
 
     // In `no-native` mode we intentionally avoid resolving/building/linking the native SDK.
-    let (depthai_core_lib, windows_static_lib) = if no_native {
+    let (depthai_core_lib, windows_static_lib): (Option<PathBuf>, Option<PathBuf>) = if no_native {
         (None, None)
     } else {
-        let depthai_core_lib =
-            resolve_depthai_core_lib().expect("Failed to resolve depthai-core path");
-        let windows_static_lib = if cfg!(target_os = "windows") {
-            Some(get_depthai_core_root().join("lib").join("depthai-core.lib"))
-        } else {
-            None
-        };
-        (Some(depthai_core_lib), windows_static_lib)
+        #[cfg(feature = "native")]
+        {
+            let depthai_core_lib =
+                resolve_depthai_core_lib().expect("Failed to resolve depthai-core path");
+            let windows_static_lib = if cfg!(target_os = "windows") {
+                Some(get_depthai_core_root().join("lib").join("depthai-core.lib"))
+            } else {
+                None
+            };
+            (Some(depthai_core_lib), windows_static_lib)
+        }
+
+        #[cfg(not(feature = "native"))]
+        {
+            panic!("depthai-sys was built without the `native` feature enabled, but a native build was requested. Enable default features or enable the `native` feature.");
+        }
     };
     let out_dir = env::var("OUT_DIR").unwrap();
     let target_dir = Path::new(&out_dir).ancestors().nth(3).unwrap();
@@ -191,7 +203,14 @@ fn main() {
     if cfg!(target_os = "windows") {
         ensure_libclang_path_for_windows();
         if !no_native {
-            download_and_prepare_opencv();
+            #[cfg(feature = "native")]
+            {
+                download_and_prepare_opencv();
+            }
+            #[cfg(not(feature = "native"))]
+            {
+                panic!("depthai-sys was built without the `native` feature enabled, but a native build was requested. Enable default features or enable the `native` feature.");
+            }
         }
     }
 
@@ -360,6 +379,7 @@ fn copy_so_to_run_dirs(src: &Path, target_dir: &Path, deps_dir: &Path, examples_
     }
 }
 
+#[cfg(feature = "native")]
 fn find_dynamic_calibration_so() -> Option<PathBuf> {
     let needle = "libdynamic_calibration.so";
 
@@ -404,6 +424,11 @@ fn find_dynamic_calibration_so() -> Option<PathBuf> {
         }
     }
 
+    None
+}
+
+#[cfg(not(feature = "native"))]
+fn find_dynamic_calibration_so() -> Option<PathBuf> {
     None
 }
 
@@ -576,34 +601,43 @@ fn ensure_libclang_path_for_windows() {
 fn build_with_autocxx(no_native: bool) -> Vec<PathBuf> {
     println_build!("Building with autocxx...");
 
+    let docs_rs = env::var_os("DOCS_RS").is_some();
+
     // In `no-native` mode we want docs to build without requiring DepthAI-Core headers.
     // Only our own wrapper headers are needed.
     let mut include_paths: Vec<PathBuf> = vec![PROJECT_ROOT.join("wrapper")];
     if !no_native {
-        let includes = get_depthai_includes();
-        include_paths.extend(includes.clone());
+        #[cfg(feature = "native")]
+        {
+            let includes = get_depthai_includes();
+            include_paths.extend(includes.clone());
 
-        // Add additional includes from deps
-        let deps_includes_path = resolve_deps_includes();
-        println_build!(
-            "Walking through depthai-core deps directory: {}",
-            deps_includes_path.display()
-        );
+            // Add additional includes from deps
+            let deps_includes_path = resolve_deps_includes();
+            println_build!(
+                "Walking through depthai-core deps directory: {}",
+                deps_includes_path.display()
+            );
 
-        for entry in WalkDir::new(&deps_includes_path) {
-            if let Ok(entry) = entry {
-                if entry.file_type().is_dir() && entry.path().join("include").exists() {
-                    if let Ok(canonical) = entry.path().join("include").canonicalize() {
-                        println_build!("Found include directory: {}", canonical.display());
-                        include_paths.push(canonical);
+            for entry in WalkDir::new(&deps_includes_path) {
+                if let Ok(entry) = entry {
+                    if entry.file_type().is_dir() && entry.path().join("include").exists() {
+                        if let Ok(canonical) = entry.path().join("include").canonicalize() {
+                            println_build!("Found include directory: {}", canonical.display());
+                            include_paths.push(canonical);
+                        }
                     }
                 }
             }
         }
+
+        #[cfg(not(feature = "native"))]
+        {
+            panic!("depthai-sys was built without the `native` feature enabled, but a native build was requested. Enable default features or enable the `native` feature.");
+        }
     } else {
         println_build!("no-native: using minimal include path set (wrapper only)");
     }
-
     println_build!("Total include paths: {}", include_paths.len());
 
     // Convert to references
@@ -653,7 +687,18 @@ fn build_with_autocxx(no_native: bool) -> Vec<PathBuf> {
         build.flag("-std=c++17");
     }
 
-    build.compile("autocxx-depthai-sys");
+    // `autocxx_build::Builder::build()` generates the Rust/C++ sources, and `compile()` builds
+    // the C++ glue for linking.
+    //
+    // For docs.rs builds we want to minimize native compilation time (and avoid requiring a full
+    // C++ toolchain). rustdoc only needs the generated Rust API for type-checking.
+    if no_native && docs_rs {
+        println_build!(
+            "no-native + DOCS_RS: skipping compilation of autocxx C++ glue (docs-only fast path)"
+        );
+    } else {
+        build.compile("autocxx-depthai-sys");
+    }
 
     println_build!("autocxx build completed successfully");
     include_paths
@@ -835,6 +880,7 @@ fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
         .expect("Failed to write stripped .7z file");
 }
 
+#[cfg(feature = "native")]
 fn download_and_prepare_opencv() {
     if !cfg!(target_os = "windows") {
         return;
@@ -1034,6 +1080,7 @@ fn download_and_prepare_opencv() {
     }
 }
 
+#[cfg(feature = "native")]
 fn resolve_deps_includes() -> PathBuf {
     println_build!("Resolving depthai-core deps include paths...");
     let build_deps = BUILD_FOLDER_PATH.join("_deps");
@@ -1064,6 +1111,7 @@ fn resolve_deps_includes() -> PathBuf {
     }
 }
 
+#[cfg(feature = "native")]
 fn resolve_depthai_core_lib() -> Result<PathBuf, &'static str> {
     println_build!("Resolving depthai-core library path...");
     let prefer_static = !env_bool("DEPTHAI_SYS_LINK_SHARED").unwrap_or(false);
@@ -1320,6 +1368,7 @@ fn depthai_core_headers_present() -> bool {
     depthai_core_header_path().exists()
 }
 
+#[cfg(feature = "native")]
 fn probe_depthai_core_lib(out: PathBuf, prefer_static: bool) -> Option<PathBuf> {
     println_build!("Probing for depthai-core library...");
     let out_dir = env::var("OUT_DIR").unwrap();
@@ -1405,6 +1454,7 @@ fn probe_depthai_core_lib(out: PathBuf, prefer_static: bool) -> Option<PathBuf> 
     None
 }
 
+#[cfg(feature = "native")]
 fn cmake_build_depthai_core(path: PathBuf) -> Option<PathBuf> {
     println_build!(
         "Building depthai-core with source in {} and target in {}...",
@@ -1550,6 +1600,7 @@ fn bool_to_cmake(value: bool) -> &'static str {
     if value { "ON" } else { "OFF" }
 }
 
+#[cfg(feature = "native")]
 fn get_depthai_windows_prebuilt_binary() -> Result<PathBuf, String> {
     let mut zip_path = BUILD_FOLDER_PATH.join("depthai-core.zip");
 
@@ -1612,6 +1663,7 @@ fn get_depthai_windows_prebuilt_binary() -> Result<PathBuf, String> {
     Ok(extracted_path)
 }
 
+#[cfg(feature = "native")]
 fn download_file(url: &str, dest_dir: &Path) -> Result<PathBuf, String> {
     if !dest_dir.exists() {
         fs::create_dir_all(dest_dir).map_err(|e| format!("Failed to create directory: {}", e))?;
@@ -1792,6 +1844,7 @@ fn link_all_static_libs_with_prefix(libdir: &Path, prefix: &str) {
     }
 }
 
+#[cfg(feature = "native")]
 fn emit_link_directives(path: &Path) {
     if let Some(parent) = path.parent() {
         println!("cargo:rustc-link-search=native={}", parent.display());

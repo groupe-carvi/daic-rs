@@ -103,8 +103,10 @@ docs.rs builds are time-limited and often network-restricted. Building DepthAI-C
 
 To make documentation builds reliable, the top-level crate provides a `docs` feature which enables `depthai-sys/no-native` and:
 
-- still runs `autocxx` to generate the Rust FFI API (and compiles the autocxx C++ glue),
+- still runs `autocxx` to generate the Rust FFI API,
 - but **does not** download/build/link DepthAI-Core, and **does not** compile the custom C++ wrapper.
+
+On docs.rs specifically, the build also skips compiling the autocxx C++ glue to keep builds fast.
 
 This mode is **for docs only** and is not runnable.
 

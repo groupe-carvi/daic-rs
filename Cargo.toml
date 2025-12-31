@@ -46,7 +46,8 @@ include = [
 ]
 
 [features]
-default = []
+default = ["native"]
+native = ["depthai-sys/native"]
 docs = ["depthai-sys/no-native"]
 hit = [] # Hardware Integration Tests
 rerun = ["dep:rerun", "dep:tokio", "dep:re_web_viewer_server"]
@@ -73,7 +74,7 @@ memmap2 = "0.9.9"
 ndarray = "0.17.1"
 # Include both `path` and `version` so local workspace builds use the path,
 # while published crates will use the version on crates.io.
-depthai-sys = { version = "0.1.1", path = "./depthai-sys" }
+depthai-sys = { version = "0.1.1", path = "./depthai-sys", default-features = false }
 depthai-macros = { version = "0.1.1", path = "./depthai-macros" }
 imageproc = "0.25.0"
 serde = { version = "1.0.228", features = ["derive"] }
