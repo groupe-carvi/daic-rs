@@ -1,6 +1,6 @@
 //! # depthai-rs
 //!
-//! Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
+//! Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3.2.1**.
 //!
 //! ## API Overview
 //!

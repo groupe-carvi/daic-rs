@@ -194,28 +194,6 @@ This section is generated from the native DepthAI-Core C++ examples vendored in 
 | `Warp` | `Warp` |  |
 <!-- END depthai-node-matrix -->
 
-## API overview
-
-### Device ownership
-
-DepthAI device connections are typically exclusive. `depthai-rs` mirrors the common C++ pattern of sharing one device connection:
-
-- `Device::new()` opens/returns a device handle.
-- `Device::clone()` / `Device::try_clone()` creates another handle to the same underlying connection.
-- `Pipeline::with_device(&device)` binds a pipeline to an existing device connection (recommended).
-- `Pipeline::start_default()` starts the pipeline using its internally-held device.
-
-### Generic node linking
-
-The generic node API supports linking by explicit port names *or* by choosing a compatible default when you omit port names.
-For example, `StereoDepth` expects inputs named `"left"` and `"right"`:
-
-```rust
-let stereo = pipeline.create_node("dai::node::StereoDepth")?;
-left_camera.as_node().link(None, None, &stereo, None, Some("left"))?;
-right_camera.as_node().link(None, None, &stereo, None, Some("right"))?;
-```
-
 ## Environment variables (advanced)
 
 `depthai-sys` exposes a few environment variables that affect native builds:
