@@ -1,8 +1,7 @@
-#[cfg(feature = "hit")]
-
 use depthai::{Colormap, ImageManipConfig, ImageManipNode, ImageManipResizeMode, Pipeline, Result};
 use depthai::common::ImageFrameType;
 
+#[cfg(feature = "hit")]
 #[test]
 fn image_manip_api_smoke() -> Result<()> {
     let pipeline = Pipeline::new().build()?;
