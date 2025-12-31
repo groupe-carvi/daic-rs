@@ -205,7 +205,31 @@ fn main() {
         if !no_native {
             #[cfg(feature = "native")]
             {
-                download_and_prepare_opencv();
+                // OpenCV runtime staging is only needed when OpenCV support is enabled.
+                // The DepthAI-Core Windows release artifacts typically ship with the required DLLs;
+                // downloading/extracting OpenCV is an opt-in fallback.
+                let opencv_enabled = env_bool("DEPTHAI_OPENCV_SUPPORT").unwrap_or(false);
+                if opencv_enabled {
+                    if env::var_os("CARGO_FEATURE_OPENCV_DOWNLOAD").is_some() {
+                        #[cfg(feature = "opencv-download")]
+                        {
+                            download_and_prepare_opencv();
+                        }
+
+                        #[cfg(not(feature = "opencv-download"))]
+                        {
+                            // Should be unreachable because Cargo wouldn't set the env var without the feature,
+                            // but keep a clear message just in case.
+                            println_build!(
+                                "DEPTHAI_OPENCV_SUPPORT is enabled but the `opencv-download` feature is not active; skipping OpenCV download"
+                            );
+                        }
+                    } else {
+                        println_build!(
+                            "DEPTHAI_OPENCV_SUPPORT is enabled, but `opencv-download` feature is not enabled; skipping OpenCV download"
+                        );
+                    }
+                }
             }
             #[cfg(not(feature = "native"))]
             {
@@ -880,7 +904,7 @@ fn strip_sfx_header(exe_path: &Path, out_7z_path: &Path) {
         .expect("Failed to write stripped .7z file");
 }
 
-#[cfg(feature = "native")]
+#[cfg(all(feature = "native", feature = "opencv-download"))]
 fn download_and_prepare_opencv() {
     if !cfg!(target_os = "windows") {
         return;

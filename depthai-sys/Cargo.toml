@@ -32,10 +32,10 @@ native = [
 	"dep:walkdir",
 	"dep:zip-extensions",
 	"dep:reqwest",
-	"dep:sevenz-rust2",
 	"dep:pkg-config",
 	"dep:zip",
 ]
+opencv-download = ["dep:sevenz-rust2"]
 no-native = []
 force-binding-regeneration = []
 default = ["native"]
@@ -65,7 +65,7 @@ num_cpus = { version = "1.17.0", optional = true }
 walkdir = { version = "2.5.0", optional = true }
 once_cell = "1.21.3"
 zip-extensions = { version = "0.13.0", optional = true }
-reqwest = { version = "0.13.1", features = ["blocking", "json"], optional = true }
+reqwest = { version = "0.13.1", default-features = false, features = ["blocking", "json", "native-tls", "http2"], optional = true }
 sevenz-rust2 = { version = "0.20.0", optional = true }
 pkg-config = { version = "0.3.32", optional = true }
-zip = { version = "7.0.0", optional = true }
+zip = { version = "7.0.0", default-features = false, features = ["deflate"], optional = true }
