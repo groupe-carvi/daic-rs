@@ -268,7 +268,7 @@
 //! The `common` module provides frequently used types:
 //!
 //! - **`ImageFrameType`**: Frame pixel formats (RGB888i, GRAY8, NV12, etc.)
-//! - **`ResizeMode`**: How to resize images (Crop, Stretch, KeepAspectRatio)
+//! - **`ResizeMode`**: How to resize images (Crop, Stretch, Letterbox)
 //! - **`CameraBoardSocket`**: Physical camera ports on the device
 //! - **`CameraSensorType`**: Camera sensor types (Color, Mono, Thermal, ToF)
 //!
@@ -356,14 +356,16 @@
 //! # let camera_out = pipeline.create_node("dai::node::Camera")?.output("raw")?;
 //! let manip = pipeline.create::<ImageManipNode>()?;
 //! 
-//! // Configure manipulation
-//! let mut config = ImageManipConfig::new()?;
+//! // Configure manipulation via initial config
+//! let mut config = manip.initial_config()?;
 //! config.add_crop_xywh(100, 100, 640, 480)
 //!       .add_rotate_deg(90.0);
-//! manip.set_config(config)?;
+//! 
+//! // Send config to the input config port
+//! manip.input_config()?.send(config.into_buffer())?;
 //!
 //! // Link camera to manipulator
-//! camera_out.link(&manip.input_image()?)?;
+//! camera_out.link(manip.as_node())?;
 //! # Ok(())
 //! # }
 //! ```
@@ -402,7 +404,7 @@
 //! // Get all connections
 //! let connections = pipeline.connections()?;
 //! for conn in connections {
-//!     println!("Connection: {} -> {}", conn.source_name, conn.sink_name);
+//!     println!("Connection: {} -> {}", conn.output_name, conn.input_name);
 //! }
 //! # Ok(())
 //! # }
