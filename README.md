@@ -1,10 +1,6 @@
 # depthai-rs
 
-Experimental Rust bindings + safe-ish wrapper for Luxonis **DepthAI-Core v3**.
-
-- High-level crate: `depthai` (Rust API; this repo is `depthai-rs`)
-- Low-level crate: `depthai-sys` (builds DepthAI-Core and exposes an FFI surface via `autocxx`)
-- Proc-macro crate: `depthai-macros`
+depthai-rs is an unofficial binding in rust for the Luxonis's DepthAI-Core C++ library. Our goals at Carvi was to initially just do an experiment and see if it would be possible to create a safe bindings easily and quickly for our project by using agentic AI for lot of ffi boilerplates and resolution.
 
 > [!CAUTION]
 > This project is experimental and in active development. APIs and behavior can change.
