@@ -205,10 +205,10 @@ fn main() {
         if !no_native {
             #[cfg(feature = "native")]
             {
-                // OpenCV runtime staging is only needed when OpenCV support is enabled.
+                // OpenCV runtime staging is only needed when OpenCV support is enabled. (Should be enable by default since it can create some issues on windows)
                 // The DepthAI-Core Windows release artifacts typically ship with the required DLLs;
                 // downloading/extracting OpenCV is an opt-in fallback.
-                let opencv_enabled = env_bool("DEPTHAI_OPENCV_SUPPORT").unwrap_or(false);
+                let opencv_enabled = env_bool("DEPTHAI_OPENCV_SUPPORT").unwrap_or(true);
                 if opencv_enabled {
                     if env::var_os("CARGO_FEATURE_OPENCV_DOWNLOAD").is_some() {
                         #[cfg(feature = "opencv-download")]
