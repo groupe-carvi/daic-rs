@@ -1,9 +1,5 @@
-use depthai::Pipeline;
-use depthai::camera::{CameraNode, CameraBoardSocket};
-use depthai::stereo_depth::StereoDepthNode;
-
 #[test]
-fn test_new_api_concept() -> depthai::Result<()> {
+fn test_new_api_concept() {
     // TODO: Create mock so we can test node creation and linking without hardware.
     /*
     let pipeline = Pipeline::new().build()?;
@@ -13,6 +9,4 @@ fn test_new_api_concept() -> depthai::Result<()> {
     
     cam.video()?.link(&stereo.left()?)?;
     */
-
-    Ok(())
 }

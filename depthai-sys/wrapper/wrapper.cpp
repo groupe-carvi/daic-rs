@@ -56,7 +56,7 @@ template <typename T>
 inline constexpr bool _dai_is_std_optional_v = _dai_is_std_optional<std::decay_t<T>>::value;
 
 template <typename T, typename Out>
-static bool _dai_optionalish_to_out(const std::optional<T>& value, Out* out) {
+static bool _dai_optional_to_out(const std::optional<T>& value, Out* out) {
     if(!out) return false;
     if(value.has_value()) {
         *out = static_cast<Out>(value.value());
@@ -68,8 +68,12 @@ static bool _dai_optionalish_to_out(const std::optional<T>& value, Out* out) {
 template <typename T, typename Out>
 static bool _dai_optionalish_to_out(const T& value, Out* out) {
     if(!out) return false;
-    *out = static_cast<Out>(value);
-    return true;
+    if constexpr(_dai_is_std_optional_v<T>) {
+        return _dai_optional_to_out(value, out);
+    } else {
+        *out = static_cast<Out>(value);
+        return true;
+    }
 }
 
 struct HostNodeCallbacks {
@@ -2779,6 +2783,51 @@ DaiImgFrame dai_input_try_get_img_frame(DaiInput input) {
     }
 }
 
+DaiInputQueue dai_input_create_input_queue(DaiInput input, unsigned int max_size, bool blocking) {
+    if(!input) {
+        last_error = "dai_input_create_input_queue: null input";
+        return nullptr;
+    }
+    try {
+        auto in = static_cast<dai::Node::Input*>(input);
+        auto q = in->createInputQueue(max_size, blocking);
+        if(!q) return nullptr;
+        return static_cast<DaiInputQueue>(new std::shared_ptr<dai::InputQueue>(std::move(q)));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_input_create_input_queue failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+void dai_input_queue_delete(DaiInputQueue queue) {
+    if(queue) {
+        auto ptr = static_cast<std::shared_ptr<dai::InputQueue>*>(queue);
+        delete ptr;
+    }
+}
+
+void dai_input_queue_send(DaiInputQueue queue, DaiDatatype msg) {
+    if(!queue || !msg) {
+        last_error = "dai_input_queue_send: null queue/msg";
+        return;
+    }
+    try {
+        auto q = static_cast<std::shared_ptr<dai::InputQueue>*>(queue);
+        auto m = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        if(!q->get() || !(*q)) {
+            last_error = "dai_input_queue_send: invalid queue";
+            return;
+        }
+        if(!m->get() || !(*m)) {
+            last_error = "dai_input_queue_send: invalid msg";
+            return;
+        }
+        (*q)->send(*m);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_input_queue_send failed: ") + e.what();
+    }
+}
+
 void dai_output_send_buffer(DaiOutput output, DaiBuffer buffer) {
     if(!output || !buffer) {
         last_error = "dai_output_send_buffer: null output/buffer";
@@ -3597,6 +3646,418 @@ void dai_queue_delete(DaiDataQueue queue) {
     }
 }
 
+char* dai_queue_get_name(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_get_name: null queue";
+        return nullptr;
+    }
+    try {
+        dai_clear_last_error();
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_get_name: invalid queue";
+            return nullptr;
+        }
+        auto name = (*ptr)->getName();
+        return dai_string_to_cstring(name.c_str());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get_name failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+bool dai_queue_set_name(DaiDataQueue queue, const char* name) {
+    if(!queue || !name) {
+        last_error = "dai_queue_set_name: null queue/name";
+        return false;
+    }
+    try {
+        dai_clear_last_error();
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_set_name: invalid queue";
+            return false;
+        }
+        (*ptr)->setName(std::string(name));
+        return true;
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_set_name failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_queue_is_closed(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_is_closed: null queue";
+        return true;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_is_closed: invalid queue";
+            return true;
+        }
+        return (*ptr)->isClosed();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_is_closed failed: ") + e.what();
+        return true;
+    }
+}
+
+void dai_queue_close(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_close: null queue";
+        return;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_close: invalid queue";
+            return;
+        }
+        (*ptr)->close();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_close failed: ") + e.what();
+    }
+}
+
+void dai_queue_set_blocking(DaiDataQueue queue, bool blocking) {
+    if(!queue) {
+        last_error = "dai_queue_set_blocking: null queue";
+        return;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_set_blocking: invalid queue";
+            return;
+        }
+        (*ptr)->setBlocking(blocking);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_set_blocking failed: ") + e.what();
+    }
+}
+
+bool dai_queue_get_blocking(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_get_blocking: null queue";
+        return false;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_get_blocking: invalid queue";
+            return false;
+        }
+        return (*ptr)->getBlocking();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get_blocking failed: ") + e.what();
+        return false;
+    }
+}
+
+void dai_queue_set_max_size(DaiDataQueue queue, unsigned int max_size) {
+    if(!queue) {
+        last_error = "dai_queue_set_max_size: null queue";
+        return;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_set_max_size: invalid queue";
+            return;
+        }
+        (*ptr)->setMaxSize(max_size);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_set_max_size failed: ") + e.what();
+    }
+}
+
+unsigned int dai_queue_get_max_size(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_get_max_size: null queue";
+        return 0;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_get_max_size: invalid queue";
+            return 0;
+        }
+        return (*ptr)->getMaxSize();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get_max_size failed: ") + e.what();
+        return 0;
+    }
+}
+
+unsigned int dai_queue_get_size(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_get_size: null queue";
+        return 0;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_get_size: invalid queue";
+            return 0;
+        }
+        return (*ptr)->getSize();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get_size failed: ") + e.what();
+        return 0;
+    }
+}
+
+unsigned int dai_queue_is_full(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_is_full: null queue";
+        return 0;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_is_full: invalid queue";
+            return 0;
+        }
+        return (*ptr)->isFull();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_is_full failed: ") + e.what();
+        return 0;
+    }
+}
+
+bool dai_queue_has(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_has: null queue";
+        return false;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        if(!ptr->get() || !(*ptr)) {
+            last_error = "dai_queue_has: invalid queue";
+            return false;
+        }
+        return (*ptr)->has();
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_has failed: ") + e.what();
+        return false;
+    }
+}
+
+struct _DaiDatatypeArray {
+    std::vector<DaiDatatype> elems;
+};
+
+static inline DaiDatatypeArray _dai_make_datatype_array(const std::vector<std::shared_ptr<dai::ADatatype>>& msgs) {
+    auto out = new _DaiDatatypeArray();
+    out->elems.reserve(msgs.size());
+    for(const auto& m : msgs) {
+        out->elems.push_back(static_cast<DaiDatatype>(new std::shared_ptr<dai::ADatatype>(m)));
+    }
+    return static_cast<DaiDatatypeArray>(out);
+}
+
+DaiDatatype dai_queue_get(DaiDataQueue queue, int timeout_ms) {
+    if(!queue) {
+        last_error = "dai_queue_get: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        std::shared_ptr<dai::ADatatype> msg;
+        if(timeout_ms < 0) {
+            msg = (*ptr)->get();
+        } else {
+            bool timedOut = false;
+            msg = (*ptr)->get(std::chrono::milliseconds(timeout_ms), timedOut);
+            if(timedOut) {
+                return nullptr;
+            }
+        }
+        if(!msg) return nullptr;
+        return static_cast<DaiDatatype>(new std::shared_ptr<dai::ADatatype>(std::move(msg)));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiDatatype dai_queue_try_get(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_try_get: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto msg = (*ptr)->tryGet();
+        if(!msg) return nullptr;
+        return static_cast<DaiDatatype>(new std::shared_ptr<dai::ADatatype>(std::move(msg)));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_try_get failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiDatatype dai_queue_front(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_front: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto msg = (*ptr)->front();
+        if(!msg) return nullptr;
+        return static_cast<DaiDatatype>(new std::shared_ptr<dai::ADatatype>(std::move(msg)));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_front failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiDatatypeArray dai_queue_try_get_all(DaiDataQueue queue) {
+    if(!queue) {
+        last_error = "dai_queue_try_get_all: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto msgs = (*ptr)->tryGetAll();
+        return _dai_make_datatype_array(msgs);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_try_get_all failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiDatatypeArray dai_queue_get_all(DaiDataQueue queue, int timeout_ms, bool* has_timedout) {
+    if(has_timedout) {
+        *has_timedout = false;
+    }
+    if(!queue) {
+        last_error = "dai_queue_get_all: null queue";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        std::vector<std::shared_ptr<dai::ADatatype>> msgs;
+        if(timeout_ms < 0) {
+            msgs = (*ptr)->getAll();
+        } else {
+            bool timedOut = false;
+            msgs = (*ptr)->getAll(std::chrono::milliseconds(timeout_ms), timedOut);
+            if(has_timedout) {
+                *has_timedout = timedOut;
+            }
+        }
+        return _dai_make_datatype_array(msgs);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_get_all failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+struct _DaiQueueCallbackState {
+    void* ctx = nullptr;
+    dai::DaiQueueCallback cb = nullptr;
+    dai::DaiHostNodeCallback drop = nullptr;
+    ~_DaiQueueCallbackState() {
+        if(drop) {
+            drop(ctx);
+        }
+    }
+};
+
+int dai_queue_add_callback(DaiDataQueue queue, void* ctx, uintptr_t cb, uintptr_t drop_cb) {
+    if(!queue) {
+        last_error = "dai_queue_add_callback: null queue";
+        return -1;
+    }
+    if(cb == 0) {
+        last_error = "dai_queue_add_callback: null callback";
+        return -1;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto cb_fn = reinterpret_cast<DaiQueueCallback>(cb);
+        auto drop_fn = drop_cb == 0 ? nullptr : reinterpret_cast<DaiHostNodeCallback>(drop_cb);
+        auto state = std::make_shared<_DaiQueueCallbackState>();
+        state->ctx = ctx;
+        state->cb = cb_fn;
+        state->drop = drop_fn;
+
+        auto id = (*ptr)->addCallback([state](std::string name, std::shared_ptr<dai::ADatatype> msg) {
+            if(!state || !state->cb) return;
+            // Transfer ownership of a new shared_ptr handle to the Rust side.
+            auto handle = new std::shared_ptr<dai::ADatatype>(std::move(msg));
+            state->cb(state->ctx, name.c_str(), static_cast<DaiDatatype>(handle));
+        });
+        return static_cast<int>(id);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_add_callback failed: ") + e.what();
+        return -1;
+    }
+}
+
+bool dai_queue_remove_callback(DaiDataQueue queue, int callback_id) {
+    if(!queue) {
+        last_error = "dai_queue_remove_callback: null queue";
+        return false;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        return (*ptr)->removeCallback(static_cast<dai::MessageQueue::CallbackId>(callback_id));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_remove_callback failed: ") + e.what();
+        return false;
+    }
+}
+
+void dai_queue_send(DaiDataQueue queue, DaiDatatype msg) {
+    if(!queue || !msg) {
+        last_error = "dai_queue_send: null queue/msg";
+        return;
+    }
+    try {
+        auto q = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto m = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        (*q)->send(*m);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_send failed: ") + e.what();
+    }
+}
+
+bool dai_queue_send_timeout(DaiDataQueue queue, DaiDatatype msg, int timeout_ms) {
+    if(!queue || !msg) {
+        last_error = "dai_queue_send_timeout: null queue/msg";
+        return false;
+    }
+    try {
+        auto q = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto m = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        const int t = timeout_ms < 0 ? 0 : timeout_ms;
+        return (*q)->send(*m, std::chrono::milliseconds(t));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_send_timeout failed: ") + e.what();
+        return false;
+    }
+}
+
+bool dai_queue_try_send(DaiDataQueue queue, DaiDatatype msg) {
+    if(!queue || !msg) {
+        last_error = "dai_queue_try_send: null queue/msg";
+        return false;
+    }
+    try {
+        auto q = static_cast<std::shared_ptr<dai::MessageQueue>*>(queue);
+        auto m = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        return (*q)->trySend(*m);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_queue_try_send failed: ") + e.what();
+        return false;
+    }
+}
+
 DaiImgFrame dai_queue_get_frame(DaiDataQueue queue, int timeout_ms) {
     if(!queue) {
         last_error = "dai_queue_get_frame: null queue";
@@ -3685,6 +4146,181 @@ DaiEncodedFrame dai_queue_try_get_encoded_frame(DaiDataQueue queue) {
         last_error = std::string("dai_queue_try_get_encoded_frame failed: ") + e.what();
         return nullptr;
     }
+}
+
+void dai_datatype_release(DaiDatatype msg) {
+    if(msg) {
+        auto ptr = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        delete ptr;
+    }
+}
+
+DaiDatatype dai_datatype_clone(DaiDatatype msg) {
+    if(!msg) {
+        last_error = "dai_datatype_clone: null msg";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        if(!ptr->get() || !(*ptr)) return nullptr;
+        return static_cast<DaiDatatype>(new std::shared_ptr<dai::ADatatype>(*ptr));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_datatype_clone failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+int dai_datatype_get_datatype_enum(DaiDatatype msg) {
+    if(!msg) {
+        last_error = "dai_datatype_get_datatype_enum: null msg";
+        return -1;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        if(!ptr->get() || !(*ptr)) return -1;
+        return static_cast<int>((*ptr)->getDatatype());
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_datatype_get_datatype_enum failed: ") + e.what();
+        return -1;
+    }
+}
+
+DaiImgFrame dai_datatype_as_img_frame(DaiDatatype msg) {
+    if(!msg) {
+        last_error = "dai_datatype_as_img_frame: null msg";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        auto frame = std::dynamic_pointer_cast<dai::ImgFrame>(*ptr);
+        if(!frame) return nullptr;
+        return new std::shared_ptr<dai::ImgFrame>(std::move(frame));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_datatype_as_img_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiEncodedFrame dai_datatype_as_encoded_frame(DaiDatatype msg) {
+    if(!msg) {
+        last_error = "dai_datatype_as_encoded_frame: null msg";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        auto frame = std::dynamic_pointer_cast<dai::EncodedFrame>(*ptr);
+        if(!frame) return nullptr;
+        return new std::shared_ptr<dai::EncodedFrame>(std::move(frame));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_datatype_as_encoded_frame failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiPointCloud dai_datatype_as_pointcloud(DaiDatatype msg) {
+    if(!msg) {
+        last_error = "dai_datatype_as_pointcloud: null msg";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        auto pcl = std::dynamic_pointer_cast<dai::PointCloudData>(*ptr);
+        if(!pcl) return nullptr;
+
+        auto view = new DaiPointCloudView();
+        view->msg = pcl;
+        view->points = pcl->getPointsRGB();
+        return static_cast<DaiPointCloud>(view);
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_datatype_as_pointcloud failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiRGBDData dai_datatype_as_rgbd(DaiDatatype msg) {
+    if(!msg) {
+        last_error = "dai_datatype_as_rgbd: null msg";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        auto rgbd = std::dynamic_pointer_cast<dai::RGBDData>(*ptr);
+        if(!rgbd) return nullptr;
+        return static_cast<DaiRGBDData>(new std::shared_ptr<dai::RGBDData>(std::move(rgbd)));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_datatype_as_rgbd failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiBuffer dai_datatype_as_buffer(DaiDatatype msg) {
+    if(!msg) {
+        last_error = "dai_datatype_as_buffer: null msg";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        auto buf = std::dynamic_pointer_cast<dai::Buffer>(*ptr);
+        if(!buf) return nullptr;
+        return static_cast<DaiBuffer>(new std::shared_ptr<dai::Buffer>(std::move(buf)));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_datatype_as_buffer failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+DaiMessageGroup dai_datatype_as_message_group(DaiDatatype msg) {
+    if(!msg) {
+        last_error = "dai_datatype_as_message_group: null msg";
+        return nullptr;
+    }
+    try {
+        auto ptr = static_cast<std::shared_ptr<dai::ADatatype>*>(msg);
+        auto group = std::dynamic_pointer_cast<dai::MessageGroup>(*ptr);
+        if(!group) return nullptr;
+        return static_cast<DaiMessageGroup>(new std::shared_ptr<dai::MessageGroup>(std::move(group)));
+    } catch(const std::exception& e) {
+        last_error = std::string("dai_datatype_as_message_group failed: ") + e.what();
+        return nullptr;
+    }
+}
+
+size_t dai_datatype_array_len(DaiDatatypeArray arr) {
+    if(!arr) {
+        return 0;
+    }
+    auto ptr = static_cast<_DaiDatatypeArray*>(arr);
+    return ptr->elems.size();
+}
+
+DaiDatatype dai_datatype_array_take(DaiDatatypeArray arr, size_t index) {
+    if(!arr) {
+        last_error = "dai_datatype_array_take: null array";
+        return nullptr;
+    }
+    auto ptr = static_cast<_DaiDatatypeArray*>(arr);
+    if(index >= ptr->elems.size()) {
+        last_error = "dai_datatype_array_take: index out of bounds";
+        return nullptr;
+    }
+    auto out = ptr->elems[index];
+    ptr->elems[index] = nullptr;
+    return out;
+}
+
+void dai_datatype_array_free(DaiDatatypeArray arr) {
+    if(!arr) {
+        return;
+    }
+    auto ptr = static_cast<_DaiDatatypeArray*>(arr);
+    for(auto& h : ptr->elems) {
+        if(h) {
+            // Release any remaining elements (ones not taken by the caller).
+            delete static_cast<std::shared_ptr<dai::ADatatype>*>(h);
+            h = nullptr;
+        }
+    }
+    delete ptr;
 }
 
 // Low-level frame operations

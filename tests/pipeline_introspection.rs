@@ -1,3 +1,5 @@
+#![cfg(not(target_os = "windows"))]
+
 use depthai::pipeline::{Pipeline, PipelineConnectionInfo, SerializationType};
 use depthai::{ThreadedHostNodeContext, ThreadedHostNodeImpl};
 

@@ -47,17 +47,28 @@ typedef void* DaiCameraNode;  // currently: `dai::node::Camera*`
 typedef void* DaiOutput;      // currently: `dai::Node::Output*`
 typedef void* DaiInput;       // currently: `dai::Node::Input*`
 typedef void* DaiDataQueue;   // currently: `std::shared_ptr<dai::MessageQueue>*`
+typedef void* DaiDatatype;    // currently: `std::shared_ptr<dai::ADatatype>*`
 typedef void* DaiImgFrame;    // currently: `std::shared_ptr<dai::ImgFrame>*`
 typedef void* DaiEncodedFrame; // currently: `std::shared_ptr<dai::EncodedFrame>*`
 typedef void* DaiPointCloud;  // currently: wrapper-owned view of `std::shared_ptr<dai::PointCloudData>`
 typedef void* DaiRGBDData;    // currently: `std::shared_ptr<dai::RGBDData>*`
 typedef void* DaiMessageGroup; // currently: `std::shared_ptr<dai::MessageGroup>*`
 typedef void* DaiBuffer;       // currently: `std::shared_ptr<dai::Buffer>*`
+typedef void* DaiInputQueue;   // currently: `std::shared_ptr<dai::InputQueue>*`
+
+// Opaque handle to a heap-allocated array of `DaiDatatype` handles.
+//
+// Use `dai_datatype_array_len` + `dai_datatype_array_take` to extract the elements.
+// Any elements not taken are released when `dai_datatype_array_free` is called.
+typedef void* DaiDatatypeArray;
 
 // Host node callback types
 typedef DaiBuffer (*DaiHostNodeProcessGroup)(void* ctx, DaiMessageGroup group);
 typedef void (*DaiHostNodeCallback)(void* ctx);
 typedef void (*DaiThreadedHostNodeRun)(void* ctx);
+
+// Queue callback types
+typedef void (*DaiQueueCallback)(void* ctx, const char* queue_name, DaiDatatype msg);
 
 // POD view of `dai::Point3fRGBA`
 typedef struct DaiPoint3fRGBA {
@@ -321,6 +332,37 @@ API DaiDataQueue dai_output_create_queue(DaiOutput output, unsigned int max_size
 
 // Low-level queue operations
 API void dai_queue_delete(DaiDataQueue queue);
+
+// Generic queue controls / status
+// Returned strings must be freed with dai_free_cstring.
+API char* dai_queue_get_name(DaiDataQueue queue);
+API bool dai_queue_set_name(DaiDataQueue queue, const char* name);
+API bool dai_queue_is_closed(DaiDataQueue queue);
+API void dai_queue_close(DaiDataQueue queue);
+API void dai_queue_set_blocking(DaiDataQueue queue, bool blocking);
+API bool dai_queue_get_blocking(DaiDataQueue queue);
+API void dai_queue_set_max_size(DaiDataQueue queue, unsigned int max_size);
+API unsigned int dai_queue_get_max_size(DaiDataQueue queue);
+API unsigned int dai_queue_get_size(DaiDataQueue queue);
+API unsigned int dai_queue_is_full(DaiDataQueue queue);
+API bool dai_queue_has(DaiDataQueue queue);
+
+// Generic message retrieval (untyped)
+API DaiDatatype dai_queue_get(DaiDataQueue queue, int timeout_ms);
+API DaiDatatype dai_queue_try_get(DaiDataQueue queue);
+API DaiDatatype dai_queue_front(DaiDataQueue queue);
+API DaiDatatypeArray dai_queue_try_get_all(DaiDataQueue queue);
+API DaiDatatypeArray dai_queue_get_all(DaiDataQueue queue, int timeout_ms, bool* has_timedout);
+
+// Queue callbacks
+API int dai_queue_add_callback(DaiDataQueue queue, void* ctx, uintptr_t cb, uintptr_t drop_cb);
+API bool dai_queue_remove_callback(DaiDataQueue queue, int callback_id);
+
+// Queue send helpers (mirrors depthai::MessageQueue)
+API void dai_queue_send(DaiDataQueue queue, DaiDatatype msg);
+API bool dai_queue_send_timeout(DaiDataQueue queue, DaiDatatype msg, int timeout_ms);
+API bool dai_queue_try_send(DaiDataQueue queue, DaiDatatype msg);
+
 API DaiImgFrame dai_queue_get_frame(DaiDataQueue queue, int timeout_ms);
 API DaiImgFrame dai_queue_try_get_frame(DaiDataQueue queue);
 
@@ -332,6 +374,20 @@ API DaiPointCloud dai_queue_get_pointcloud(DaiDataQueue queue, int timeout_ms);
 API DaiPointCloud dai_queue_try_get_pointcloud(DaiDataQueue queue);
 API DaiRGBDData dai_queue_get_rgbd(DaiDataQueue queue, int timeout_ms);
 API DaiRGBDData dai_queue_try_get_rgbd(DaiDataQueue queue);
+
+// Generic datatype helpers
+API void dai_datatype_release(DaiDatatype msg);
+API DaiDatatype dai_datatype_clone(DaiDatatype msg);
+API int dai_datatype_get_datatype_enum(DaiDatatype msg);
+API DaiImgFrame dai_datatype_as_img_frame(DaiDatatype msg);
+API DaiEncodedFrame dai_datatype_as_encoded_frame(DaiDatatype msg);
+API DaiPointCloud dai_datatype_as_pointcloud(DaiDatatype msg);
+API DaiRGBDData dai_datatype_as_rgbd(DaiDatatype msg);
+API DaiBuffer dai_datatype_as_buffer(DaiDatatype msg);
+API DaiMessageGroup dai_datatype_as_message_group(DaiDatatype msg);
+API size_t dai_datatype_array_len(DaiDatatypeArray arr);
+API DaiDatatype dai_datatype_array_take(DaiDatatypeArray arr, size_t index);
+API void dai_datatype_array_free(DaiDatatypeArray arr);
 
 // PointCloud view accessors
 API int dai_pointcloud_get_width(DaiPointCloud pcl);
@@ -350,6 +406,11 @@ API DaiBuffer dai_input_get_buffer(DaiInput input);
 API DaiBuffer dai_input_try_get_buffer(DaiInput input);
 API DaiImgFrame dai_input_get_img_frame(DaiInput input);
 API DaiImgFrame dai_input_try_get_img_frame(DaiInput input);
+
+// Host -> device input queue (depthai::InputQueue)
+API DaiInputQueue dai_input_create_input_queue(DaiInput input, unsigned int max_size, bool blocking);
+API void dai_input_queue_delete(DaiInputQueue queue);
+API void dai_input_queue_send(DaiInputQueue queue, DaiDatatype msg);
 
 // Output send helpers (host node)
 API void dai_output_send_buffer(DaiOutput output, DaiBuffer buffer);

@@ -9,6 +9,7 @@ use crate::encoded_frame::EncodedFrameQueue;
 use crate::error::{clear_error_flag, last_error, Result};
 use crate::host_node::Buffer;
 use crate::pipeline::{Node, PipelineInner};
+use crate::queue::{InputQueue, MessageQueue};
 
 #[derive(Clone)]
 pub struct Output {
@@ -75,6 +76,19 @@ impl Output {
             Err(last_error("failed to create output queue"))
         } else {
             Ok(OutputQueue::from_handle(handle))
+        }
+    }
+
+    /// Create a generic output queue which yields messages as `Datatype`.
+    ///
+    /// This maps closely to DepthAI-Core's `MessageQueue`/`DataOutputQueue` API.
+    pub fn create_message_queue(&self, max_size: u32, blocking: bool) -> Result<MessageQueue> {
+        clear_error_flag();
+        let handle = unsafe { depthai::dai_output_create_queue(self.handle, c_uint(max_size), blocking) };
+        if handle.is_null() {
+            Err(last_error("failed to create message queue"))
+        } else {
+            Ok(MessageQueue::from_handle(handle))
         }
     }
 
@@ -162,6 +176,19 @@ impl Input {
             }
         } else {
             Ok(Some(ImageFrame::from_handle(handle)))
+        }
+    }
+
+    /// Create a host→device input queue (DepthAI-Core `InputQueue`).
+    ///
+    /// This is the canonical way to send messages into a pipeline input from the host.
+    pub fn create_input_queue(&self, max_size: u32, blocking: bool) -> Result<InputQueue> {
+        clear_error_flag();
+        let handle = unsafe { depthai::dai_input_create_input_queue(self.handle, c_uint(max_size), blocking) };
+        if handle.is_null() {
+            Err(last_error("failed to create input queue"))
+        } else {
+            Ok(InputQueue::from_handle(handle))
         }
     }
 }

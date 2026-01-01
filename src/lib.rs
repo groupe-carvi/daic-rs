@@ -331,7 +331,7 @@
 //! # let pipeline = Pipeline::new().build()?;
 //! # let camera_out = pipeline.create_node("dai::node::Camera")?.output("raw")?;
 //! let encoder = pipeline.create::<VideoEncoderNode>()?;
-//! encoder.set_default_profile_preset(30.0, VideoEncoderProfile::H264_HIGH);
+//! encoder.set_default_profile_preset(30.0, VideoEncoderProfile::H264High);
 //! encoder.set_rate_control_mode(VideoEncoderRateControlMode::Cbr);
 //! encoder.set_bitrate_kbps(5000);
 //! encoder.set_keyframe_frequency(30);
@@ -510,6 +510,7 @@ pub mod rerun_host_node;
 pub mod output;
 pub mod pipeline;
 pub mod pointcloud;
+pub mod queue;
 pub mod rgbd;
 pub mod stereo_depth;
 pub mod video_encoder;
@@ -523,6 +524,7 @@ pub use pipeline::Pipeline;
 
 pub use output::{Output, Input};
 pub use pointcloud::{Point3fRGBA, PointCloudData};
+pub use queue::{Datatype, DatatypeEnum, InputQueue, MessageQueue, QueueCallbackHandle};
 pub use image_manip::{
     Backend as ImageManipBackend,
     Colormap,

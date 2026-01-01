@@ -208,6 +208,36 @@ include_cpp! {
     // Queue/frame helpers
     generate!("dai::dai_output_create_queue")
     generate!("dai::dai_queue_delete")
+
+    // Generic queue controls / status
+    generate!("dai::dai_queue_get_name")
+    generate!("dai::dai_queue_set_name")
+    generate!("dai::dai_queue_is_closed")
+    generate!("dai::dai_queue_close")
+    generate!("dai::dai_queue_set_blocking")
+    generate!("dai::dai_queue_get_blocking")
+    generate!("dai::dai_queue_set_max_size")
+    generate!("dai::dai_queue_get_max_size")
+    generate!("dai::dai_queue_get_size")
+    generate!("dai::dai_queue_is_full")
+    generate!("dai::dai_queue_has")
+
+    // Generic message retrieval (untyped)
+    generate!("dai::dai_queue_get")
+    generate!("dai::dai_queue_try_get")
+    generate!("dai::dai_queue_front")
+    generate!("dai::dai_queue_try_get_all")
+    generate!("dai::dai_queue_get_all")
+
+    // Queue callbacks
+    generate!("dai::dai_queue_add_callback")
+    generate!("dai::dai_queue_remove_callback")
+
+    // Queue send helpers
+    generate!("dai::dai_queue_send")
+    generate!("dai::dai_queue_send_timeout")
+    generate!("dai::dai_queue_try_send")
+
     generate!("dai::dai_queue_get_frame")
     generate!("dai::dai_queue_try_get_frame")
     generate!("dai::dai_queue_get_encoded_frame")
@@ -216,6 +246,20 @@ include_cpp! {
     generate!("dai::dai_queue_try_get_pointcloud")
     generate!("dai::dai_queue_get_rgbd")
     generate!("dai::dai_queue_try_get_rgbd")
+
+    // Generic datatype helpers
+    generate!("dai::dai_datatype_release")
+    generate!("dai::dai_datatype_clone")
+    generate!("dai::dai_datatype_get_datatype_enum")
+    generate!("dai::dai_datatype_as_img_frame")
+    generate!("dai::dai_datatype_as_encoded_frame")
+    generate!("dai::dai_datatype_as_pointcloud")
+    generate!("dai::dai_datatype_as_rgbd")
+    generate!("dai::dai_datatype_as_buffer")
+    generate!("dai::dai_datatype_as_message_group")
+    generate!("dai::dai_datatype_array_len")
+    generate!("dai::dai_datatype_array_take")
+    generate!("dai::dai_datatype_array_free")
     generate!("dai::dai_frame_get_data")
     generate!("dai::dai_frame_get_width")
     generate!("dai::dai_frame_get_height")
@@ -256,6 +300,11 @@ include_cpp! {
     generate!("dai::dai_input_get_img_frame")
     generate!("dai::dai_input_try_get_img_frame")
 
+    // Host -> device input queue (depthai::InputQueue)
+    generate!("dai::dai_input_create_input_queue")
+    generate!("dai::dai_input_queue_delete")
+    generate!("dai::dai_input_queue_send")
+
     // Output send helpers
     generate!("dai::dai_output_send_buffer")
     generate!("dai::dai_output_send_img_frame")
@@ -290,12 +339,14 @@ pub type DaiCameraNode = *mut autocxx::c_void;
 pub type DaiOutput = *mut autocxx::c_void;
 pub type DaiInput = *mut autocxx::c_void;
 pub type DaiDataQueue = *mut autocxx::c_void;
+pub type DaiDatatype = *mut autocxx::c_void;
 pub type DaiImgFrame = *mut autocxx::c_void;
 pub type DaiEncodedFrame = *mut autocxx::c_void;
 pub type DaiPointCloud = *mut autocxx::c_void;
 pub type DaiRGBDData = *mut autocxx::c_void;
 pub type DaiMessageGroup = *mut autocxx::c_void;
 pub type DaiBuffer = *mut autocxx::c_void;
+pub type DaiInputQueue = *mut autocxx::c_void;
 
 pub mod string_utils;
 
