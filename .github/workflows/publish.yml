@@ -100,14 +100,14 @@ jobs:
       - name: Publish depthai-macros
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: cargo publish -p depthai-macros --locked
+        run: cargo publish -p depthai-macros --locked --allow-dirty
 
       - name: Publish depthai-sys
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: cargo publish -p depthai-sys --locked
+        run: cargo publish -p depthai-sys --locked --allow-dirty
 
       - name: Publish depthai
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
-        run: cargo publish -p depthai --locked
+        run: cargo publish -p depthai --locked --allow-dirty
