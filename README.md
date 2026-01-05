@@ -175,6 +175,7 @@ This table reflects what the Rust crates in this repo currently wrap and demonst
 
 - `DEPTHAI_CORE_ROOT`: override the DepthAI-Core checkout directory.
 - `DEPTHAI_SYS_LINK_SHARED=1`: prefer linking against `libdepthai-core.so` (otherwise static is preferred).
+- `DEPTHAI_STAGE_RUNTIME_DEPS=0`: disable automatic staging of runtime DLL/.so dependencies into `target/<profile>/{,deps,examples}`.
 - `DEPTHAI_OPENCV_SUPPORT=1`: enable DepthAI-Core OpenCV support (if available).
 - `DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT=1`: toggle DepthAI-Core dynamic calibration support.
 - `DEPTHAI_ENABLE_EVENTS_MANAGER=1`: toggle DepthAI-Core events manager.

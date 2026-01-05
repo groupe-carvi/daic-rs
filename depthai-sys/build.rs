@@ -158,6 +158,7 @@ fn main() {
     println!("cargo:rerun-if-changed={}", BUILD_FOLDER_PATH.join("depthai-core").join("include").display());
     println!("cargo:rerun-if-env-changed=DOCS_RS");
     println!("cargo:rerun-if-env-changed=DEPTHAI_SYS_LINK_SHARED");
+    println!("cargo:rerun-if-env-changed=DEPTHAI_STAGE_RUNTIME_DEPS");
     println!("cargo:rerun-if-env-changed=DEPTHAI_OPENCV_SUPPORT");
     println!("cargo:rerun-if-env-changed=DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT");
     println!("cargo:rerun-if-env-changed=DEPTHAI_ENABLE_EVENTS_MANAGER");
@@ -199,6 +200,10 @@ fn main() {
     let target_dir = Path::new(&out_dir).ancestors().nth(3).unwrap();
     let deps_dir = target_dir.join("deps");
     let examples_dir = target_dir.join("examples");
+
+    // By default we stage runtime dependencies into the target/<profile> folders so `cargo run`,
+    // tests, and examples work out-of-the-box. This can be disabled for advanced packaging.
+    let stage_runtime_deps = env_bool("DEPTHAI_STAGE_RUNTIME_DEPS").unwrap_or(true);
 
     if cfg!(target_os = "windows") {
         ensure_libclang_path_for_windows();
@@ -263,6 +268,11 @@ fn main() {
         // copy all runtime DLLs shipped with depthai-core into target/<profile>, deps and examples.
         if no_native {
             // Nothing to stage in no-native mode.
+            return;
+        }
+
+        if !stage_runtime_deps {
+            println_build!("DEPTHAI_STAGE_RUNTIME_DEPS=0: skipping runtime DLL staging");
             return;
         }
 
@@ -355,16 +365,6 @@ fn main() {
                         .expect("Failed to copy depthai-core to examples dir");
                 }
 
-                // depthai-core may depend on libdynamic_calibration.so (when enabled in the core build).
-                // If present, stage it next to produced executables so runtime loading works out of the box.
-                if let Some(dcl) = find_dynamic_calibration_so() {
-                    copy_so_to_run_dirs(&dcl, target_dir, &deps_dir, &examples_dir);
-                } else {
-                    println_build!(
-                        "Note: libdynamic_calibration.so not found in build tree; if your depthai-core build requires it, runtime loading may fail"
-                    );
-                }
-
                 println_build!(
                     "Depthai-core library copied to: {} and {} and {}",
                     target_dir.to_string_lossy(),
@@ -380,7 +380,98 @@ fn main() {
             }
         }
 
+        // Even when DepthAI-Core itself is linked statically, some features (notably
+        // Dynamic Calibration) and some vcpkg-provided deps (FFmpeg, libusb) are still
+        // dynamically linked on Linux. Stage those .so files next to executables.
+        if cfg!(target_os = "linux") {
+            if stage_runtime_deps {
+                stage_linux_runtime_deps(target_dir, &deps_dir, &examples_dir);
+            } else {
+                println_build!("DEPTHAI_STAGE_RUNTIME_DEPS=0: skipping runtime .so staging");
+            }
+        }
+
         println_build!("Linux build configuration complete.");
+    }
+}
+
+fn copy_matching_shared_libs_with_prefixes(
+    src_dir: &Path,
+    prefixes: &[&str],
+    target_dir: &Path,
+    deps_dir: &Path,
+    examples_dir: &Path,
+) {
+    let entries = match fs::read_dir(src_dir) {
+        Ok(e) => e,
+        Err(_) => return,
+    };
+
+    for entry in entries.flatten() {
+        let src = entry.path();
+        if !src.is_file() {
+            continue;
+        }
+
+        let file_name = match src.file_name().and_then(|n| n.to_str()) {
+            Some(n) => n,
+            None => continue,
+        };
+
+        // On Linux, the DT_NEEDED entry usually references the SONAME (e.g. libavcodec.so.60),
+        // so we must copy versioned variants too. Matching by prefix handles both `libfoo.so`
+        // and `libfoo.so.<major>`.
+        if !prefixes.iter().any(|p| file_name.starts_with(p)) {
+            continue;
+        }
+
+        for dest_dir in [target_dir, deps_dir, examples_dir] {
+            let dest = dest_dir.join(file_name);
+            if let Err(e) = fs::copy(&src, &dest) {
+                println_build!(
+                    "Warning: failed to copy {} to {}: {}",
+                    file_name,
+                    dest.display(),
+                    e
+                );
+            }
+        }
+    }
+}
+
+fn stage_linux_runtime_deps(target_dir: &Path, deps_dir: &Path, examples_dir: &Path) {
+    // 1) Dynamic calibration plugin (DepthAI-Core loads it dynamically).
+    if let Some(dcl) = find_dynamic_calibration_so() {
+        copy_so_to_run_dirs(&dcl, target_dir, deps_dir, examples_dir);
+    } else {
+        println_build!(
+            "Note: libdynamic_calibration.so not found in build tree; if your depthai-core build requires it, runtime loading may fail"
+        );
+    }
+
+    // 2) vcpkg-provided shared libs (FFmpeg, libusb, ...). We only stage the ones we may
+    // link dynamically in `emit_link_directives`.
+    if let Some(vcpkg_lib) = vcpkg_lib_dir() {
+        let prefixes: &[&str] = &[
+            // FFmpeg runtime
+            "libavcodec.so",
+            "libavformat.so",
+            "libavutil.so",
+            "libavfilter.so",
+            "libavdevice.so",
+            "libswscale.so",
+            "libswresample.so",
+            // USB runtime
+            "libusb-1.0.so",
+        ];
+
+        copy_matching_shared_libs_with_prefixes(
+            &vcpkg_lib,
+            prefixes,
+            target_dir,
+            deps_dir,
+            examples_dir,
+        );
     }
 }
 
@@ -1913,11 +2004,12 @@ fn emit_link_directives(path: &Path) {
                 if cfg!(target_os = "linux") {
                     // NOTE: On some toolchains, passing multiple `-Wl,-rpath,...` only keeps
                     // the last value. Prefer a single RUNPATH containing both directories.
-                    let mut runpath = libdir.display().to_string();
+                    let mut parts: Vec<String> = vec!["$ORIGIN".to_string()];
                     if dcl_dir.join("libdynamic_calibration.so").exists() {
-                        runpath = format!("{}:{}", dcl_dir.display(), runpath);
+                        parts.push(dcl_dir.display().to_string());
                     }
-                    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runpath);
+                    parts.push(libdir.display().to_string());
+                    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", parts.join(":"));
                 }
             }
 
