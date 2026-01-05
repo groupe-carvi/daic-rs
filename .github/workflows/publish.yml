@@ -38,32 +38,61 @@ jobs:
         with:
           cache-on-failure: true
 
-      - name: Validate tag matches Cargo.toml version
+      - name: Sync Cargo.toml version from tag
         env:
           REF_NAME: ${{ github.ref_name }}
         run: |
           python3 - <<'PY'
           import os
           import re
-          import tomllib
 
           ref = os.environ.get('REF_NAME', '')
-          m = re.match(r'^v(?P<ver>\d+\.\d+\.\d+.*)$', ref)
+          m = re.match(r'^v(?P<ver>\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)$', ref)
           if not m:
-            raise SystemExit(f"Tag '{ref}' does not match expected pattern v<semver> (e.g. v0.1.0)")
+            raise SystemExit(
+              f"Tag '{ref}' does not match expected pattern v<semver> (e.g. v0.1.0 or v0.1.0-rc.1)"
+            )
           tag_ver = m.group('ver')
 
-          with open('Cargo.toml', 'rb') as f:
-            root = tomllib.load(f)
-          cargo_ver = root.get('workspace', {}).get('package', {}).get('version')
-          if not cargo_ver:
-            raise SystemExit('Could not read [workspace.package].version from Cargo.toml')
+          cargo_toml_path = 'Cargo.toml'
+          with open(cargo_toml_path, 'r', encoding='utf-8') as f:
+            text = f.read()
 
-          if cargo_ver != tag_ver:
-            raise SystemExit(f"Tag version ({tag_ver}) does not match Cargo.toml workspace version ({cargo_ver})")
+          # Update [workspace.package].version (this drives `version.workspace = true` crates).
+          m_sec = re.search(r'(?ms)^\[workspace\.package\]\s*\n(.*?)(?=^\[|\Z)', text)
+          if not m_sec:
+            raise SystemExit('Could not find [workspace.package] section in Cargo.toml')
+          section = m_sec.group(1)
 
-          print(f"OK: tag {tag_ver} matches Cargo.toml version")
+          new_section, n = re.subn(
+            r'(?m)^version\s*=\s*"[^"]*"\s*$',
+            f'version = "{tag_ver}"',
+            section,
+            count=1,
+          )
+          if n != 1:
+            raise SystemExit('Could not update [workspace.package].version in Cargo.toml')
+          text = text[:m_sec.start(1)] + new_section + text[m_sec.end(1):]
+
+          # Update pinned intra-workspace dependency versions used when publishing.
+          def bump_dep_version(t: str, name: str) -> str:
+            pat = rf'(?m)^(\s*{re.escape(name)}\s*=\s*\{{[^\n\r]*?\bversion\s*=\s*")([^"]+)("[^\n\r]*\}}\s*)$'
+            new_t, nn = re.subn(pat, rf'\g<1>{tag_ver}\g<3>', t, count=1)
+            if nn != 1:
+              raise SystemExit(f"Could not update dependency version for '{name}' in Cargo.toml")
+            return new_t
+
+          text = bump_dep_version(text, 'depthai-sys')
+          text = bump_dep_version(text, 'depthai-macros')
+
+          with open(cargo_toml_path, 'w', encoding='utf-8', newline='\n') as f:
+            f.write(text)
+
+          print(f"Updated Cargo.toml workspace/dependency versions to {tag_ver} from tag {ref}")
           PY
+
+      - name: Regenerate Cargo.lock
+        run: cargo generate-lockfile
 
       # IMPORTANT:
       # - Set the repository secret CRATES_IO_TOKEN to a crates.io API token.
