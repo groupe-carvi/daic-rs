@@ -180,6 +180,25 @@ This table reflects what the Rust crates in this repo currently wrap and demonst
 - `DEPTHAI_DYNAMIC_CALIBRATION_SUPPORT=1`: toggle DepthAI-Core dynamic calibration support.
 - `DEPTHAI_ENABLE_EVENTS_MANAGER=1`: toggle DepthAI-Core events manager.
 
+## Using depthai as a dependency
+
+When using the `depthai` crate as a dependency in your own project on Linux, you need to ensure the runtime shared libraries can be found. The `depthai-sys` crate stages these libraries (like `libdynamic_calibration.so`, FFmpeg libraries, etc.) into your `target/{debug,release}/` directory alongside your binary.
+
+To enable your binary to find these libraries, add a `build.rs` file to your project with the following content:
+
+```rust
+fn main() {
+    if cfg!(target_os = "linux") {
+        // $ORIGIN makes the binary look for .so files in its own directory
+        println!("cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN");
+    }
+}
+```
+
+This sets the RPATH to `$ORIGIN`, which tells the dynamic linker to look for shared libraries in the same directory as your executable.
+
+Alternatively, you can set `LD_LIBRARY_PATH` before running your binary, but using RPATH is more convenient for distribution.
+
 ## Troubleshooting
 
 ### “No available devices (… connected, but in use)”

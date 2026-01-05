@@ -78,6 +78,8 @@ fn main() {
     }
 
     // Note: cargo:rustc-link-arg applies to this package's final link (bins/examples/tests).
-    // Use a single argument with -Wl, to pass through the cc driver.
+    // When depthai is used as a library dependency in downstream crates, those crates need
+    // to set their own rpath (e.g., `cargo:rustc-link-arg=-Wl,-rpath,$ORIGIN` in their
+    // build.rs) to find the staged .so files.
     println!("cargo:rustc-link-arg=-Wl,-rpath,{}", runpaths.join(":"));
 }
