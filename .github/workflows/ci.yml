@@ -16,6 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
 
+    env:
+      VCPKG_DOWNLOADS: ${{ github.workspace }}/.vcpkg-cache/downloads
+      VCPKG_DEFAULT_BINARY_CACHE: ${{ github.workspace }}/.vcpkg-cache/archives
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,6 +39,20 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Prepare vcpkg cache directories
+        run: |
+          mkdir -p "${VCPKG_DOWNLOADS}" "${VCPKG_DEFAULT_BINARY_CACHE}"
+
+      - name: Cache vcpkg downloads and binary archives
+        uses: actions/cache@v4
+        with:
+          path: |
+            .vcpkg-cache/downloads
+            .vcpkg-cache/archives
+          key: vcpkg-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}-${{ hashFiles('depthai-sys/build.rs') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-
+
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
         with:
@@ -42,7 +60,11 @@ jobs:
           cache-on-failure: true
 
       - name: Build (workspace)
-        run: cargo build --workspace --all-targets --locked
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 80
+          max_attempts: 2
+          command: cargo build --workspace --all-targets --locked
 
       - name: Test (workspace)
         run: cargo test --workspace --all-targets --locked
